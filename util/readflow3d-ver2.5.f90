@@ -1,686 +1,651 @@
 !-----------------------------------------------------------
 ! Copyright by LiXinliang
-! Ver 1.2   ½«¸ñĞÄ×ø±ê×ª»»µ½¸ñµãÉÏ
-! Ver 1.3 ¿É¶ÁÈ¡flow3d.dat (tecplot¸ñÊ½ÎÄ¼ş)¼°flow.dat (ÎŞ¸ñÊ½ÎÄ¼ş)
-! Ver 1.4  ¶ÁÈ¡ ver 0.8 ÒÔÉÏ°æ±¾µÄÊı¾İ £¨°üº¬k,w,mu_tµÈ£©
-! Ver 1.5 ¶ÁÈ¡ver0.82ÒÔÉÏµÄÊı¾İ
-! Ver 1.6 ¶ÁÈ¡ver 0.84ÒÔÉÏ°æ±¾µÄÊı¾İ£¨.inpÎÄ¼ş£©
+! Ver 1.2   å°†æ ¼å¿ƒåæ ‡è½¬æ¢åˆ°æ ¼ç‚¹ä¸Š
+! Ver 1.3 å¯è¯»å–flow3d.dat (tecplotæ ¼å¼æ–‡ä»¶)åŠflow.dat (æ— æ ¼å¼æ–‡ä»¶)
+! Ver 1.4  è¯»å– ver 0.8 ä»¥ä¸Šç‰ˆæœ¬çš„æ•°æ® ï¼ˆåŒ…å«k,w,mu_tç­‰ï¼‰
+! Ver 1.5 è¯»å–ver0.82ä»¥ä¸Šçš„æ•°æ®
+! Ver 1.6 è¯»å–ver 0.84ä»¥ä¸Šç‰ˆæœ¬çš„æ•°æ®ï¼ˆ.inpæ–‡ä»¶ï¼‰
 ! Ver 1.7 Plot 3D flow
 ! Ver 1.8 Plot Cp and Cf on the wall
-! Ver 1.8a, vt ÎŞĞè³ËÒÔRe
-! Ver 2.3, ¿É¶ÁÈ¡BC_user
-! Ver 2.4a, ĞŞÕıÁËread wall_dist() ÖĞµÄBug
-! Ver 2.5, ¿ÉÊä³öÍø¸ñµãÉÏµÄÁ÷³¡ 
+! Ver 1.8a, vt æ— éœ€ä¹˜ä»¥Re
+! Ver 2.3, å¯è¯»å–BC_user
+! Ver 2.4a, ä¿®æ­£äº†read wall_dist() ä¸­çš„Bug
+! Ver 2.5, å¯è¾“å‡ºç½‘æ ¼ç‚¹ä¸Šçš„æµåœº
 !------------------------------------------------------------
-  module Const_Variables
+module Const_Variables
   implicit none
-  integer,parameter:: PRE_EC=8
-   integer,parameter::  BC_Wall=2, BC_Symmetry=3, BC_Farfield=4,BC_Inflow=5, BC_Outflow=6 
-   integer,parameter::  BC_Wall_Turbo=201             
-   integer,parameter::  BC_Periodic=501, BC_Extrapolate=401      
-   integer,parameter::  BC_Inner=-1, BC_PeriodicL=-2, BC_PeriodicR=-3   
-   integer,parameter::  BC_Zero=0     
-   integer,parameter::  BC_USER_FixedInlet=901, BC_USER_Inlet_time=902      
-   integer,parameter:: BC_USER_Blow_Suction_Wall=903    
+  integer, parameter:: PRE_EC = 8
+  integer, parameter::  BC_Wall = 2, BC_Symmetry = 3, BC_Farfield = 4, BC_Inflow = 5, BC_Outflow = 6
+  integer, parameter::  BC_Wall_Turbo = 201
+  integer, parameter::  BC_Periodic = 501, BC_Extrapolate = 401
+  integer, parameter::  BC_Inner = -1, BC_PeriodicL = -2, BC_PeriodicR = -3
+  integer, parameter::  BC_Zero = 0
+  integer, parameter::  BC_USER_FixedInlet = 901, BC_USER_Inlet_time = 902
+  integer, parameter:: BC_USER_Blow_Suction_Wall = 903
 end module Const_Variables
 
- 
-  module Global_Variables
+module Global_Variables
   use Const_Variables
   implicit none
- ! global parameter (for all blocks) 
-  real(PRE_EC),save:: Ma,Re,gamma,T_inf,p00
-  integer,save:: Num_Block, Mesh_File_Format, BC_number,BC_type(100)
+  ! global parameter (for all blocks)
+  real(PRE_EC), save:: Ma, Re, gamma, T_inf, p00
+  integer, save:: Num_Block, Mesh_File_Format, BC_number, BC_type(100)
 !-----------------------------------------------------------------------------------------
-! Íø¸ñÁ¬½ÓĞÅÏ¢ 
+! ç½‘æ ¼è¿æ¥ä¿¡æ¯
   TYPE BC_MSG_TYPE
-   integer::   ib,ie,jb,je,kb,ke,bc
+    integer::   ib, ie, jb, je, kb, ke, bc
   END TYPE BC_MSG_TYPE
 
-!  ºËĞÄ±äÁ¿¡ª¡ªÃ¿¿éÍø¸ñ´æ´¢µÄĞÅÏ¢ £¨È«¾Ö±äÁ¿£©
-   TYPE Block_TYPE           !  variables for each block 
-     integer :: Block_no,nx,ny,nz,subface
-     real(PRE_EC),pointer,dimension(:,:,:):: xc,yc,zc  ! coordinates of cell center, Íø¸ñÖĞĞÄ×ø±ê 
-     real(PRE_EC),pointer,dimension(:,:,:):: dc,uc,vc,wc,Tc,pc,mut,vt,kt,wt
-	 real(PRE_EC),pointer,dimension(:,:,:):: d,u,v,w,T,p,mut1,vt1
-	 real(PRE_EC),pointer,dimension(:,:,:):: x,y,z,dw
-     TYPE(BC_MSG_TYPE),pointer,dimension(:):: bc_msg
-   End TYPE Block_TYPE  
-   TYPE (Block_TYPE), save,dimension(:),allocatable,target:: Block
-  
-  end module Global_Variables
+!  æ ¸å¿ƒå˜é‡â€”â€”æ¯å—ç½‘æ ¼å­˜å‚¨çš„ä¿¡æ¯ ï¼ˆå…¨å±€å˜é‡ï¼‰
+  TYPE Block_TYPE           !  variables for each block
+    integer :: Block_no, nx, ny, nz, subface
+    real(PRE_EC), pointer, dimension(:, :, :):: xc, yc, zc  ! coordinates of cell center, ç½‘æ ¼ä¸­å¿ƒåæ ‡
+    real(PRE_EC), pointer, dimension(:, :, :):: dc, uc, vc, wc, Tc, pc, mut, vt, kt, wt
+    real(PRE_EC), pointer, dimension(:, :, :):: d, u, v, w, T, p, mut1, vt1
+    real(PRE_EC), pointer, dimension(:, :, :):: x, y, z, dw
+    TYPE(BC_MSG_TYPE), pointer, dimension(:):: bc_msg
+  End TYPE Block_TYPE
+  TYPE(Block_TYPE), save, dimension(:), allocatable, target:: Block
+
+end module Global_Variables
 !------------------------------------------------------------------
 
-
 !-------------------------------------------
-     program readflow   
-     use Global_Variables
-     implicit none
-     integer:: If3d,m
-	  character(len=50):: filename
-    
-	   call init
-   
-    print*, "Plot boundary plane ;  bounary-xxx.dat  Grid value, boundaryc-xxx.dat  Grid center value"
-    print*, "xxx:  002 BC_Wall,  003BC_Symmetry, 004 BC_Farfield, 005 BC_Inflow, 006 BC_Outflow"
-     
-     do m=1,Bc_number
-           write(filename,"('boundary-'I3.3'.dat')") Bc_type(m)
-           call plot_p(filename,BC_type(m)) 
+program readflow
+  use Global_Variables
+  implicit none
+  integer:: If3d, m
+  character(len=50):: filename
 
-            write(filename,"('boundaryc-'I3.3'.dat')") Bc_type(m)
-            call plot_center(filename,BC_type(m)) 
-    enddo
-    
-    	   
-	   print*, "if you want to plot 2D plane flow ?  1 for yes, 0 for no"
-	   read(*,*) If3d
-       if(If3d .eq. 1) then
-	    call Plot_2D
-       endif
-      
-	 
-	   print*, "if you want to plot 3D flow  (tecplot type) ?  1 for yes, 0 for no"
-	   read(*,*) If3d
-	   if(If3d .eq. 1) then
-	    call Plot_3D
-	   endif
-  	 
-	   print*, "if you want to plot 3D flow (PLOT3D type) ?  1 for yes, 0 for no"
-	   read(*,*) If3d
-	   if(If3d .eq. 1) then
-	    call Plot_3D1
-	   endif
-  
-	 end
+  call init
+
+  print *, "Plot boundary plane ;  bounary-xxx.dat  Grid value, boundaryc-xxx.dat  Grid center value"
+  print *, "xxx:  002 BC_Wall,  003BC_Symmetry, 004 BC_Farfield, 005 BC_Inflow, 006 BC_Outflow"
+
+  do m = 1, Bc_number
+    write (filename, "('boundary-'I3.3'.dat')") Bc_type(m)
+    call plot_p(filename, BC_type(m))
+
+    write (filename, "('boundaryc-'I3.3'.dat')") Bc_type(m)
+    call plot_center(filename, BC_type(m))
+  end do
+
+  print *, "if you want to plot 2D plane flow ?  1 for yes, 0 for no"
+  read (*, *) If3d
+  if (If3d .eq. 1) then
+    call Plot_2D
+  end if
+
+  print *, "if you want to plot 3D flow  (tecplot type) ?  1 for yes, 0 for no"
+  read (*, *) If3d
+  if (If3d .eq. 1) then
+    call Plot_3D
+  end if
+
+  print *, "if you want to plot 3D flow (PLOT3D type) ?  1 for yes, 0 for no"
+  read (*, *) If3d
+  if (If3d .eq. 1) then
+    call Plot_3D1
+  end if
+
+end
 
 !=====================================================================================
-     subroutine plot_3D
-     use Global_Variables
-     implicit none
-     Type (Block_TYPE),pointer:: B
-     TYPE(BC_MSG_TYPE),pointer::Bc
-     integer::  i,j,k,m,n,bCondition
-	 open(100,file="flow3d-tec.dat")
-     write(100,*) "variables=x,y,z,d,u,v,w,T,p,mut,vt,Kt,Wt"
-     do m=1,Num_Block
-     B=>Block(m)
-      write(100,*) "zone i=", B%nx, " j= ", B%ny , " k= ", B%nz  
-      do k=1,B%nz
-      do j=1,B%ny
-      do i=1,B%nx
-	   write(100,"(13E18.9)") B%x(i,j,k),B%y(i,j,k),B%z(i,j,k), &
-	                          B%d(i,j,k),B%u(i,j,k),B%v(i,j,k),  B%w(i,j,k),B%T(i,j,k), &
-							  B%p(i,j,k),B%mut1(i,j,k)*Re,B%vt1(i,j,k),B%Kt(i,j,k),B%Wt(i,j,k)
-      enddo
-      enddo
-      enddo
-     enddo
-     close(100)
-    end
+subroutine plot_3D
+  use Global_Variables
+  implicit none
+  Type(Block_TYPE), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer::Bc
+  integer::  i, j, k, m, n, bCondition
+  open (100, file="flow3d-tec.dat")
+  write (100, *) "variables=x,y,z,d,u,v,w,T,p,mut,vt,Kt,Wt"
+  do m = 1, Num_Block
+    B => Block(m)
+    write (100, *) "zone i=", B%nx, " j= ", B%ny, " k= ", B%nz
+    do k = 1, B%nz
+    do j = 1, B%ny
+    do i = 1, B%nx
+      write (100, "(13E18.9)") B%x(i, j, k), B%y(i, j, k), B%z(i, j, k), &
+        B%d(i, j, k), B%u(i, j, k), B%v(i, j, k), B%w(i, j, k), B%T(i, j, k), &
+        B%p(i, j, k), B%mut1(i, j, k)*Re, B%vt1(i, j, k), B%Kt(i, j, k), B%Wt(i, j, k)
+    end do
+    end do
+    end do
+  end do
+  close (100)
+end
 
-     subroutine plot_3D1
-     use Global_Variables
-     implicit none
-     Type (Block_TYPE),pointer:: B
-     TYPE(BC_MSG_TYPE),pointer::Bc
-     integer::  i,j,k,m,n,bCondition
-	 open(100,file="flow3d-plot3d.dat", form="unformatted")
-     do m=1,Num_Block
-     B=>Block(m)
-	   write(100)   (((B%d(i,j,k), i=1, B%nx), j=1, B%ny), k=1, B%nz),   &
-	                       (((B%u(i,j,k), i=1, B%nx), j=1, B%ny), k=1, B%nz),   &
-	                       (((B%v(i,j,k), i=1, B%nx), j=1, B%ny), k=1, B%nz),   &
-	                       (((B%w(i,j,k), i=1, B%nx), j=1, B%ny), k=1, B%nz),   &
-	                       (((B%T(i,j,k), i=1, B%nx), j=1, B%ny), k=1, B%nz)     
-	 
-	 enddo
-     close(100)
-    end
+subroutine plot_3D1
+  use Global_Variables
+  implicit none
+  Type(Block_TYPE), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer::Bc
+  integer::  i, j, k, m, n, bCondition
+  open (100, file="flow3d-plot3d.dat", form="unformatted")
+  do m = 1, Num_Block
+    B => Block(m)
+    write (100) (((B%d(i, j, k), i=1, B%nx), j=1, B%ny), k=1, B%nz), &
+      (((B%u(i, j, k), i=1, B%nx), j=1, B%ny), k=1, B%nz), &
+      (((B%v(i, j, k), i=1, B%nx), j=1, B%ny), k=1, B%nz), &
+      (((B%w(i, j, k), i=1, B%nx), j=1, B%ny), k=1, B%nz), &
+      (((B%T(i, j, k), i=1, B%nx), j=1, B%ny), k=1, B%nz)
 
+  end do
+  close (100)
+end
 
-     subroutine plot_2D
-     use Global_Variables
-     implicit none
-     Type (Block_TYPE),pointer:: B
-     TYPE(BC_MSG_TYPE),pointer::Bc
-     integer::  i,j,k,m,n,i0,j0,k0,Iflag
+subroutine plot_2D
+  use Global_Variables
+  implicit none
+  Type(Block_TYPE), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer::Bc
+  integer::  i, j, k, m, n, i0, j0, k0, Iflag
 
-	 print*, "If you want to plot 2D section ? (0/1) "
-	 read(*,*)  Iflag
-	 if (Iflag ==0) return
-	 print*, "Please input i0, j0,k0"
-	 read(*,*) i0,j0,k0
+  print *, "If you want to plot 2D section ? (0/1) "
+  read (*, *) Iflag
+  if (Iflag == 0) return
+  print *, "Please input i0, j0,k0"
+  read (*, *) i0, j0, k0
 
-     print*, "... flow2d-i.dat..."
-     i=i0
-	 open(100,file="flow2d-i.dat")
-     write(100,*) "variables=x,y,z,d,u,v,w,T,p,mut,vt,Kt,Wt"
-     do m=1,Num_Block
-     B=>Block(m)
-      write(100,*) "zone j=", B%ny , " k= ", B%nz  
-      do k=1,B%nz
-      do j=1,B%ny
-	   write(100,"(13E18.9)") B%x(i,j,k),B%y(i,j,k),B%z(i,j,k), &
-	                          B%d(i,j,k),B%u(i,j,k),B%v(i,j,k),  B%w(i,j,k),B%T(i,j,k), &
-							  B%p(i,j,k),B%mut1(i,j,k)*Re,B%vt1(i,j,k),B%Kt(i,j,k),B%Wt(i,j,k)
-      enddo
-      enddo
-     enddo
-     close(100)
+  print *, "... flow2d-i.dat..."
+  i = i0
+  open (100, file="flow2d-i.dat")
+  write (100, *) "variables=x,y,z,d,u,v,w,T,p,mut,vt,Kt,Wt"
+  do m = 1, Num_Block
+    B => Block(m)
+    write (100, *) "zone j=", B%ny, " k= ", B%nz
+    do k = 1, B%nz
+    do j = 1, B%ny
+      write (100, "(13E18.9)") B%x(i, j, k), B%y(i, j, k), B%z(i, j, k), &
+        B%d(i, j, k), B%u(i, j, k), B%v(i, j, k), B%w(i, j, k), B%T(i, j, k), &
+        B%p(i, j, k), B%mut1(i, j, k)*Re, B%vt1(i, j, k), B%Kt(i, j, k), B%Wt(i, j, k)
+    end do
+    end do
+  end do
+  close (100)
 
-       print*, "... flow2d-j.dat..."
-      
-     j=j0
-  	 open(100,file="flow2d-j.dat")
-	 write(100,*) "variables=x,y,z,d,u,v,w,T,p,mut,vt,Kt,Wt"
-     do m=1,Num_Block
-     B=>Block(m)
-      write(100,*) "zone i=", B%nx,  " k= ", B%nz  
-      do k=1,B%nz
-      do i=1,B%nx
-	   write(100,"(13E18.9)") B%x(i,j,k),B%y(i,j,k),B%z(i,j,k), &
-	                          B%d(i,j,k),B%u(i,j,k),B%v(i,j,k),  B%w(i,j,k),B%T(i,j,k), &
-							  B%p(i,j,k),B%mut1(i,j,k)*Re,B%vt1(i,j,k),B%Kt(i,j,k),B%Wt(i,j,k)
-      enddo
-      enddo
-     enddo
-     close(100)
+  print *, "... flow2d-j.dat..."
 
-     print*, " ... flow2d-k.dat..."
-	 k=k0
-	 open(100,file="flow2d-k.dat")
-     write(100,*) "variables=x,y,z,d,u,v,w,T,p,mut,vt,Kt,Wt"
-     do m=1,Num_Block
-     B=>Block(m)
-      write(100,*) "zone i=", B%nx, " j= ", B%ny   
-      do j=1,B%ny
-      do i=1,B%nx
-	   write(100,"(13E18.9)") B%x(i,j,k),B%y(i,j,k),B%z(i,j,k), &
-	                          B%d(i,j,k),B%u(i,j,k),B%v(i,j,k),  B%w(i,j,k),B%T(i,j,k), &
-							  B%p(i,j,k),B%mut1(i,j,k)*Re,B%vt1(i,j,k),B%Kt(i,j,k),B%Wt(i,j,k)
-      enddo
-      enddo
-     enddo
-     close(100)
-  
-    end
+  j = j0
+  open (100, file="flow2d-j.dat")
+  write (100, *) "variables=x,y,z,d,u,v,w,T,p,mut,vt,Kt,Wt"
+  do m = 1, Num_Block
+    B => Block(m)
+    write (100, *) "zone i=", B%nx, " k= ", B%nz
+    do k = 1, B%nz
+    do i = 1, B%nx
+      write (100, "(13E18.9)") B%x(i, j, k), B%y(i, j, k), B%z(i, j, k), &
+        B%d(i, j, k), B%u(i, j, k), B%v(i, j, k), B%w(i, j, k), B%T(i, j, k), &
+        B%p(i, j, k), B%mut1(i, j, k)*Re, B%vt1(i, j, k), B%Kt(i, j, k), B%Wt(i, j, k)
+    end do
+    end do
+  end do
+  close (100)
 
+  print *, " ... flow2d-k.dat..."
+  k = k0
+  open (100, file="flow2d-k.dat")
+  write (100, *) "variables=x,y,z,d,u,v,w,T,p,mut,vt,Kt,Wt"
+  do m = 1, Num_Block
+    B => Block(m)
+    write (100, *) "zone i=", B%nx, " j= ", B%ny
+    do j = 1, B%ny
+    do i = 1, B%nx
+      write (100, "(13E18.9)") B%x(i, j, k), B%y(i, j, k), B%z(i, j, k), &
+        B%d(i, j, k), B%u(i, j, k), B%v(i, j, k), B%w(i, j, k), B%T(i, j, k), &
+        B%p(i, j, k), B%mut1(i, j, k)*Re, B%vt1(i, j, k), B%Kt(i, j, k), B%Wt(i, j, k)
+    end do
+    end do
+  end do
+  close (100)
 
+end
 
+subroutine plot_p(filename, bCondition)
+  use Global_Variables
+  implicit none
+  Type(Block_TYPE), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer::Bc
+  integer::  i, j, k, m, n, bCondition
+  character(len=50):: filename
 
-   
-    subroutine plot_p(filename,bCondition)
-     use Global_Variables
-     implicit none
-     Type (Block_TYPE),pointer:: B
-     TYPE(BC_MSG_TYPE),pointer::Bc
-     integer::  i,j,k,m,n,bCondition
-     character(len=50):: filename
+  open (100, file=trim(filename))
+  write (100, *) "variables=x,y,z,d,u,v,w,T,p,mut,vt,Kt,Wt"
+  do m = 1, Num_Block
+    B => Block(m)
+    do n = 1, B%subface
+      Bc => B%bc_msg(n)
+      if (Bc%bc .eq. bCondition) then
+        write (100, *) "zone i=", (Bc%ie-Bc%ib+1), " j= ", (Bc%je-Bc%jb+1), " k= ", Bc%ke-Bc%kb+1
+        do k = Bc%kb, Bc%ke
+        do j = Bc%jb, Bc%je
+        do i = Bc%ib, Bc%ie
+          write (100, "(13E18.9)") B%x(i, j, k), B%y(i, j, k), B%z(i, j, k), &
+            B%d(i, j, k), B%u(i, j, k), B%v(i, j, k), B%w(i, j, k), B%T(i, j, k), &
+            B%p(i, j, k), B%mut1(i, j, k)*Re, B%vt1(i, j, k), B%Kt(i, j, k), B%Wt(i, j, k)
+        end do
+        end do
+        end do
+      end if
 
-	
-	 open(100,file=trim(filename))
-     write(100,*) "variables=x,y,z,d,u,v,w,T,p,mut,vt,Kt,Wt"
-     do m=1,Num_Block
-     B=>Block(m)
-     do n=1,B%subface
-     Bc=>B%bc_msg(n)
-     if(Bc%bc .eq. bCondition) then
-      write(100,*) "zone i=", (Bc%ie-Bc%ib+1), " j= ",(Bc%je-Bc%jb+1) , " k= ", Bc%ke-Bc%kb+1  
-      do k=Bc%kb,Bc%ke
-      do j=Bc%jb,Bc%je
-      do i=Bc%ib,Bc%ie
-	   write(100,"(13E18.9)") B%x(i,j,k),B%y(i,j,k),B%z(i,j,k), &
-	                          B%d(i,j,k),B%u(i,j,k),B%v(i,j,k),  B%w(i,j,k),B%T(i,j,k), &
-							  B%p(i,j,k),B%mut1(i,j,k)*Re,B%vt1(i,j,k),B%Kt(i,j,k),B%Wt(i,j,k)
-      enddo
-      enddo
-      enddo
-     endif
- 
-     enddo
-     enddo
-     close(100)
-    end
+    end do
+  end do
+  close (100)
+end
 
-    
-
- 
-   
 !------------------------------------------------------------------------------------
 
-   subroutine plot_center(filename,bCondition)
-     use Global_Variables
-     implicit none
-     Type (Block_TYPE),pointer:: B
-     TYPE(BC_MSG_TYPE),pointer::Bc
-     integer::  i,j,k,m,n,bCondition,ib,ie,jb,je,kb,ke
-      real(PRE_EC):: Cpw,Cf,Cfx,mu0,Tsb
+subroutine plot_center(filename, bCondition)
+  use Global_Variables
+  implicit none
+  Type(Block_TYPE), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer::Bc
+  integer::  i, j, k, m, n, bCondition, ib, ie, jb, je, kb, ke
+  real(PRE_EC):: Cpw, Cf, Cfx, mu0, Tsb
 
-	 character(len=50):: filename
+  character(len=50):: filename
 
-     open(100,file=trim(filename))
-     write(100,*) "variables=x,y,z,d,u,v,w,T,p,mut,vt,Kt,Wt"
-     if(BCondition==BC_Wall) then
-	 open(101,file="CpCf.dat")
-	 write(101,*) "variables=x,y,z,Cp,Cf,Cfx,Pw"
-	 endif
-  
-     Tsb=110.4d0/T_inf
-	
-	 do m=1,Num_Block
-     B=>Block(m)
-     do n=1,B%subface
-     Bc=>B%bc_msg(n)
-     if(Bc%bc .eq. bCondition) then
-       ib=Bc%ib; ie=Bc%ie-1; jb=Bc%jb; je=Bc%je-1; kb=Bc%kb; ke=Bc%ke-1
-       if(Bc%ib .eq. Bc%ie) then
-	     if(Bc%ib .eq. 1) then
-		  ie=1
-		 else
-		  ib=ib-1
-		 endif
-		endif
+  open (100, file=trim(filename))
+  write (100, *) "variables=x,y,z,d,u,v,w,T,p,mut,vt,Kt,Wt"
+  if (BCondition == BC_Wall) then
+    open (101, file="CpCf.dat")
+    write (101, *) "variables=x,y,z,Cp,Cf,Cfx,Pw"
+  end if
 
-       if(Bc%jb .eq. Bc%je) then
-	     if(Bc%jb .eq. 1) then
-		  je=1
-		 else
-		  jb=jb-1
-		 endif
-		endif
+  Tsb = 110.4d0/T_inf
 
-       if(Bc%kb .eq. Bc%ke) then
-	     if(Bc%kb .eq. 1) then
-		  ke=1
-		 else
-		  kb=kb-1
-		 endif
-		endif
+  do m = 1, Num_Block
+    B => Block(m)
+    do n = 1, B%subface
+      Bc => B%bc_msg(n)
+      if (Bc%bc .eq. bCondition) then
+        ib = Bc%ib; ie = Bc%ie-1; jb = Bc%jb; je = Bc%je-1; kb = Bc%kb; ke = Bc%ke-1
+        if (Bc%ib .eq. Bc%ie) then
+          if (Bc%ib .eq. 1) then
+            ie = 1
+          else
+            ib = ib-1
+          end if
+        end if
 
-			    
-	  write(100,*) "zone i=", (ie-ib+1), " j= ",(je-jb+1) , " k= ", ke-kb+1  
-  	  do k=kb,ke
-      do j=jb,je
-      do i=ib,ie
-       write(100,"(13E18.9)") B%xc(i,j,k),B%yc(i,j,k),B%zc(i,j,k),B%dc(i,j,k),B%uc(i,j,k),B%vc(i,j,k), &
-                     B%wc(i,j,k),B%Tc(i,j,k),B%pc(i,j,k),B%mut(i,j,k),B%vt(i,j,k),B%Kt(i,j,k),B%Wt(i,j,k)
-      enddo
-      enddo
-      enddo
-      
-	  if(bCondition==BC_Wall) then
- 	  write(101,*) "zone i=", (ie-ib+1), " j= ",(je-jb+1) , " k= ", ke-kb+1  
-  	  do k=kb,ke
-      do j=jb,je
-      do i=ib,ie
-       mu0=1.d0/Re*(1.d0+Tsb)*sqrt(B%Tc(i,j,k)**3)/(Tsb+B%Tc(i,j,k))
-       Cpw=(B%pc(i,j,k)-p00)*2.d0
-	   Cf=mu0*(sqrt(B%uc(i,j,k)**2+B%vc(i,j,k)**2+B%wc(i,j,k)**2)/B%dw(i,j,k))*2.d0
-	   Cfx=mu0*(B%uc(i,j,k)/B%dw(i,j,k))*2.d0
-	   write(101,"(13E18.9)") B%xc(i,j,k),B%yc(i,j,k),B%zc(i,j,k),Cpw,Cf,Cfx,B%dc(i,j,k)*B%Tc(i,j,k)
-      enddo
-      enddo
-      enddo
-      endif
+        if (Bc%jb .eq. Bc%je) then
+          if (Bc%jb .eq. 1) then
+            je = 1
+          else
+            jb = jb-1
+          end if
+        end if
 
-     endif
+        if (Bc%kb .eq. Bc%ke) then
+          if (Bc%kb .eq. 1) then
+            ke = 1
+          else
+            kb = kb-1
+          end if
+        end if
 
-     enddo
-     enddo
-     close(100)
-	 close(101)
-    end
- 
+        write (100, *) "zone i=", (ie-ib+1), " j= ", (je-jb+1), " k= ", ke-kb+1
+        do k = kb, ke
+          do j = jb, je
+          do i = ib, ie
+            write (100, "(13E18.9)") B%xc(i, j, k), B%yc(i, j, k), B%zc(i, j, k), B%dc(i, j, k), B%uc(i, j, k), B%vc(i, j, k), &
+              B%wc(i, j, k), B%Tc(i, j, k), B%pc(i, j, k), B%mut(i, j, k), B%vt(i, j, k), B%Kt(i, j, k), B%Wt(i, j, k)
+          end do
+          end do
+        end do
 
+        if (bCondition == BC_Wall) then
+          write (101, *) "zone i=", (ie-ib+1), " j= ", (je-jb+1), " k= ", ke-kb+1
+          do k = kb, ke
+            do j = jb, je
+            do i = ib, ie
+              mu0 = 1.d0/Re*(1.d0+Tsb)*sqrt(B%Tc(i, j, k)**3)/(Tsb+B%Tc(i, j, k))
+              Cpw = (B%pc(i, j, k)-p00)*2.d0
+              Cf = mu0*(sqrt(B%uc(i, j, k)**2+B%vc(i, j, k)**2+B%wc(i, j, k)**2)/B%dw(i, j, k))*2.d0
+              Cfx = mu0*(B%uc(i, j, k)/B%dw(i, j, k))*2.d0
+              write (101, "(13E18.9)") B%xc(i, j, k), B%yc(i, j, k), B%zc(i, j, k), Cpw, Cf, Cfx, B%dc(i, j, k)*B%Tc(i, j, k)
+            end do
+            end do
+          end do
+        end if
 
+      end if
 
-!------------------------------------------------------------------------------     
-! Read the message of the mesh and the initial flow;
-! ¶ÁÈ¡Íø¸ñ£¬³õÊ¼Á÷³¡ĞÅÏ¢; 
-! ·ÖÅäÄÚ´æ±äÁ¿£»
-! ¼ÆËã¼¸ºÎÁ¿£»
+    end do
+  end do
+  close (100)
+  close (101)
+end
+
 !------------------------------------------------------------------------------
-   subroutine init
-   use  Global_Variables
-   implicit none
-   integer :: i,j,k,m,km,nx,ny,nz,Num_Block1,ksub,tmp,NB1,Iflag
-   integer,allocatable,dimension(:):: NI,NJ,NK
-   Type (Block_TYPE),pointer:: B
-   TYPE(BC_MSG_TYPE),pointer::Bc
-   logical:: EX
-   integer:: ib,ie,jb,je,kb,ke
+! Read the message of the mesh and the initial flow;
+! è¯»å–ç½‘æ ¼ï¼Œåˆå§‹æµåœºä¿¡æ¯;
+! åˆ†é…å†…å­˜å˜é‡ï¼›
+! è®¡ç®—å‡ ä½•é‡ï¼›
+!------------------------------------------------------------------------------
+subroutine init
+  use Global_Variables
+  implicit none
+  integer :: i, j, k, m, km, nx, ny, nz, Num_Block1, ksub, tmp, NB1, Iflag
+  integer, allocatable, dimension(:):: NI, NJ, NK
+  Type(Block_TYPE), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer::Bc
+  logical:: EX
+  integer:: ib, ie, jb, je, kb, ke
 !------------------------------------------------------------------
 !    print*, "Please input Ma, Re, T_inf, Mesh_File_Format"
 !    read(*,*) Ma, Re, T_inf,Mesh_File_Format
 
+  call read_parameter_ec
 
-    call read_parameter_ec 
+  print *, "Ma,Re,gamma,Tinf=", Ma, Re, gamma, T_inf
+  print *, "Mesh_File_Format=", Mesh_File_Format
 
-    print*, "Ma,Re,gamma,Tinf=", Ma,Re,gamma,T_inf
-    print*, "Mesh_File_Format=", Mesh_File_Format
+  p00 = 1.d0/(gamma*Ma*Ma)
 
-    p00=1.d0/(gamma*Ma*Ma)
-
-! ---------node Coordinates----------------------------------------  
-!  Íø¸ñÎÄ¼ş£ºPLOT3D¸ñÊ½£»   
-   print*, "read Mesh3d.dat... (PLOT3D Format)"
-   if(Mesh_File_Format .eq. 0) then
-    open(99,file="Mesh3d.dat",form="unformatted")
-    read(99) Num_Block         ! ×Ü¿éÊı
-   else
-    open(99,file="Mesh3d.dat")
-    read(99,*) Num_Block         ! ×Ü¿éÊı
-   endif
-   print*, "Num_Block=", Num_Block
-   
-   
-      
-    allocate(Block(Num_Block))             
-    allocate(NI(Num_Block),NJ(Num_Block),NK(Num_Block) )   ! Ã¿¿éµÄ´óĞ¡
-  if(Mesh_File_Format .eq. 0) then
-   read(99) (NI(k), NJ(k), NK(k), k=1,Num_Block)
+! ---------node Coordinates----------------------------------------
+!  ç½‘æ ¼æ–‡ä»¶ï¼šPLOT3Dæ ¼å¼ï¼›
+  print *, "read Mesh3d.dat... (PLOT3D Format)"
+  if (Mesh_File_Format .eq. 0) then
+    open (99, file="Mesh3d.dat", form="unformatted")
+    read (99) Num_Block         ! æ€»å—æ•°
   else
-   read(99,*) (NI(k), NJ(k), NK(k), k=1,Num_Block)
-  endif
+    open (99, file="Mesh3d.dat")
+    read (99, *) Num_Block         ! æ€»å—æ•°
+  end if
+  print *, "Num_Block=", Num_Block
 
-! ¶ÁÈ¡Ã¿¿éĞÅÏ¢----------------------------------------   
-    do m=1,Num_Block
-     B => Block(m)
-     B%nx=NI(m); B%ny=NJ(m) ; B%nz=NK(m)   ! nx,ny,nz Ã¿¿éµÄ´óĞ¡
-     nx=B%nx ; ny= B%ny ; nz=B%nz
-! ----------  ¼¸ºÎÁ¿ -----------------------------------------------
-    allocate(B%xc(0:nx,0:ny,0:nz), B%yc(0:nx,0:ny,0:nz), B%zc(0:nx,0:ny,0:nz)) 
-    allocate(B%dc(0:nx,0:ny,0:nz),B%uc(0:nx,0:ny,0:nz),B%vc(0:nx,0:ny,0:nz), &
-       B%wc(0:nx,0:ny,0:nz),B%Tc(0:nx,0:ny,0:nz),B%pc(0:nx,0:ny,0:nz), &
-	   B%mut(0:nx,0:ny,0:nz),B%vt(0:nx,0:ny,0:nz),B%Kt(0:nx,0:ny,0:nz),B%Wt(0:nx,0:ny,0:nz))
-    allocate(B%x(nx,ny,nz),B%y(nx,ny,nz),B%z(nx,ny,nz))
-    allocate(B%d(nx,ny,nz),B%u(nx,ny,nz),B%v(nx,ny,nz), &
-             B%w(nx,ny,nz),B%T(nx,ny,nz),B%p(nx,ny,nz),B%mut1(nx,ny,nz),B%vt1(nx,ny,nz))
-    allocate(B%dw(nx-1,ny-1,nz-1))
+  allocate (Block(Num_Block))
+  allocate (NI(Num_Block), NJ(Num_Block), NK(Num_Block))   ! æ¯å—çš„å¤§å°
+  if (Mesh_File_Format .eq. 0) then
+    read (99) (NI(k), NJ(k), NK(k), k=1, Num_Block)
+  else
+    read (99, *) (NI(k), NJ(k), NK(k), k=1, Num_Block)
+  end if
 
-   B%mut(:,:,:)=0.d0
-   B%vt(:,:,:)=0.d0
-   B%mut1(:,:,:)=0.d0
-   B%Kt(:,:,:)=0.d0
-   B%Wt(:,:,:)=0.d0
-   B%vt1(:,:,:)=0.d0
+! è¯»å–æ¯å—ä¿¡æ¯----------------------------------------
+  do m = 1, Num_Block
+    B => Block(m)
+    B%nx = NI(m); B%ny = NJ(m); B%nz = NK(m)   ! nx,ny,nz æ¯å—çš„å¤§å°
+    nx = B%nx; ny = B%ny; nz = B%nz
+! ----------  å‡ ä½•é‡ -----------------------------------------------
+    allocate (B%xc(0:nx, 0:ny, 0:nz), B%yc(0:nx, 0:ny, 0:nz), B%zc(0:nx, 0:ny, 0:nz))
+    allocate (B%dc(0:nx, 0:ny, 0:nz), B%uc(0:nx, 0:ny, 0:nz), B%vc(0:nx, 0:ny, 0:nz), &
+              B%wc(0:nx, 0:ny, 0:nz), B%Tc(0:nx, 0:ny, 0:nz), B%pc(0:nx, 0:ny, 0:nz), &
+              B%mut(0:nx, 0:ny, 0:nz), B%vt(0:nx, 0:ny, 0:nz), B%Kt(0:nx, 0:ny, 0:nz), B%Wt(0:nx, 0:ny, 0:nz))
+    allocate (B%x(nx, ny, nz), B%y(nx, ny, nz), B%z(nx, ny, nz))
+    allocate (B%d(nx, ny, nz), B%u(nx, ny, nz), B%v(nx, ny, nz), &
+              B%w(nx, ny, nz), B%T(nx, ny, nz), B%p(nx, ny, nz), B%mut1(nx, ny, nz), B%vt1(nx, ny, nz))
+    allocate (B%dw(nx-1, ny-1, nz-1))
 
-   print*, "m=", m
-   print*, "nx,ny,nz=", nx,ny,nz
-   if(Mesh_File_Format .eq. 0) then
-	read(99)   (((B%x(i,j,k),i=1,nx),j=1,ny),k=1,nz) , &
-               (((B%y(i,j,k),i=1,nx),j=1,ny),k=1,nz) , &
-               (((B%z(i,j,k),i=1,nx),j=1,ny),k=1,nz)
-   else
-  	read(99,*)   (((B%x(i,j,k),i=1,nx),j=1,ny),k=1,nz) , &
-               (((B%y(i,j,k),i=1,nx),j=1,ny),k=1,nz) , &
-               (((B%z(i,j,k),i=1,nx),j=1,ny),k=1,nz)
-   endif
-   print*, "read mesh ok "
-!----------²åÖµ³öÍø¸ñÖĞĞÄµãµÄÊı¾İ-----------------------------------
-   do k=1,B%nz-1
-   do j=1,B%ny-1
-   do i=1,B%nx-1
-     B%xc(i,j,k)=(B%x(i,j,k)+B%x(i+1,j,k)+B%x(i,j+1,k)+        &
-	              B%x(i,j,k+1)+B%x(i+1,j+1,k)+B%x(i+1,j,k+1) + &
-                  B%x(i,j+1,k+1)+B%x(i+1,j+1,k+1))/8.d0
-     B%yc(i,j,k)=(B%y(i,j,k)+B%y(i+1,j,k)+B%y(i,j+1,k)+        &
-	              B%y(i,j,k+1)+B%y(i+1,j+1,k)+B%y(i+1,j,k+1) + &
-                  B%y(i,j+1,k+1)+B%y(i+1,j+1,k+1))/8.d0
-     B%zc(i,j,k)=(B%z(i,j,k)+B%z(i+1,j,k)+B%z(i,j+1,k)+        &
-	              B%z(i,j,k+1)+B%z(i+1,j+1,k)+B%z(i+1,j,k+1) + &
-                  B%z(i,j+1,k+1)+B%z(i+1,j+1,k+1))/8.d0
-   
-   enddo
-   enddo
-   enddo
-  enddo
- 
-  close(99)
+    B%mut(:, :, :) = 0.d0
+    B%vt(:, :, :) = 0.d0
+    B%mut1(:, :, :) = 0.d0
+    B%Kt(:, :, :) = 0.d0
+    B%Wt(:, :, :) = 0.d0
+    B%vt1(:, :, :) = 0.d0
 
-    inquire( file="wall_dist.dat", exist=EX)
-    if(EX) then
-      open(100,file="wall_dist.dat",form="unformatted")
-      do m=1,Num_Block
+    print *, "m=", m
+    print *, "nx,ny,nz=", nx, ny, nz
+    if (Mesh_File_Format .eq. 0) then
+      read (99) (((B%x(i, j, k), i=1, nx), j=1, ny), k=1, nz), &
+        (((B%y(i, j, k), i=1, nx), j=1, ny), k=1, nz), &
+        (((B%z(i, j, k), i=1, nx), j=1, ny), k=1, nz)
+    else
+      read (99, *) (((B%x(i, j, k), i=1, nx), j=1, ny), k=1, nz), &
+        (((B%y(i, j, k), i=1, nx), j=1, ny), k=1, nz), &
+        (((B%z(i, j, k), i=1, nx), j=1, ny), k=1, nz)
+    end if
+    print *, "read mesh ok "
+!----------æ’å€¼å‡ºç½‘æ ¼ä¸­å¿ƒç‚¹çš„æ•°æ®-----------------------------------
+    do k = 1, B%nz-1
+    do j = 1, B%ny-1
+    do i = 1, B%nx-1
+      B%xc(i, j, k) = (B%x(i, j, k)+B%x(i+1, j, k)+B%x(i, j+1, k)+ &
+                       B%x(i, j, k+1)+B%x(i+1, j+1, k)+B%x(i+1, j, k+1)+ &
+                       B%x(i, j+1, k+1)+B%x(i+1, j+1, k+1))/8.d0
+      B%yc(i, j, k) = (B%y(i, j, k)+B%y(i+1, j, k)+B%y(i, j+1, k)+ &
+                       B%y(i, j, k+1)+B%y(i+1, j+1, k)+B%y(i+1, j, k+1)+ &
+                       B%y(i, j+1, k+1)+B%y(i+1, j+1, k+1))/8.d0
+      B%zc(i, j, k) = (B%z(i, j, k)+B%z(i+1, j, k)+B%z(i, j+1, k)+ &
+                       B%z(i, j, k+1)+B%z(i+1, j+1, k)+B%z(i+1, j, k+1)+ &
+                       B%z(i, j+1, k+1)+B%z(i+1, j+1, k+1))/8.d0
+
+    end do
+    end do
+    end do
+  end do
+
+  close (99)
+
+  inquire (file="wall_dist.dat", exist=EX)
+  if (EX) then
+    open (100, file="wall_dist.dat", form="unformatted")
+    do m = 1, Num_Block
       B => Block(m)
-      read(100) (((B%dw(i,j,k),i=1,B%nx-1),j=1,B%ny-1),k=1,B%nz-1)
-     enddo
-     close(100)
-   endif
-   
-!---------------´Óflow3d.datÖĞ¶ÁÈ¡³¡×÷Îª³õÖµ----------------------
-  print*, "input 1 or 2,  1 read flow3d.dat,  2 read flow3d_average.dat "
-  read(*,*) Iflag
-  
-  if(Iflag == 1) then   
-	open(99,file="flow3d.dat",form="unformatted")
+      read (100) (((B%dw(i, j, k), i=1, B%nx-1), j=1, B%ny-1), k=1, B%nz-1)
+    end do
+    close (100)
+  end if
+
+!---------------ä»flow3d.datä¸­è¯»å–åœºä½œä¸ºåˆå€¼----------------------
+  print *, "input 1 or 2,  1 read flow3d.dat,  2 read flow3d_average.dat "
+  read (*, *) Iflag
+
+  if (Iflag == 1) then
+    open (99, file="flow3d.dat", form="unformatted")
   else
-	open(99,file="flow3d_average.dat",form="unformatted")
-  endif
-    
-	 do m=1,Num_Block
-     B => Block(m)
-        read(99)   (((B%dc(i,j,k),i=0,B%nx),j=0,B%ny),k=0,B%nz) , &
-                   (((B%uc(i,j,k),i=0,B%nx),j=0,B%ny),k=0,B%nz) , &
-                   (((B%vc(i,j,k),i=0,B%nx),j=0,B%ny),k=0,B%nz) , &
-                   (((B%wc(i,j,k),i=0,B%nx),j=0,B%ny),k=0,B%nz) , &
-		           (((B%Tc(i,j,k),i=0,B%nx),j=0,B%ny),k=0,B%nz) 
-          do k=0, B%nz
-		  do j=0, B%ny
-		  do i=0, B%nx
-		    B%pc(i,j,k)=p00*B%dc(i,j,k)*B%Tc(i,j,k)
-		  enddo
-		  enddo
-		  enddo
+    open (99, file="flow3d_average.dat", form="unformatted")
+  end if
 
-	 enddo
-	close(99)
-    
-	 inquire(file="SA3d.dat",exist=EX)
-	 if(EX) then
-     open(100,file="SA3d.dat",form="unformatted")
-      do m=1,Num_Block
-        B => Block(m)
-        read(100)   (((B%vt(i,j,k),i=0,B%nx),j=0,B%ny),k=0,B%nz) 
- 	  enddo
-      close(100)
-     endif
+  do m = 1, Num_Block
+    B => Block(m)
+    read (99) (((B%dc(i, j, k), i=0, B%nx), j=0, B%ny), k=0, B%nz), &
+      (((B%uc(i, j, k), i=0, B%nx), j=0, B%ny), k=0, B%nz), &
+      (((B%vc(i, j, k), i=0, B%nx), j=0, B%ny), k=0, B%nz), &
+      (((B%wc(i, j, k), i=0, B%nx), j=0, B%ny), k=0, B%nz), &
+      (((B%Tc(i, j, k), i=0, B%nx), j=0, B%ny), k=0, B%nz)
+    do k = 0, B%nz
+      do j = 0, B%ny
+      do i = 0, B%nx
+        B%pc(i, j, k) = p00*B%dc(i, j, k)*B%Tc(i, j, k)
+      end do
+      end do
+    end do
 
-    inquire(file="SST3d.dat",exist=EX)
-	 if(EX) then
-     open(100,file="SST3d.dat",form="unformatted")
-     do m=1,Num_Block
-     B => Block(m)
-        read(100)   (((B%Kt(i,j,k),i=0,B%nx),j=0,B%ny),k=0,B%nz),  (((B%Wt(i,j,k),i=0,B%nx),j=0,B%ny),k=0,B%nz)
- 	 enddo
- 	 close(100)
-    endif
+  end do
+  close (99)
+
+  inquire (file="SA3d.dat", exist=EX)
+  if (EX) then
+    open (100, file="SA3d.dat", form="unformatted")
+    do m = 1, Num_Block
+      B => Block(m)
+      read (100) (((B%vt(i, j, k), i=0, B%nx), j=0, B%ny), k=0, B%nz)
+    end do
+    close (100)
+  end if
+
+  inquire (file="SST3d.dat", exist=EX)
+  if (EX) then
+    open (100, file="SST3d.dat", form="unformatted")
+    do m = 1, Num_Block
+      B => Block(m)
+      read (100) (((B%Kt(i, j, k), i=0, B%nx), j=0, B%ny), k=0, B%nz), (((B%Wt(i, j, k), i=0, B%nx), j=0, B%ny), k=0, B%nz)
+    end do
+    close (100)
+  end if
 !=================================================================================
-   call comput_value_in_mesh
+  call comput_value_in_mesh
 
+!----------------------------------------------------
+  BC_number = 0
+  BC_type = 0
 
-!---------------------------------------------------- 
-   BC_number=0
-   BC_type=0
-   
 !--------------------------------------------------
-    print*, "read bc3d.inp"
-    open(88,file="bc3d.inp")
-    read(88,*)
-    read(88,*) Num_Block1
-    if(Num_Block1 .ne. Num_Block) then
-      print*, "Error!  Block number in bc2d.in is not equal to that in Mesh3d.dat !"
-      stop
-    endif
-    
-    do m=1,Num_Block
-     B => Block(m)
-     read(88,*)
-     read(88,*)
-     read(88,*) B%subface   !number of the subface in the Block m
+  print *, "read bc3d.inp"
+  open (88, file="bc3d.inp")
+  read (88, *)
+  read (88, *) Num_Block1
+  if (Num_Block1 .ne. Num_Block) then
+    print *, "Error!  Block number in bc2d.in is not equal to that in Mesh3d.dat !"
+    stop
+  end if
+
+  do m = 1, Num_Block
+    B => Block(m)
+    read (88, *)
+    read (88, *)
+    read (88, *) B%subface   !number of the subface in the Block m
 !-------------------------------------------------------------------------------
-     allocate(B%bc_msg(B%subface))
-     do ksub=1, B%subface
-     Bc => B%bc_msg(ksub)
-     read(88,*) ib,ie,jb,je,kb,ke,Bc%bc
-	 if(Bc%bc .lt. 0) then
-  	   read(88,*)
-  	  endif
-  	  
- ! Find boundary type 	  
-   if(Bc%bc .ge. 0) then
-      if(BC_number .eq. 0) then
-       BC_number=1
-       BC_type(1)=Bc%bc
-      else
-       km=1
-       do k=1,BC_number
-        if(Bc%bc .eq. BC_type(k)) km=0
-       enddo
-      if(km .eq. 1) then
-       Bc_number=Bc_number+1
-       Bc_type(Bc_number)=Bc%bc
-      endif
-     endif
-    endif
+    allocate (B%bc_msg(B%subface))
+    do ksub = 1, B%subface
+      Bc => B%bc_msg(ksub)
+      read (88, *) ib, ie, jb, je, kb, ke, Bc%bc
+      if (Bc%bc .lt. 0) then
+        read (88, *)
+      end if
 
+      ! Find boundary type
+      if (Bc%bc .ge. 0) then
+        if (BC_number .eq. 0) then
+          BC_number = 1
+          BC_type(1) = Bc%bc
+        else
+          km = 1
+          do k = 1, BC_number
+            if (Bc%bc .eq. BC_type(k)) km = 0
+          end do
+          if (km .eq. 1) then
+            Bc_number = Bc_number+1
+            Bc_type(Bc_number) = Bc%bc
+          end if
+        end if
+      end if
 
+      Bc%ib = min(abs(ib), abs(ie)); Bc%ie = max(abs(ib), abs(ie))
+      Bc%jb = min(abs(jb), abs(je)); Bc%je = max(abs(jb), abs(je))
+      Bc%kb = min(abs(kb), abs(ke)); Bc%ke = max(abs(kb), abs(ke))
+    end do
+  end do
+  close (88)
+  print *, "read bc3d.in ok ..."
 
-	  Bc%ib=min(abs(ib),abs(ie)) ;  Bc%ie=max(abs(ib),abs(ie))
-	  Bc%jb=min(abs(jb),abs(je)) ;  Bc%je=max(abs(jb),abs(je))
-	  Bc%kb=min(abs(kb),abs(ke)) ;  Bc%ke=max(abs(kb),abs(ke))
-     enddo
-     enddo
-     close(88)
-	 print*, "read bc3d.in ok ..."
+end subroutine init
 
+subroutine comput_value_in_mesh
+  use Global_Variables
+  implicit none
+  integer:: nx, ny, nz, i, j, k, m
+  Type(Block_TYPE), pointer:: B
+  do m = 1, NUM_BLOCK
+    B => Block(m)
+    nx = B%nx; ny = B%ny; nz = B%nz
+!  å°†æ ¼å¿ƒå¤„çš„ç‰©ç†é‡æ’å€¼åˆ°æ ¼ç‚¹ä¸Š
+    do k = 1, B%nz
+    do j = 1, B%ny
+    do i = 1, B%nx
+      B%d(i, j, k) = (B%dc(i-1, j-1, k-1)+B%dc(i, j-1, k-1)+B%dc(i-1, j, k-1)+B%dc(i, j, k-1) &
+                      +B%dc(i-1, j-1, k)+B%dc(i, j-1, k)+B%dc(i-1, j, k)+B%dc(i, j, k))/8.d0
+      B%u(i, j, k) = (B%uc(i-1, j-1, k-1)+B%uc(i, j-1, k-1)+B%uc(i-1, j, k-1)+B%uc(i, j, k-1) &
+                      +B%uc(i-1, j-1, k)+B%uc(i, j-1, k)+B%uc(i-1, j, k)+B%uc(i, j, k))/8.d0
+      B%v(i, j, k) = (B%vc(i-1, j-1, k-1)+B%vc(i, j-1, k-1)+B%vc(i-1, j, k-1)+B%vc(i, j, k-1) &
+                      +B%vc(i-1, j-1, k)+B%vc(i, j-1, k)+B%vc(i-1, j, k)+B%vc(i, j, k))/8.d0
+      B%w(i, j, k) = (B%wc(i-1, j-1, k-1)+B%wc(i, j-1, k-1)+B%wc(i-1, j, k-1)+B%wc(i, j, k-1) &
+                      +B%wc(i-1, j-1, k)+B%wc(i, j-1, k)+B%wc(i-1, j, k)+B%wc(i, j, k))/8.d0
 
- end subroutine init  
+      B%T(i, j, k) = (B%Tc(i-1, j-1, k-1)+B%Tc(i, j-1, k-1)+B%Tc(i-1, j, k-1)+B%Tc(i, j, k-1) &
+                      +B%Tc(i-1, j-1, k)+B%Tc(i, j-1, k)+B%Tc(i-1, j, k)+B%Tc(i, j, k))/8.d0
 
-   subroutine comput_value_in_mesh
-   use  Global_Variables
-   implicit none
-   integer:: nx,ny,nz,i,j,k,m
-   Type (Block_TYPE),pointer:: B
-   do m=1, NUM_BLOCK
-   B=> Block(m)
-   nx=B%nx; ny=B%ny; nz=B%nz
-!  ½«¸ñĞÄ´¦µÄÎïÀíÁ¿²åÖµµ½¸ñµãÉÏ   
-   do k=1,B%nz
-   do j=1,B%ny
-   do i=1,B%nx
-     B%d(i,j,k)=(B%dc(i-1,j-1,k-1)+B%dc(i,j-1,k-1)+B%dc(i-1,j,k-1)+B%dc(i,j,k-1)  &
-	             +B%dc(i-1,j-1,k)+B%dc(i,j-1,k)+B%dc(i-1,j,k)+B%dc(i,j,k))/8.d0
-     B%u(i,j,k)=(B%uc(i-1,j-1,k-1)+B%uc(i,j-1,k-1)+B%uc(i-1,j,k-1)+B%uc(i,j,k-1)  &
-	             +B%uc(i-1,j-1,k)+B%uc(i,j-1,k)+B%uc(i-1,j,k)+B%uc(i,j,k))/8.d0
-     B%v(i,j,k)=(B%vc(i-1,j-1,k-1)+B%vc(i,j-1,k-1)+B%vc(i-1,j,k-1)+B%vc(i,j,k-1)  &
-	             +B%vc(i-1,j-1,k)+B%vc(i,j-1,k)+B%vc(i-1,j,k)+B%vc(i,j,k))/8.d0
-     B%w(i,j,k)=(B%wc(i-1,j-1,k-1)+B%wc(i,j-1,k-1)+B%wc(i-1,j,k-1)+B%wc(i,j,k-1)  &
-	             +B%wc(i-1,j-1,k)+B%wc(i,j-1,k)+B%wc(i-1,j,k)+B%wc(i,j,k))/8.d0
+      B%p(i, j, k) = (B%pc(i-1, j-1, k-1)+B%pc(i, j-1, k-1)+B%pc(i-1, j, k-1)+B%pc(i, j, k-1) &
+                      +B%pc(i-1, j-1, k)+B%pc(i, j-1, k)+B%pc(i-1, j, k)+B%pc(i, j, k))/8.d0
 
-     B%T(i,j,k)=(B%Tc(i-1,j-1,k-1)+B%Tc(i,j-1,k-1)+B%Tc(i-1,j,k-1)+B%Tc(i,j,k-1)  &
-	             +B%Tc(i-1,j-1,k)+B%Tc(i,j-1,k)+B%Tc(i-1,j,k)+B%Tc(i,j,k))/8.d0
+      B%mut1(i, j, k) = (B%mut(i-1, j-1, k-1)+B%mut(i, j-1, k-1)+B%mut(i-1, j, k-1)+B%mut(i, j, k-1) &
+                         +B%mut(i-1, j-1, k)+B%mut(i, j-1, k)+B%mut(i-1, j, k)+B%mut(i, j, k))/8.d0
 
-     B%p(i,j,k)=(B%pc(i-1,j-1,k-1)+B%pc(i,j-1,k-1)+B%pc(i-1,j,k-1)+B%pc(i,j,k-1)  &
-	             +B%pc(i-1,j-1,k)+B%pc(i,j-1,k)+B%pc(i-1,j,k)+B%pc(i,j,k))/8.d0
+      B%vt1(i, j, k) = (B%vt(i-1, j-1, k-1)+B%vt(i, j-1, k-1)+B%vt(i-1, j, k-1)+B%vt(i, j, k-1) &
+                        +B%vt(i-1, j-1, k)+B%vt(i, j-1, k)+B%vt(i-1, j, k)+B%vt(i, j, k))/8.d0
 
-     B%mut1(i,j,k)=(B%mut(i-1,j-1,k-1)+B%mut(i,j-1,k-1)+B%mut(i-1,j,k-1)+B%mut(i,j,k-1)  &
-	             +B%mut(i-1,j-1,k)+B%mut(i,j-1,k)+B%mut(i-1,j,k)+B%mut(i,j,k))/8.d0
+    end do
+    end do
+    end do
+  end do
+end
 
-     B%vt1(i,j,k)=(B%vt(i-1,j-1,k-1)+B%vt(i,j-1,k-1)+B%vt(i-1,j,k-1)+B%vt(i,j,k-1)  &
-	             +B%vt(i-1,j-1,k)+B%vt(i,j-1,k)+B%vt(i-1,j,k)+B%vt(i,j,k))/8.d0
+!------read parameter (Namelist type)----------------
+subroutine read_parameter_ec
+  use Global_Variables
+  implicit none
+  real(PRE_EC), parameter:: PI = 3.14159265358979d0
+  real(PRE_EC):: R0, a0, d0, mu0, mu1
 
-   enddo
-   enddo
-   enddo
-   enddo
-   end
+  real(PRE_EC)::  AoA, AoS, p_outlet, t_end, &
+                 PrL, PrT, &
+                 dt_global, CFL, dtmax, dtmin, Time_Method, &
+                 w_LU, Twall, Kt_inf, Wt_inf, &
+                 Step_Inner_Limit, Res_Inner_Limit, MUT_MAX, &
+                 Ref_S, Ref_L, Centroid(3), &
+                 Ldmin, Ldmax, Lpmin, Lpmax, Lumax, LSAmax, CP1_NSA, CP2_NSA, &
+                 Turbo_P0, Turbo_T0, Turbo_L0, Turbo_w, Turbo_Periodic_seta, &
+                 Periodic_dX, Periodic_dY, Periodic_dZ
 
+  integer:: Kstep_save, Kstep_average, Iflag_turbulence_model, Iflag_init, If_viscous, &
+            Iflag_local_dt, If_Residual_smoothing, If_dtime_mesh, &
+            Iflag_Scheme, Iflag_Flux, IFlag_Reconstruction, Pre_Step_Mesh(3), &
+            Kstep_show, Kstep_smooth, Kstep_init_smooth, Bound_Scheme, &
+            Num_Mesh, IF_Debug, NUM_THREADS, Cood_Y_UP, IFLAG_LIMIT_FLOW, Pdebug(4), &
+            IF_TurboMachinary, Ref_medium_usrdef, IF_Scheme_Positivity, IF_Innerflow, Iflag_savefile
 
-
-!------read parameter (Namelist type)---------------- 
-  subroutine read_parameter_ec 
-   use Global_Variables
-   implicit none
-   real(PRE_EC),parameter:: PI=3.14159265358979d0
-   real(PRE_EC):: R0, a0, d0, mu0,mu1
-   
-   real(PRE_EC)::  AoA, AoS, p_outlet, t_end, &
-	    PrL, PrT, &
-        dt_global,CFL,dtmax,dtmin,Time_Method, &
-		w_LU, Twall,Kt_inf,Wt_inf,&
-		Step_Inner_Limit, Res_Inner_Limit, MUT_MAX, &
-        Ref_S,Ref_L,Centroid(3), &
-		Ldmin,Ldmax,Lpmin,Lpmax,Lumax,LSAmax,CP1_NSA,CP2_NSA, &
- 		Turbo_P0,Turbo_T0, Turbo_L0,Turbo_w, Turbo_Periodic_seta, &
-		Periodic_dX, Periodic_dY, Periodic_dZ
-  
-   integer:: Kstep_save, Kstep_average, Iflag_turbulence_model,Iflag_init,If_viscous,  &
-           Iflag_local_dt,  If_Residual_smoothing, If_dtime_mesh,  &
-		   Iflag_Scheme,Iflag_Flux,IFlag_Reconstruction, Pre_Step_Mesh(3), &
-           Kstep_show,Kstep_smooth,Kstep_init_smooth, Bound_Scheme,  &
-           Num_Mesh,IF_Debug, NUM_THREADS, Cood_Y_UP,IFLAG_LIMIT_FLOW,Pdebug(4),  &
-           IF_TurboMachinary, Ref_medium_usrdef, IF_Scheme_Positivity, IF_Innerflow,Iflag_savefile
-
-	namelist /control_ec/ Ma, Re, AoA, AoS, p_outlet, t_end, &
-	    gamma, PrL, PrT, &
-	    Kstep_save, &
-	    Iflag_turbulence_model,Iflag_init,If_viscous,  &
-        Iflag_local_dt,dt_global,CFL,dtmax,dtmin,Time_Method, &
-		If_Residual_smoothing,w_LU,If_dtime_mesh,  &
-        Iflag_Scheme,Iflag_Flux,IFlag_Reconstruction, &
-		Mesh_File_Format,Kstep_show,Kstep_average,Kstep_smooth,Kstep_init_smooth,  &
-        Num_Mesh,T_inf,Twall,Kt_inf,Wt_inf,IF_Debug,NUM_THREADS,  &
-		Step_Inner_Limit, Res_Inner_Limit, MUT_MAX, Bound_Scheme, &
-        Pre_Step_Mesh,Ref_S,Ref_L,Centroid,Cood_Y_UP,IFLAG_LIMIT_FLOW,Pdebug, &
-		Ldmin,Ldmax,Lpmin,Lpmax,Lumax,LSAmax,CP1_NSA,CP2_NSA, &
-        IF_TurboMachinary, Ref_medium_usrdef, IF_Scheme_Positivity, &
-		Turbo_P0,Turbo_T0, Turbo_L0,Turbo_w, Turbo_Periodic_seta, &
-		Periodic_dX, Periodic_dY, Periodic_dZ, &
-		IF_Innerflow, Iflag_savefile
-
-
-	
+  namelist /control_ec/ Ma, Re, AoA, AoS, p_outlet, t_end, &
+    gamma, PrL, PrT, &
+    Kstep_save, &
+    Iflag_turbulence_model, Iflag_init, If_viscous, &
+    Iflag_local_dt, dt_global, CFL, dtmax, dtmin, Time_Method, &
+    If_Residual_smoothing, w_LU, If_dtime_mesh, &
+    Iflag_Scheme, Iflag_Flux, IFlag_Reconstruction, &
+    Mesh_File_Format, Kstep_show, Kstep_average, Kstep_smooth, Kstep_init_smooth, &
+    Num_Mesh, T_inf, Twall, Kt_inf, Wt_inf, IF_Debug, NUM_THREADS, &
+    Step_Inner_Limit, Res_Inner_Limit, MUT_MAX, Bound_Scheme, &
+    Pre_Step_Mesh, Ref_S, Ref_L, Centroid, Cood_Y_UP, IFLAG_LIMIT_FLOW, Pdebug, &
+    Ldmin, Ldmax, Lpmin, Lpmax, Lumax, LSAmax, CP1_NSA, CP2_NSA, &
+    IF_TurboMachinary, Ref_medium_usrdef, IF_Scheme_Positivity, &
+    Turbo_P0, Turbo_T0, Turbo_L0, Turbo_w, Turbo_Periodic_seta, &
+    Periodic_dX, Periodic_dY, Periodic_dZ, &
+    IF_Innerflow, Iflag_savefile
 
 !---- default--------
-        Ma=1.d0
-        Re=100.d0
-    	gamma=1.4d0
-        T_inf=288.15
-        Mesh_File_Format=0
-        
+  Ma = 1.d0
+  Re = 100.d0
+  gamma = 1.4d0
+  T_inf = 288.15
+  Mesh_File_Format = 0
+
 !---------------------------------
-	open(99,file="control.ec")
-	read(99,nml=control_ec)
-    close(99)
- 
- !---- convert parameters ----------------------
- ! Ref_medium_usrdef==0 Ê¹ÓÃÄ¬ÈÏ½éÖÊ (Ma=1, ¸ù¾İ×ÜÎÂ¡¢×ÜÑ¹¼ÆËã Re) £» ==1 Ê¹ÓÃ×Ô¶¨Òå½éÖÊ £¨ÈËÎªÊäÈëMa, ReµÈ£©
-    if( (IF_TurboMachinary ==1 .or. IF_Innerflow ==1) .and.  Ref_medium_usrdef == 0) then   ! Ä¬ÈÏ¿ÕÆø½éÖÊ£¬¼ÆËãMachÊı£¬ ReynoldsÊı
-      
-	  T_inf=Turbo_T0  ! ²Î¿¼ÎÂ¶È £¨À´Á÷×ÜÎÂ£©
-      gamma=1.4d0    ! 
-	  PrL=0.7d0   ! PrandtlÊı
-	  PrT=0.9d0
-      R0= 287.06d0   ! ¿ÕÆøµÄÆøÌå³£ÊıR
-	  a0= sqrt(gamma*R0*Turbo_T0)    ! ²Î¿¼ÎÂ¶ÈÏÂµÄÉùËÙ 
-	  mu0=1.179d-5     ! ¿ÕÆøÕ³ĞÔÏµÊı (288.15K)  
-      mu1=mu0* sqrt((Turbo_T0/288.15d0)**3)*(288.15d0+110.4d0)/(Turbo_T0+110.4d0)  ! ²Î¿¼ÎÂ¶ÈÏÂµÄ¿ÕÆøÕ³ĞÔÏµÊı
-      d0=Turbo_P0/(R0*Turbo_T0)
-	  Re=d0*a0*Turbo_L0/mu1    ! ²Î¿¼ÎÂ¶ÈÏÂ£¬ÒÔÉùËÙÔË¶¯µÄReynoldsÊı
-	  Ma=1.d0     ! MachÊı    £¨ÒÔÉùËÙ×÷Îª²Î¿¼ËÙ¶È£¬Òò¶ø²Î¿¼MachÊıÎª1£©
-      Turbo_w= 2.d0*PI*Turbo_w/(a0/Turbo_L0)   ! ÎŞÁ¿¸Ù½ÇËÙ¶È Turbo_W£¨×ª/Ãë£©
-      P_outlet=P_outlet/Turbo_P0    ! ±³Ñ¹ £¨ÎŞÁ¿¸Ù£©
-	endif
+  open (99, file="control.ec")
+  read (99, nml=control_ec)
+  close (99)
 
- !  print*, "Re, Ma, gamma, T_inf=", Re, Ma, gamma, T_inf
- !  print*, "Mesh_File_Format=", Mesh_File_Format
+  !---- convert parameters ----------------------
+  ! Ref_medium_usrdef==0 ä½¿ç”¨é»˜è®¤ä»‹è´¨ (Ma=1, æ ¹æ®æ€»æ¸©ã€æ€»å‹è®¡ç®— Re) ï¼› ==1 ä½¿ç”¨è‡ªå®šä¹‰ä»‹è´¨ ï¼ˆäººä¸ºè¾“å…¥Ma, Reç­‰ï¼‰
+  if ((IF_TurboMachinary == 1 .or. IF_Innerflow == 1) .and. Ref_medium_usrdef == 0) then   ! é»˜è®¤ç©ºæ°”ä»‹è´¨ï¼Œè®¡ç®—Machæ•°ï¼Œ Reynoldsæ•°
 
+    T_inf = Turbo_T0  ! å‚è€ƒæ¸©åº¦ ï¼ˆæ¥æµæ€»æ¸©ï¼‰
+    gamma = 1.4d0    !
+    PrL = 0.7d0   ! Prandtlæ•°
+    PrT = 0.9d0
+    R0 = 287.06d0   ! ç©ºæ°”çš„æ°”ä½“å¸¸æ•°R
+    a0 = sqrt(gamma*R0*Turbo_T0)    ! å‚è€ƒæ¸©åº¦ä¸‹çš„å£°é€Ÿ
+    mu0 = 1.179d-5     ! ç©ºæ°”ç²˜æ€§ç³»æ•° (288.15K)
+    mu1 = mu0*sqrt((Turbo_T0/288.15d0)**3)*(288.15d0+110.4d0)/(Turbo_T0+110.4d0)  ! å‚è€ƒæ¸©åº¦ä¸‹çš„ç©ºæ°”ç²˜æ€§ç³»æ•°
+    d0 = Turbo_P0/(R0*Turbo_T0)
+    Re = d0*a0*Turbo_L0/mu1    ! å‚è€ƒæ¸©åº¦ä¸‹ï¼Œä»¥å£°é€Ÿè¿åŠ¨çš„Reynoldsæ•°
+    Ma = 1.d0     ! Machæ•°    ï¼ˆä»¥å£°é€Ÿä½œä¸ºå‚è€ƒé€Ÿåº¦ï¼Œå› è€Œå‚è€ƒMachæ•°ä¸º1ï¼‰
+    Turbo_w = 2.d0*PI*Turbo_w/(a0/Turbo_L0)   ! æ— é‡çº²è§’é€Ÿåº¦ Turbo_Wï¼ˆè½¬/ç§’ï¼‰
+    P_outlet = P_outlet/Turbo_P0    ! èƒŒå‹ ï¼ˆæ— é‡çº²ï¼‰
+  end if
 
- !----------------------------------------------
- end
-!--------------------------------------------------
- 
+  !  print*, "Re, Ma, gamma, T_inf=", Re, Ma, gamma, T_inf
+  !  print*, "Mesh_File_Format=", Mesh_File_Format
 
-
+  !----------------------------------------------
+end

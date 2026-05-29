@@ -1,298 +1,282 @@
 !------------------------------------------------------------------------------
-! Source term of SA model  (See: J. Blazek's book, P240-243) 
+! Source term of SA model  (See: J. Blazek's book, P240-243)
 ! Do not consider transition (full turbulence)
 ! Ver 0.81a, using Eq. (7.4.2) (J. Blazek's book)
 ! Ver 0.81b, limit for sorce term  ( not less than 0.3*Omega)
 ! Ver 0.98c, Nondimensional (See CFL3D manual)
 
-  subroutine  Turbulence_model_SA(nMesh,mBlock)
-   use Global_Var
-   Use Flow_Var
-   implicit none
-   integer:: mBlock,nx,ny,nz,i,j,k,nMesh
-   real(PRE_EC):: ui,vi,wi,uj,vj,wj,uk,vk,wk,ux,vx,wx,uy,vy,wy,uz,vz,wz
-   real(PRE_EC):: s1x,s1y,s1z,v0,vti,vtj,vtk,vtx,vty,vtz
-   real(PRE_EC):: ix,iy,iz,jx,jy,jz,kx,ky,kz
-   real(PRE_EC):: S, S1,X,fv1,fv2,fv3,ft1,ft2,r,g,fw,Q_SA,vn1,vn2,vfi,Q3
-   
-   real(PRE_EC),parameter:: SA_sigma=2.d0/3.d0,Cv1=7.1d0,Cv2=5.d0,Cb1=0.1355d0,Cb2=0.622d0,SA_k=0.41d0
-   real(PRE_EC),parameter:: Cw1=Cb1/(SA_k*SA_k)+(1.d0+Cb2)/SA_sigma, Cw2=0.3d0, Cw3=2.d0, &
-                            Ct1=1.d0, Ct2=2.d0, Ct3=1.2d0, Ct4=0.5d0  !Ct3=1.3d0
-   real(PRE_EC),Pointer,dimension(:,:,:):: vt,Fluxv,fluxv2
-   Type (Block_TYPE),pointer:: B
- 
-  
-   B => Mesh(nMesh)%Block(mBlock)
-   nx=B%nx ; ny=B%ny; nz=B%nz
+subroutine Turbulence_model_SA(nMesh, mBlock)
+  use Global_Var
+  Use Flow_Var
+  implicit none
+  integer:: mBlock, nx, ny, nz, i, j, k, nMesh
+  real(PRE_EC):: ui, vi, wi, uj, vj, wj, uk, vk, wk, ux, vx, wx, uy, vy, wy, uz, vz, wz
+  real(PRE_EC):: s1x, s1y, s1z, v0, vti, vtj, vtk, vtx, vty, vtz
+  real(PRE_EC):: ix, iy, iz, jx, jy, jz, kx, ky, kz
+  real(PRE_EC):: S, S1, X, fv1, fv2, fv3, ft1, ft2, r, g, fw, Q_SA, vn1, vn2, vfi, Q3
 
+  real(PRE_EC), parameter:: SA_sigma = 2.d0/3.d0, Cv1 = 7.1d0, Cv2 = 5.d0, Cb1 = 0.1355d0, Cb2 = 0.622d0, SA_k = 0.41d0
+  real(PRE_EC), parameter:: Cw1 = Cb1/(SA_k*SA_k)+(1.d0+Cb2)/SA_sigma, Cw2 = 0.3d0, Cw3 = 2.d0, &
+                            Ct1 = 1.d0, Ct2 = 2.d0, Ct3 = 1.2d0, Ct4 = 0.5d0  !Ct3=1.3d0
+  real(PRE_EC), Pointer, dimension(:, :, :):: vt, Fluxv, fluxv2
+  Type(Block_TYPE), pointer:: B
 
+  B => Mesh(nMesh)%Block(mBlock)
+  nx = B%nx; ny = B%ny; nz = B%nz
 
- ! ¼ÆËãÍÄÁ÷Õ³ÐÔÏµÊý
-   allocate(vt(0:nx,0:ny,0:nz),Fluxv(nx,ny,nz),fluxv2(nx,ny,nz))
-	
-! OpenMPµÄ±àÒëÖ¸Ê¾·û£¨²»ÊÇ×¢ÊÍ£©£¬ Ö¸¶¨Do Ñ­»·²¢ÐÐÖ´ÐÐ£» Ö¸¶¨Ò»Ð©¸÷½ø³ÌË½ÓÐµÄ±äÁ¿
+! è®¡ç®—æ¹æµç²˜æ€§ç³»æ•°
+  allocate (vt(0:nx, 0:ny, 0:nz), Fluxv(nx, ny, nz), fluxv2(nx, ny, nz))
 
+! OpenMPçš„ç¼–è¯‘æŒ‡ç¤ºç¬¦ï¼ˆä¸æ˜¯æ³¨é‡Šï¼‰ï¼Œ æŒ‡å®šDo å¾ªçŽ¯å¹¶è¡Œæ‰§è¡Œï¼› æŒ‡å®šä¸€äº›å„è¿›ç¨‹ç§æœ‰çš„å˜é‡
 
-
-!$OMP PARALLEL DO DEFAULT(PRIVATE) SHARED(nx,ny,nz,B,Re)  
-   do k=0,nz
-   do j=0,ny
-   do i=0,nx
-    B%mu(i,j,k)=B%mu(i,j,k)*Re             ! Á¿¸Ù×ª»»
-   enddo
-   enddo
-   enddo
-!$OMP END PARALLEL DO   
-
-
+!$OMP PARALLEL DO DEFAULT(PRIVATE) SHARED(nx,ny,nz,B,Re)
+  do k = 0, nz
+  do j = 0, ny
+  do i = 0, nx
+    B%mu(i, j, k) = B%mu(i, j, k)*Re             ! é‡çº²è½¬æ¢
+  end do
+  end do
+  end do
+!$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO DEFAULT(PRIVATE) SHARED(nx,ny,nz,B,vt,d)
- 
-    do k=0,nz
-    do j=0,ny
-    do i=0,nx
-     vt(i,j,k)=B%U(6,i,j,k)
-	 X=d(i,j,k)*vt(i,j,k)/B%mu(i,j,k)   ! ÍÄÁ÷Õ³ÐÔÏµÊýÓë²ãÁ÷Õ³ÐÔÏµÊýÖ®±È
-     fv1=X**3/(X**3+Cv1**3)
-     B%mu_t(i,j,k)=fv1*d(i,j,k)*vt(i,j,k)
-    enddo
-    enddo
-    enddo
+
+  do k = 0, nz
+  do j = 0, ny
+  do i = 0, nx
+    vt(i, j, k) = B%U(6, i, j, k)
+    X = d(i, j, k)*vt(i, j, k)/B%mu(i, j, k)   ! æ¹æµç²˜æ€§ç³»æ•°ä¸Žå±‚æµç²˜æ€§ç³»æ•°ä¹‹æ¯”
+    fv1 = X**3/(X**3+Cv1**3)
+    B%mu_t(i, j, k) = fv1*d(i, j, k)*vt(i, j, k)
+  end do
+  end do
+  end do
 !$OMP END PARALLEL DO
-   
-   ! ÏÞ¶¨ÍÄÁ÷Õ³ÐÔÏµÊý
-   call limit_mut(nMesh,mBlock)
 
-! Éè¶¨ÍÄÁ÷Õ³ÐÔÏµÊýÐéÍø¸ñµÄÖµ
- 
+! é™å®šæ¹æµç²˜æ€§ç³»æ•°
+  call limit_mut(nMesh, mBlock)
 
-! ¼ÆËãvt·½³ÌµÄ²Ð²î B%Res(6,:,:,:)
+! è®¾å®šæ¹æµç²˜æ€§ç³»æ•°è™šç½‘æ ¼çš„å€¼
+
+! è®¡ç®—vtæ–¹ç¨‹çš„æ®‹å·® B%Res(6,:,:,:)
 
 !$OMP PARALLEL  DEFAULT(FIRSTPRIVATE) SHARED(nx,ny,nz,B,Re,vt,d,uu,v,w,Fluxv,fluxv2)
 !------i- direcion ---------------------------
 !$OMP DO
-    do k=1,nz-1 
-     do j=1,ny-1
-      do i=1,nx
-          s1x=B%ni1(i,j,k); s1y=B%ni2(i,j,k) ; s1z= B%ni3(i,j,k)  ! ¹éÒ»»¯µÄ·¨·½Ïò
-          vti=vt(i,j,k)-vt(i-1,j,k)                               ! SAÄ£ÐÍÖÐµÄvt
-          vtj=0.25d0*(vt(i,j+1,k)-vt(i,j-1,k)+vt(i-1,j+1,k)-vt(i-1,j-1,k))
-          vtk=0.25d0*(vt(i,j,k+1)-vt(i,j,k-1)+vt(i-1,j,k+1)-vt(i-1,j,k-1))
-          ix=B%ix1(i,j,k); iy=B%iy1(i,j,k); iz=B%iz1(i,j,k)
-          jx=B%jx1(i,j,k); jy=B%jy1(i,j,k); jz=B%jz1(i,j,k)
-          kx=B%kx1(i,j,k); ky=B%ky1(i,j,k); kz=B%kz1(i,j,k)
-          vtx=vti*ix+vtj*jx+vtk*kx
-          vty=vti*iy+vtj*jy+vtk*ky
-          vtz=vti*iz+vtj*jz+vtk*kz
-          v0=0.5d0*(1.d0+Cb2)/SA_sigma*(vt(i,j,k)+B%mu(i,j,k)/d(i,j,k) + vt(i-1,j,k)+B%mu(i-1,j,k)/d(i-1,j,k))  ! (I-1/2,J,K) µãµÄ¶¯Á¦Ñ§Õ³ÐÔÏµÊý
- 
-          vn1=uu(i-1,j,k)*s1x+v(i-1,j,k)*s1y+w(i-1,j,k)*s1z   ! ·¨ÏòËÙ¶È
-          vn2=uu(i,j,k)*s1x+v(i,j,k)*s1y+w(i,j,k)*s1z
-          vfi=0.5d0*((vn1+abs(vn1))*vt(i-1,j,k)+(vn2-abs(vn2))*vt(i,j,k))  ! Ò»½× L-F¸ñÊ½
-          Fluxv(i,j,k)= (-vfi+v0/Re*(vtx*s1x+vty*s1y+vtz*s1z))* B%Si(i,j,k)    !!! Re
-          Fluxv2(i,j,k)=(vtx*s1x+vty*s1y+vtz*s1z)*B%Si(i,j,k)
-	  enddo
-     enddo
-    enddo
+  do k = 1, nz-1
+  do j = 1, ny-1
+    do i = 1, nx
+      s1x = B%ni1(i, j, k); s1y = B%ni2(i, j, k); s1z = B%ni3(i, j, k)  ! å½’ä¸€åŒ–çš„æ³•æ–¹å‘
+      vti = vt(i, j, k)-vt(i-1, j, k)                               ! SAæ¨¡åž‹ä¸­çš„vt
+      vtj = 0.25d0*(vt(i, j+1, k)-vt(i, j-1, k)+vt(i-1, j+1, k)-vt(i-1, j-1, k))
+      vtk = 0.25d0*(vt(i, j, k+1)-vt(i, j, k-1)+vt(i-1, j, k+1)-vt(i-1, j, k-1))
+      ix = B%ix1(i, j, k); iy = B%iy1(i, j, k); iz = B%iz1(i, j, k)
+      jx = B%jx1(i, j, k); jy = B%jy1(i, j, k); jz = B%jz1(i, j, k)
+      kx = B%kx1(i, j, k); ky = B%ky1(i, j, k); kz = B%kz1(i, j, k)
+      vtx = vti*ix+vtj*jx+vtk*kx
+      vty = vti*iy+vtj*jy+vtk*ky
+      vtz = vti*iz+vtj*jz+vtk*kz
+      v0 = 0.5d0*(1.d0+Cb2)/SA_sigma*(vt(i, j, k)+B%mu(i, j, k)/d(i, j, k)+vt(i-1, j, k)+B%mu(i-1, j, k)/d(i-1, j, k))  ! (I-1/2,J,K) ç‚¹çš„åŠ¨åŠ›å­¦ç²˜æ€§ç³»æ•°
+
+      vn1 = uu(i-1, j, k)*s1x+v(i-1, j, k)*s1y+w(i-1, j, k)*s1z   ! æ³•å‘é€Ÿåº¦
+      vn2 = uu(i, j, k)*s1x+v(i, j, k)*s1y+w(i, j, k)*s1z
+      vfi = 0.5d0*((vn1+abs(vn1))*vt(i-1, j, k)+(vn2-abs(vn2))*vt(i, j, k))  ! ä¸€é˜¶ L-Fæ ¼å¼
+      Fluxv(i, j, k) = (-vfi+v0/Re*(vtx*s1x+vty*s1y+vtz*s1z))*B%Si(i, j, k)    !!! Re
+      Fluxv2(i, j, k) = (vtx*s1x+vty*s1y+vtz*s1z)*B%Si(i, j, k)
+    end do
+  end do
+  end do
 !$OMP END DO
 !$OMP DO
-      do k=1,nz-1
-      do j=1,ny-1
-      do i=1,nx-1
-	     v0=(vt(i,j,k)+B%mu(i,j,k)/d(i,j,k))*Cb2/SA_sigma
-         B%Res(6,i,j,k)=Fluxv(i+1,j,k)-Fluxv(i,j,k) -v0/Re*(Fluxv2(i+1,j,k)-Fluxv2(i,j,k))    !!! Re     
-      enddo
-      enddo
-      enddo
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do i = 1, nx-1
+    v0 = (vt(i, j, k)+B%mu(i, j, k)/d(i, j, k))*Cb2/SA_sigma
+    B%Res(6, i, j, k) = Fluxv(i+1, j, k)-Fluxv(i, j, k)-v0/Re*(Fluxv2(i+1, j, k)-Fluxv2(i, j, k))    !!! Re
+  end do
+  end do
+  end do
 !$OMP END DO
 !-----j- direction ------------------------
 !$OMP DO
-    do k=1,nz-1 
-    do j=1,ny
-    do i=1,nx-1
-      s1x=B%nj1(i,j,k); s1y=B%nj2(i,j,k) ; s1z= B%nj3(i,j,k)  ! ¹éÒ»»¯µÄ·¨·½Ïò
-      vti=0.25d0*(vt(i+1,j,k)-vt(i-1,j,k)+vt(i+1,j-1,k)-vt(i-1,j-1,k))
-      vtj=vt(i,j,k)-vt(i,j-1,k)
-      vtk=0.25d0*(vt(i,j,k+1)-vt(i,j,k-1)+vt(i,j-1,k+1)-vt(i,j-1,k-1))
-      ix=B%ix2(i,j,k); iy=B%iy2(i,j,k); iz=B%iz2(i,j,k)
-      jx=B%jx2(i,j,k); jy=B%jy2(i,j,k); jz=B%jz2(i,j,k)
-      kx=B%kx2(i,j,k); ky=B%ky2(i,j,k); kz=B%kz2(i,j,k)
-      vtx=vti*ix+vtj*jx+vtk*kx
-      vty=vti*iy+vtj*jy+vtk*ky
-      vtz=vti*iz+vtj*jz+vtk*kz
-      v0=0.5d0*(1.d0+Cb2)/SA_sigma*(vt(i,j,k)+B%mu(i,j,k)/d(i,j,k) + vt(i,j-1,k)+B%mu(i,j-1,k)/d(i,j-1,k))  ! (I-1/2,J,K) µãµÄ¶¯Á¦Ñ§Õ³ÐÔÏµÊý   s11=Amu1*(tmp1*ux-tmp2*(vy+wz))    ! tmp1=4.d0/3.d0; tmp2=2.d0/3.d0
-      vn1=uu(i,j-1,k)*s1x+v(i,j-1,k)*s1y+w(i,j-1,k)*s1z   ! ·¨ÏòËÙ¶È
-      vn2=uu(i,j,k)*s1x+v(i,j,k)*s1y+w(i,j,k)*s1z
-      vfi=0.5d0*((vn1+abs(vn1))*vt(i,j-1,k)+(vn2-abs(vn2))*vt(i,j,k))  ! Ò»½× L-F¸ñÊ½
-      Fluxv(i,j,k)= (-vfi+v0/Re*(vtx*s1x+vty*s1y+vtz*s1z))* B%Sj(i,j,k)   !!! Re
-      Fluxv2(i,j,k)= (vtx*s1x+vty*s1y+vtz*s1z)* B%Sj(i,j,k)
-    enddo
-    enddo
-    enddo
+  do k = 1, nz-1
+  do j = 1, ny
+  do i = 1, nx-1
+    s1x = B%nj1(i, j, k); s1y = B%nj2(i, j, k); s1z = B%nj3(i, j, k)  ! å½’ä¸€åŒ–çš„æ³•æ–¹å‘
+    vti = 0.25d0*(vt(i+1, j, k)-vt(i-1, j, k)+vt(i+1, j-1, k)-vt(i-1, j-1, k))
+    vtj = vt(i, j, k)-vt(i, j-1, k)
+    vtk = 0.25d0*(vt(i, j, k+1)-vt(i, j, k-1)+vt(i, j-1, k+1)-vt(i, j-1, k-1))
+    ix = B%ix2(i, j, k); iy = B%iy2(i, j, k); iz = B%iz2(i, j, k)
+    jx = B%jx2(i, j, k); jy = B%jy2(i, j, k); jz = B%jz2(i, j, k)
+    kx = B%kx2(i, j, k); ky = B%ky2(i, j, k); kz = B%kz2(i, j, k)
+    vtx = vti*ix+vtj*jx+vtk*kx
+    vty = vti*iy+vtj*jy+vtk*ky
+    vtz = vti*iz+vtj*jz+vtk*kz
+    v0 = 0.5d0*(1.d0+Cb2)/SA_sigma*(vt(i, j, k)+B%mu(i, j, k)/d(i, j, k)+vt(i, j-1, k)+B%mu(i, j-1, k)/d(i, j-1, k))  ! (I-1/2,J,K) ç‚¹çš„åŠ¨åŠ›å­¦ç²˜æ€§ç³»æ•°   s11=Amu1*(tmp1*ux-tmp2*(vy+wz))    ! tmp1=4.d0/3.d0; tmp2=2.d0/3.d0
+    vn1 = uu(i, j-1, k)*s1x+v(i, j-1, k)*s1y+w(i, j-1, k)*s1z   ! æ³•å‘é€Ÿåº¦
+    vn2 = uu(i, j, k)*s1x+v(i, j, k)*s1y+w(i, j, k)*s1z
+    vfi = 0.5d0*((vn1+abs(vn1))*vt(i, j-1, k)+(vn2-abs(vn2))*vt(i, j, k))  ! ä¸€é˜¶ L-Fæ ¼å¼
+    Fluxv(i, j, k) = (-vfi+v0/Re*(vtx*s1x+vty*s1y+vtz*s1z))*B%Sj(i, j, k)   !!! Re
+    Fluxv2(i, j, k) = (vtx*s1x+vty*s1y+vtz*s1z)*B%Sj(i, j, k)
+  end do
+  end do
+  end do
 !$OMP END DO
 !$OMP DO
-     do k=1,nz-1
-     do j=1,ny-1
-     do i=1,nx-1
-	  v0=(vt(i,j,k)+B%mu(i,j,k)/d(i,j,k))*Cb2/SA_sigma
-      B%Res(6,i,j,k)=B%Res(6,i,j,k)+Fluxv(i,j+1,k)-Fluxv(i,j,k)- v0/Re*(Fluxv2(i,j+1,k)-Fluxv2(i,j,k))   !!! Re        
-     enddo
-     enddo
-     enddo
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do i = 1, nx-1
+    v0 = (vt(i, j, k)+B%mu(i, j, k)/d(i, j, k))*Cb2/SA_sigma
+    B%Res(6, i, j, k) = B%Res(6, i, j, k)+Fluxv(i, j+1, k)-Fluxv(i, j, k)-v0/Re*(Fluxv2(i, j+1, k)-Fluxv2(i, j, k))   !!! Re
+  end do
+  end do
+  end do
 !$OMP END DO
 !-----k- direction ------------------------
 !$OMP DO
-   do k=1,nz 
-   do j=1,ny-1
-   do i=1,nx-1
-    s1x=B%nk1(i,j,k); s1y=B%nk2(i,j,k) ; s1z= B%nk3(i,j,k)  ! ¹éÒ»»¯µÄ·¨·½Ïò
-    vti=0.25d0*(vt(i+1,j,k)-vt(i-1,j,k)+vt(i+1,j,k-1)-vt(i-1,j,k-1))
-    vtj=0.25d0*(vt(i,j+1,k)-vt(i,j-1,k)+vt(i,j+1,k-1)-vt(i,j-1,k-1))
-    vtk=vt(i,j,k)-vt(i,j,k-1)
+  do k = 1, nz
+  do j = 1, ny-1
+  do i = 1, nx-1
+    s1x = B%nk1(i, j, k); s1y = B%nk2(i, j, k); s1z = B%nk3(i, j, k)  ! å½’ä¸€åŒ–çš„æ³•æ–¹å‘
+    vti = 0.25d0*(vt(i+1, j, k)-vt(i-1, j, k)+vt(i+1, j, k-1)-vt(i-1, j, k-1))
+    vtj = 0.25d0*(vt(i, j+1, k)-vt(i, j-1, k)+vt(i, j+1, k-1)-vt(i, j-1, k-1))
+    vtk = vt(i, j, k)-vt(i, j, k-1)
 
-      ix=B%ix3(i,j,k); iy=B%iy3(i,j,k); iz=B%iz3(i,j,k)
-      jx=B%jx3(i,j,k); jy=B%jy3(i,j,k); jz=B%jz3(i,j,k)
-      kx=B%kx3(i,j,k); ky=B%ky3(i,j,k); kz=B%kz3(i,j,k)
-      vtx=vti*ix+vtj*jx+vtk*kx
-      vty=vti*iy+vtj*jy+vtk*ky
-      vtz=vti*iz+vtj*jz+vtk*kz
-      v0=0.5d0*(1.d0+Cb2)/SA_sigma*(vt(i,j,k)+B%mu(i,j,k)/d(i,j,k) + vt(i,j,k-1)+B%mu(i,j,k-1)/d(i,j,k-1))  ! (I,J,K-1/2) µãµÄ¶¯Á¦Ñ§Õ³ÐÔÏµÊý
-     vn1=uu(i,j,k-1)*s1x+v(i,j,k-1)*s1y+w(i,j,k-1)*s1z   ! ·¨ÏòËÙ¶È
-     vn2=uu(i,j,k)*s1x+v(i,j,k)*s1y+w(i,j,k)*s1z
-     vfi=0.5d0*((vn1+abs(vn1))*vt(i,j,k-1)+(vn2-abs(vn2))*vt(i,j,k))  ! Ò»½× L-F¸ñÊ½
-     Fluxv(i,j,k)= ( -vfi+v0/Re*(vtx*s1x+vty*s1y+vtz*s1z))*B%Sk(i,j,k)    ! ÎÞÕ³+Õ³ÐÔÍ¨Á¿
-     Fluxv2(i,j,k)= (vtx*s1x+vty*s1y+vtz*s1z)*B%Sk(i,j,k)   
-    enddo
-    enddo
-    enddo
+    ix = B%ix3(i, j, k); iy = B%iy3(i, j, k); iz = B%iz3(i, j, k)
+    jx = B%jx3(i, j, k); jy = B%jy3(i, j, k); jz = B%jz3(i, j, k)
+    kx = B%kx3(i, j, k); ky = B%ky3(i, j, k); kz = B%kz3(i, j, k)
+    vtx = vti*ix+vtj*jx+vtk*kx
+    vty = vti*iy+vtj*jy+vtk*ky
+    vtz = vti*iz+vtj*jz+vtk*kz
+    v0 = 0.5d0*(1.d0+Cb2)/SA_sigma*(vt(i, j, k)+B%mu(i, j, k)/d(i, j, k)+vt(i, j, k-1)+B%mu(i, j, k-1)/d(i, j, k-1))  ! (I,J,K-1/2) ç‚¹çš„åŠ¨åŠ›å­¦ç²˜æ€§ç³»æ•°
+    vn1 = uu(i, j, k-1)*s1x+v(i, j, k-1)*s1y+w(i, j, k-1)*s1z   ! æ³•å‘é€Ÿåº¦
+    vn2 = uu(i, j, k)*s1x+v(i, j, k)*s1y+w(i, j, k)*s1z
+    vfi = 0.5d0*((vn1+abs(vn1))*vt(i, j, k-1)+(vn2-abs(vn2))*vt(i, j, k))  ! ä¸€é˜¶ L-Fæ ¼å¼
+    Fluxv(i, j, k) = (-vfi+v0/Re*(vtx*s1x+vty*s1y+vtz*s1z))*B%Sk(i, j, k)    ! æ— ç²˜+ç²˜æ€§é€šé‡
+    Fluxv2(i, j, k) = (vtx*s1x+vty*s1y+vtz*s1z)*B%Sk(i, j, k)
+  end do
+  end do
+  end do
 !$OMP END DO
 !$OMP DO
-     do k=1,nz-1
-     do j=1,ny-1
-     do i=1,nx-1
- 	   v0=(vt(i,j,k)+B%mu(i,j,k)/d(i,j,k))*Cb2/SA_sigma
-       B%Res(6,i,j,k)=B%Res(6,i,j,k)+Fluxv(i,j,k+1)-Fluxv(i,j,k)-v0/Re*(Fluxv2(i,j,k+1)-Fluxv2(i,j,k))           
-	 enddo
-     enddo
-     enddo
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do i = 1, nx-1
+    v0 = (vt(i, j, k)+B%mu(i, j, k)/d(i, j, k))*Cb2/SA_sigma
+    B%Res(6, i, j, k) = B%Res(6, i, j, k)+Fluxv(i, j, k+1)-Fluxv(i, j, k)-v0/Re*(Fluxv2(i, j, k+1)-Fluxv2(i, j, k))
+  end do
+  end do
+  end do
 !$OMP END DO
-!--------------Ô´Ïî---------------------------------------------------------
+!--------------æºé¡¹---------------------------------------------------------
 !$OMP DO
-   do k=1,nz-1
-   do j=1,ny-1
-   do i=1,nx-1
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do i = 1, nx-1
 !----- get S (normal of vorticity)  S=sqrt(0.5*Omiga_ij*Omiga_ij) at the cell's center ------
-!  ¼ÆËãÎÐÁ¿£»¼ÆËãÍÄÁ÷Õ³ÐÔÏµÊýµÄÌÝ¶È
-      
+!  è®¡ç®—æ¶¡é‡ï¼›è®¡ç®—æ¹æµç²˜æ€§ç³»æ•°çš„æ¢¯åº¦
 
-   ui=uu(i+1,j,k)-uu(i-1,j,k)            
-   vi=v(i+1,j,k)-v(i-1,j,k)  
-   wi=w(i+1,j,k)-w(i-1,j,k)  
+    ui = uu(i+1, j, k)-uu(i-1, j, k)
+    vi = v(i+1, j, k)-v(i-1, j, k)
+    wi = w(i+1, j, k)-w(i-1, j, k)
 
-   uj=uu(i,j+1,k)-uu(i,j-1,k)   
-   vj=v(i,j+1,k)-v(i,j-1,k)
-   wj=w(i,j+1,k)-w(i,j-1,k) 
+    uj = uu(i, j+1, k)-uu(i, j-1, k)
+    vj = v(i, j+1, k)-v(i, j-1, k)
+    wj = w(i, j+1, k)-w(i, j-1, k)
 
-   uk=uu(i,j,k+1)-uu(i,j,k-1)  
-   vk=v(i,j,k+1)-v(i,j,k-1)
-   wk=w(i,j,k+1)-w(i,j,k-1)  
-   
-   ix=B%ix0(i,j,k); iy=B%iy0(i,j,k); iz=B%iz0(i,j,k)
-   jx=B%jx0(i,j,k); jy=B%jy0(i,j,k); jz=B%jz0(i,j,k)
-   kx=B%kx0(i,j,k); ky=B%ky0(i,j,k); kz=B%kz0(i,j,k)
+    uk = uu(i, j, k+1)-uu(i, j, k-1)
+    vk = v(i, j, k+1)-v(i, j, k-1)
+    wk = w(i, j, k+1)-w(i, j, k-1)
 
-   ux=ui*ix+uj*jx+uk*kx
-   vx=vi*ix+vj*jx+vk*kx
-   wx=wi*ix+wj*jx+wk*kx
- 
-   uy=ui*iy+uj*jy+uk*ky
-   vy=vi*iy+vj*jy+vk*ky
-   wy=wi*iy+wj*jy+wk*ky
+    ix = B%ix0(i, j, k); iy = B%iy0(i, j, k); iz = B%iz0(i, j, k)
+    jx = B%jx0(i, j, k); jy = B%jy0(i, j, k); jz = B%jz0(i, j, k)
+    kx = B%kx0(i, j, k); ky = B%ky0(i, j, k); kz = B%kz0(i, j, k)
 
-   uz=ui*iz+uj*jz+uk*kz
-   vz=vi*iz+vj*jz+vk*kz
-   wz=wi*iz+wj*jz+wk*kz
+    ux = ui*ix+uj*jx+uk*kx
+    vx = vi*ix+vj*jx+vk*kx
+    wx = wi*ix+wj*jx+wk*kx
 
-! ÎÐÁ¿
-   S=sqrt((wy-vz)**2+(uz-wx)**2+(vx-uy)**2)
-   X=d(i,j,k)*vt(i,j,k)/B%mu(i,j,k)   ! ÍÄÁ÷Õ³ÐÔÏµÊýÓë²ãÁ÷Õ³ÐÔÏµÊýÖ®±È
-!--------------------------------------------------------------------------   
+    uy = ui*iy+uj*jy+uk*ky
+    vy = vi*iy+vj*jy+vk*ky
+    wy = wi*iy+wj*jy+wk*ky
 
-! Ô´Ïî ²ÉÓÃ Blazek's book,  p241 (7.38), (7.39)
+    uz = ui*iz+uj*jz+uk*kz
+    vz = vi*iz+vj*jz+vk*kz
+    wz = wi*iz+wj*jz+wk*kz
 
+! æ¶¡é‡
+    S = sqrt((wy-vz)**2+(uz-wx)**2+(vx-uy)**2)
+    X = d(i, j, k)*vt(i, j, k)/B%mu(i, j, k)   ! æ¹æµç²˜æ€§ç³»æ•°ä¸Žå±‚æµç²˜æ€§ç³»æ•°ä¹‹æ¯”
+!--------------------------------------------------------------------------
 
-!   Blazek's book µÄ¹«Ê½ÎÈ¶¨ÐÔ²»ºÃ (ÈÝÒ×Ëã³ö¸ºµÄÍÄÁ÷Õ³ÐÔÏµÊý)
+! æºé¡¹ é‡‡ç”¨ Blazek's book,  p241 (7.38), (7.39)
+
+!   Blazek's book çš„å…¬å¼ç¨³å®šæ€§ä¸å¥½ (å®¹æ˜“ç®—å‡ºè´Ÿçš„æ¹æµç²˜æ€§ç³»æ•°)
 !   Source term, Blazek's Book section (7.2.1),  modified from original form
 !   fv1=X**3/(X**3+Cv1**3)
 !   fv2=1.d0/(1.d0+X/Cv2)**3
 !   fv3=(1.d0+X*fv1)*(1.d0-fv2)/max(X,0.001d0)
-!   S1=fv3*S+vt(i,j,k)*fv2/(SA_k*B%dw(i,j,k))**2           
+!   S1=fv3*S+vt(i,j,k)*fv2/(SA_k*B%dw(i,j,k))**2
 !   r=vt(i,j,k)/(S1*SA_K*SA_K*B%dw(i,j,k)*B%dw(i,j,k))
 
 !------------------------------------------------------------------------
 ! Source term, original form; See: http://turbmodels.larc.nasa.gov/spalart.html
-   fv1=X**3/(X**3+Cv1**3)
-   fv2=1.d0-X/(1.d0+X*fv1)
-   ft2=Ct3*exp(-Ct4*X*X)            
-   S1=max(S+fv2*vt(i,j,k)/(Re*(SA_k*B%dw(i,j,k))**2),0.d0)    !!! Re
-   r=min(vt(i,j,k)/(Re*S1*SA_K*SA_K*B%dw(i,j,k)*B%dw(i,j,k)),10.0)    !!! Re
-   g=r+Cw2*(r**6-r)
-   fw=g*((1.d0+Cw3**6)/(g**6+Cw3**6))**(1.d0/6.d0)
+    fv1 = X**3/(X**3+Cv1**3)
+    fv2 = 1.d0-X/(1.d0+X*fv1)
+    ft2 = Ct3*exp(-Ct4*X*X)
+    S1 = max(S+fv2*vt(i, j, k)/(Re*(SA_k*B%dw(i, j, k))**2), 0.d0)    !!! Re
+    r = min(vt(i, j, k)/(Re*S1*SA_K*SA_K*B%dw(i, j, k)*B%dw(i, j, k)), 10.0)    !!! Re
+    g = r+Cw2*(r**6-r)
+    fw = g*((1.d0+Cw3**6)/(g**6+Cw3**6))**(1.d0/6.d0)
 !   Q_SA=Cb1*(1.d0-ft2)*S1*vt(i,j,k) -(Cw1*fw-Cb1*ft2/(SA_k*SA_k))*(vt(i,j,k)/B%dw(i,j,k))**2/Re   !!! Re
 !---------Source term, see: CFL3D manual ---------------------
-    Q3=Cb1*((1-ft2)*fv2+ft2)/(SA_k*SA_k)-Cw1*fw
-	Q_SA=Cb1*(1.d0-ft2)*S1*vt(i,j,k)   &
-	    +Q3*(vt(i,j,k)/B%dw(i,j,k))**2/Re   !!! Re
-
+    Q3 = Cb1*((1-ft2)*fv2+ft2)/(SA_k*SA_k)-Cw1*fw
+    Q_SA = Cb1*(1.d0-ft2)*S1*vt(i, j, k) &
+           +Q3*(vt(i, j, k)/B%dw(i, j, k))**2/Re   !!! Re
 
 !---------------------------------------------------------------------------
-   B%Res(6,i,j,k)=B%Res(6,i,j,k)+Q_SA*B%vol(i,j,k)     ! Bug removed
+    B%Res(6, i, j, k) = B%Res(6, i, j, k)+Q_SA*B%vol(i, j, k)     ! Bug removed
 
-   enddo
-   enddo
-   enddo
+  end do
+  end do
+  end do
 !$OMP END DO
 !$OMP END PARALLEL
 
+!$OMP PARALLEL DO DEFAULT(PRIVATE) SHARED(nx,ny,nz,B,Re)
+  do k = 0, nz
+  do j = 0, ny
+  do i = 0, nx
+    B%mu(i, j, k) = B%mu(i, j, k)/Re             ! é‡çº²è½¬æ¢
+    B%mu_t(i, j, k) = B%mu_t(i, j, k)/Re
+  end do
+  end do
+  end do
+!$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO DEFAULT(PRIVATE) SHARED(nx,ny,nz,B,Re)  
-   do k=0,nz
-   do j=0,ny
-   do i=0,nx
-    B%mu(i,j,k)=B%mu(i,j,k)/Re             ! Á¿¸Ù×ª»»
-    B%mu_t(i,j,k)=B%mu_t(i,j,k)/Re
-   enddo
-   enddo
-   enddo
-!$OMP END PARALLEL DO   
+  deallocate (vt, Fluxv, fluxv2)
 
-
-
-  deallocate(vt,Fluxv,fluxv2)
-
-end  subroutine  Turbulence_model_SA
+end subroutine Turbulence_model_SA
 
 !-----------------------------------------------------------------------------------
-!-----¸ù¾Ývt (v~) ¼ÆËã³öSAÄ£ÐÍÖÐµÄÍÄÁ÷Õ³ÐÔÏµÊýmut-----------------------------------
+!-----æ ¹æ®vt (v~) è®¡ç®—å‡ºSAæ¨¡åž‹ä¸­çš„æ¹æµç²˜æ€§ç³»æ•°mut-----------------------------------
 ! Blazek's Book p241 (7.37)
 
+! ç²˜æ€§ç³»æ•°è™šç½‘æ ¼ä¸Šçš„å€¼ ï¼ˆå›ºå£è¾¹ç•Œé‡‡ç”¨åå€¼ï¼Œä»¥ä¿è¯å›ºå£ä¸Šçš„å¹³å‡æ¹æµç²˜æ€§ç³»æ•°ä¸º0ï¼‰
+subroutine Amut_boundary(nMesh, mBlock)
+  use Global_Var
+  use Flow_Var
+  implicit none
+  integer:: mBlock, nx, ny, nz, i, j, k, m, ksub, nMesh
+  integer:: ib, ie, jb, je, kb, ke
+  Type(Block_TYPE), pointer:: B
+  Type(BC_MSG_TYPE), pointer:: Bc
 
-
-! Õ³ÐÔÏµÊýÐéÍø¸ñÉÏµÄÖµ £¨¹Ì±Ú±ß½ç²ÉÓÃ·´Öµ£¬ÒÔ±£Ö¤¹Ì±ÚÉÏµÄÆ½¾ùÍÄÁ÷Õ³ÐÔÏµÊýÎª0£©
-subroutine Amut_boundary(nMesh,mBlock)
-   use Global_Var
-   use Flow_Var
-   implicit none
-   integer:: mBlock,nx,ny,nz,i,j,k,m,ksub,nMesh
-   integer:: ib,ie,jb,je,kb,ke
-   Type (Block_TYPE),pointer:: B
-   Type (BC_MSG_TYPE),pointer:: Bc
-
-   B => Mesh(nMesh)%Block(mBlock)
-   nx=B%nx ; ny=B%ny; nz=B%nz
+  B => Mesh(nMesh)%Block(mBlock)
+  nx = B%nx; ny = B%ny; nz = B%nz
 
 ! mut in Ghost Cell of the boundary
-! ²ÉÓÃÁÙ½üµãµÄÖµ
+! é‡‡ç”¨ä¸´è¿‘ç‚¹çš„å€¼
 
 !   B%Amu_t(0,:,:)=B%Amu_t(1,:,:)
 !   B%Amu_t(nx,:,:)=B%Amu_t(nx-1,:,:)
@@ -301,68 +285,68 @@ subroutine Amut_boundary(nMesh,mBlock)
 !   B%Amu_t(:,:,0)=B%Amu_t(:,:,1)
 !   B%Amu_t(:,:,nz)=B%Amu_t(:,:,nz-1)
 
-! Ghost Cell µãµÄ mutÖµÎª ÄÚµãmutÖµ*£¨-1£© (ÕâÑù¿ÉÒÔÊ¹±ÚÃæÉÏmut=0)
+! Ghost Cell ç‚¹çš„ mutå€¼ä¸º å†…ç‚¹mutå€¼*ï¼ˆ-1ï¼‰ (è¿™æ ·å¯ä»¥ä½¿å£é¢ä¸Šmut=0)
 
-  do  ksub=1,B%subface
-    Bc=> B%bc_msg(ksub)
-      if( Bc%bc .eq. BC_Wall  ) then   ! (Õ³ÐÔ) ±ÚÃæ±ß½çÌõ¼þ 
+  do ksub = 1, B%subface
+    Bc => B%bc_msg(ksub)
+    if (Bc%bc .eq. BC_Wall) then   ! (ç²˜æ€§) å£é¢è¾¹ç•Œæ¡ä»¶
       Bc => B%bc_msg(ksub)
-      ib=Bc%ib; ie=Bc%ie; jb=Bc%jb; je=Bc%je ; kb=Bc%kb; ke=Bc%ke      
+      ib = Bc%ib; ie = Bc%ie; jb = Bc%jb; je = Bc%je; kb = Bc%kb; ke = Bc%ke
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,j,k)  
-     if(Bc%face .eq. 1 ) then   ! i- 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,j,k)
+      if (Bc%face .eq. 1) then   ! i-
 !$OMP DO
-       do k=kb,ke-1
-       do j=jb,je-1
-         B%mu_t(0,j,k)= -B%mu_t(1,j,k)       ! mut
-       enddo
-       enddo
+        do k = kb, ke-1
+        do j = jb, je-1
+          B%mu_t(0, j, k) = -B%mu_t(1, j, k)       ! mut
+        end do
+        end do
 !$OMP ENDDO
-     else if (Bc%face .eq. 4 ) then   ! i+
+      else if (Bc%face .eq. 4) then   ! i+
 !$OMP DO
-       do k=kb,ke-1
-       do j=jb,je-1
-         B%mu_t(ie,j,k)= -B%mu_t(ie-1,j,k)       ! mut
-       enddo
-       enddo
+        do k = kb, ke-1
+        do j = jb, je-1
+          B%mu_t(ie, j, k) = -B%mu_t(ie-1, j, k)       ! mut
+        end do
+        end do
 !$OMP ENDDO
-     else if(Bc%face .eq. 2 ) then   !j-
+      else if (Bc%face .eq. 2) then   !j-
 !$OMP DO
-       do k=kb,ke-1
-       do i=ib,ie-1
-         B%mu_t(i,0,k)= -B%mu_t(i,1,k)       ! mut
-      enddo
-      enddo
+        do k = kb, ke-1
+        do i = ib, ie-1
+          B%mu_t(i, 0, k) = -B%mu_t(i, 1, k)       ! mut
+        end do
+        end do
 !$OMP ENDDO
-     else if(Bc%face .eq. 5 ) then   !j+
+      else if (Bc%face .eq. 5) then   !j+
 !$OMP DO
-       do k=kb,ke-1
-       do i=ib,ie-1
-         B%mu_t(i,je,k)= -B%mu_t(i,je-1,k)       ! mut
-      enddo
-      enddo
+        do k = kb, ke-1
+        do i = ib, ie-1
+          B%mu_t(i, je, k) = -B%mu_t(i, je-1, k)       ! mut
+        end do
+        end do
 !$OMP ENDDO
-     else if(Bc%face .eq. 3 ) then   !k-
+      else if (Bc%face .eq. 3) then   !k-
 !$OMP DO
-       do j=jb,je-1
-       do i=ib,ie-1
-         B%mu_t(i,j,0)= -B%mu_t(i,j,1) 
-       enddo
-       enddo
+        do j = jb, je-1
+        do i = ib, ie-1
+          B%mu_t(i, j, 0) = -B%mu_t(i, j, 1)
+        end do
+        end do
 !$OMP ENDDO
-     else if(Bc%face .eq. 6 ) then   !k+
+      else if (Bc%face .eq. 6) then   !k+
 !$OMP DO
-       do j=jb,je-1
-       do i=ib,ie-1
-         B%mu_t(i,j,ke)= -B%mu_t(i,j,ke-1)
-       enddo
-       enddo
+        do j = jb, je-1
+        do i = ib, ie-1
+          B%mu_t(i, j, ke) = -B%mu_t(i, j, ke-1)
+        end do
+        end do
 !$OMP ENDDO
 
-      endif
+      end if
 !$OMP END PARALLEL
 
-    endif
-   enddo
+    end if
+  end do
 
-end  subroutine Amut_boundary
+end subroutine Amut_boundary

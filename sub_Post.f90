@@ -1,426 +1,413 @@
-!  ºó´¦ÀíÄ£¿é,  ¼ÆËãÁ¦ºÍÁ¦¾Ø
-!  A bug removed, 2017-3-13 
+!  åŽå¤„ç†æ¨¡å—,  è®¡ç®—åŠ›å’ŒåŠ›çŸ©
+!  A bug removed, 2017-3-13
 !--------------------------------------------------------
-  subroutine comput_force      
-   use Global_Var
-   implicit none
-   integer:: i,j,k,m,mB,nf,nx,ny,nz,NM,ierr
-   real(PRE_EC):: Fx,Fy,Fz,Mx,My,Mz   ! 6·ÖÁ¿
-   real(PRE_EC):: Px,Py,Pz,Cfx,Cfy,Cfz   ! Ñ¹Á¦ºÍÄ¦²ÁÁ¦
-   real(PRE_EC):: fx0,fy0,fz0,xc,yc,zc,p1,p2
-   real(PRE_EC):: P_inf,Pw  
-   real(PRE_EC):: CL,CD,CS      ! ÉýÁ¦ÏµÊý¡¢×èÁ¦ÏµÊý¡¢²àÏòÁ¦ÏµÊý
-   real(PRE_EC),dimension(:),allocatable:: Mx1,My1,Mz1,Px1,Py1,Pz1,Cfx1,Cfy1,Cfz1    ! ¸÷¿éµÄÆø¶¯Á¦¡¢Á¦¾Ø
-   real(PRE_EC),dimension(9):: Ft,Ft0  ! mpi reduce »ã×Ü
-   
-   integer:: nMesh
-   Type (Block_TYPE),pointer:: B
-   Type (BC_MSG_TYPE),pointer:: Bc
-   character(len=50):: filename
+subroutine comput_force
+  use Global_Var
+  implicit none
+  integer:: i, j, k, m, mB, nf, nx, ny, nz, NM, ierr
+  real(PRE_EC):: Fx, Fy, Fz, Mx, My, Mz   ! 6åˆ†é‡
+  real(PRE_EC):: Px, Py, Pz, Cfx, Cfy, Cfz   ! åŽ‹åŠ›å’Œæ‘©æ“¦åŠ›
+  real(PRE_EC):: fx0, fy0, fz0, xc, yc, zc, p1, p2
+  real(PRE_EC):: P_inf, Pw
+  real(PRE_EC):: CL, CD, CS      ! å‡åŠ›ç³»æ•°ã€é˜»åŠ›ç³»æ•°ã€ä¾§å‘åŠ›ç³»æ•°
+  real(PRE_EC), dimension(:), allocatable:: Mx1, My1, Mz1, Px1, Py1, Pz1, Cfx1, Cfy1, Cfz1    ! å„å—çš„æ°”åŠ¨åŠ›ã€åŠ›çŸ©
+  real(PRE_EC), dimension(9):: Ft, Ft0  ! mpi reduce æ±‡æ€»
 
-!   print*, "comput force ..."    ! ÈçÃ»ÓÐ¸ÃÓï¾äÔÚSWÉÏÔËÐÐ³ö´í ???
+  integer:: nMesh
+  Type(Block_TYPE), pointer:: B
+  Type(BC_MSG_TYPE), pointer:: Bc
+  character(len=50):: filename
 
-   p_inf=1.d0/(gamma*Ma*Ma)
-! ËÑË÷Ï¸Íø¸ñËùÓÐ¿éµÄËùÓÐ×ÓÃæ£¬Èç¹û·¢ÏÖ¹Ì±Ú±ß½çÌõ¼þ£¬ÔòÍ³¼ÆÆø¶¯Á¦¼°Á¦¾Ø
-   NM=Mesh(1)%Num_Block
-   allocate(Mx1(NM),My1(NM),Mz1(NM),Px1(NM),Py1(NM),Pz1(NM),Cfx1(NM),Cfy1(NM),Cfz1(NM))
-   
-   Mx1=0.d0; My1=0.d0; Mz1=0.d0
-   Px1=0.d0; Py1=0.d0; Pz1=0.d0; Cfx1=0.d0; Cfy1=0.d0; Cfz1=0.d0
-   
-   do mB=1,NM
-     B => Mesh(1)%Block(mB)                                        
-     nx=B%nx; ny=B%ny; nz=B%nz
-     do nf=1,B%subface  
-       Bc=> B%bc_msg(nf)
+!   print*, "comput force ..."    ! å¦‚æ²¡æœ‰è¯¥è¯­å¥åœ¨SWä¸Šè¿è¡Œå‡ºé”™ ???
 
-       if(Bc%bc .eq. BC_WALL) then
-         if(Bc%face .eq. 1 ) then              ! i- Ãæ
-           do k=Bc%kb,Bc%ke-1
-             do j=Bc%jb,Bc%je-1
-!-------------------------------±íÃæÑ¹Á¦----------------------------------------------------  
-               p1=(gamma-1.d0)*(B%U(5,1,j,k)-(B%U(2,1,j,k)**2+B%U(3,1,j,k)**2+B%U(4,1,j,k)**2)/B%U(1,1,j,k))
-               p2=(gamma-1.d0)*(B%U(5,0,j,k)-(B%U(2,0,j,k)**2+B%U(3,0,j,k)**2+B%U(4,0,j,k)**2)/B%U(1,0,j,k))
-               Pw=-(0.5d0*(p1+p2)-p_inf )*B%si(1,j,k)    ! Íâ·¨Ïò
-! -------------------------»ý·Ö±íÃæÑ¹Á¦¼°±íÃæÄ¦²Á×èÁ¦ -----------------------------------          
-               Px1(mB)=Px1(mB)+Pw*B%ni1(1,j,k) ;   Py1(mB)=Py1(mB)+Pw*B%ni2(1,j,k) ;  Pz1(mB)=Pz1(mB)+Pw*B%ni3(1,j,k)   
-!              Õ³ÐÔÁ¦ £¨i-, j-, k- ÎªÕý£» i+ , j+, k+ Îª¸º£©
-               Cfx1(mB)=Cfx1(mB)+B%Surf1(j,k,1) ;  Cfy1(mB)=Cfy1(mB)+B%Surf1(j,k,2) ;  Cfz1(mB)=Cfz1(mB)+B%Surf1(j,k,3)     
+  p_inf = 1.d0/(gamma*Ma*Ma)
+! æœç´¢ç»†ç½‘æ ¼æ‰€æœ‰å—çš„æ‰€æœ‰å­é¢ï¼Œå¦‚æžœå‘çŽ°å›ºå£è¾¹ç•Œæ¡ä»¶ï¼Œåˆ™ç»Ÿè®¡æ°”åŠ¨åŠ›åŠåŠ›çŸ©
+  NM = Mesh(1)%Num_Block
+  allocate (Mx1(NM), My1(NM), Mz1(NM), Px1(NM), Py1(NM), Pz1(NM), Cfx1(NM), Cfy1(NM), Cfz1(NM))
 
-! --------------------------¼ÆËãÁ¦¾Ø (¾ØÐÄ×ø±ê centroid(1:3) )------------------------            
-               fx0=Pw*B%ni1(1,j,k)+B%Surf1(j,k,1)             
-               fy0=Pw*B%ni2(1,j,k)+B%Surf1(j,k,2)
-               fz0=Pw*B%ni3(1,j,k)+B%Surf1(j,k,3)
-               xc=(B%xc(1,j,k)+B%xc(0,j,k))*0.5d0 -centroid(1)            
-               yc=(B%yc(1,j,k)+B%yc(0,j,k))*0.5d0 -centroid(2)             
-               zc=(B%zc(1,j,k)+B%zc(0,j,k))*0.5d0 -centroid(3)            
-               Mx1(mB)=Mx1(mB)+ (yc*fz0-zc*fy0)
-               My1(mB)=My1(mB)+ (zc*fx0-xc*fz0)
-               Mz1(mB)=Mz1(mB)+ (xc*fy0-yc*fx0)
-             enddo
-           enddo
+  Mx1 = 0.d0; My1 = 0.d0; Mz1 = 0.d0
+  Px1 = 0.d0; Py1 = 0.d0; Pz1 = 0.d0; Cfx1 = 0.d0; Cfy1 = 0.d0; Cfz1 = 0.d0
 
+  do mB = 1, NM
+    B => Mesh(1)%Block(mB)
+    nx = B%nx; ny = B%ny; nz = B%nz
+    do nf = 1, B%subface
+      Bc => B%bc_msg(nf)
 
-         else if(Bc%face .eq. 2 ) then       ! j- Ãæ
-           do k=Bc%kb,Bc%ke-1
-             do i=Bc%ib,Bc%ie-1
-               p1=(gamma-1.d0)*(B%U(5,i,1,k)-(B%U(2,i,1,k)**2+B%U(3,i,1,k)**2+B%U(4,i,1,k)**2)/B%U(1,i,1,k))
-               p2=(gamma-1.d0)*(B%U(5,i,0,k)-(B%U(2,i,0,k)**2+B%U(3,i,0,k)**2+B%U(4,i,0,k)**2)/B%U(1,i,0,k))
-               Pw=-(0.5d0*(p1+p2)-p_inf )*B%sj(i,1,k)    
-               Px1(mB)=Px1(mB)+Pw*B%nj1(i,1,k);   Py1(mB)=Py1(mB)+Pw*B%nj2(i,1,k) ;   Pz1(mB)=Pz1(mB)+Pw*B%nj3(i,1,k)   
-               Cfx1(mB)=Cfx1(mB)+B%Surf2(i,k,1); Cfy1(mB)=Cfy1(mB)+B%Surf2(i,k,2);  Cfz1(mB)=Cfz1(mB)+B%Surf2(i,k,3)
+      if (Bc%bc .eq. BC_WALL) then
+      if (Bc%face .eq. 1) then              ! i- é¢
+      do k = Bc%kb, Bc%ke-1
+      do j = Bc%jb, Bc%je-1
+!-------------------------------è¡¨é¢åŽ‹åŠ›----------------------------------------------------
+        p1 = (gamma-1.d0)*(B%U(5, 1, j, k)-(B%U(2, 1, j, k)**2+B%U(3, 1, j, k)**2+B%U(4, 1, j, k)**2)/B%U(1, 1, j, k))
+        p2 = (gamma-1.d0)*(B%U(5, 0, j, k)-(B%U(2, 0, j, k)**2+B%U(3, 0, j, k)**2+B%U(4, 0, j, k)**2)/B%U(1, 0, j, k))
+        Pw = -(0.5d0*(p1+p2)-p_inf)*B%si(1, j, k)    ! å¤–æ³•å‘
+! -------------------------ç§¯åˆ†è¡¨é¢åŽ‹åŠ›åŠè¡¨é¢æ‘©æ“¦é˜»åŠ› -----------------------------------
+        Px1(mB) = Px1(mB)+Pw*B%ni1(1, j, k); Py1(mB) = Py1(mB)+Pw*B%ni2(1, j, k); Pz1(mB) = Pz1(mB)+Pw*B%ni3(1, j, k)
+!              ç²˜æ€§åŠ› ï¼ˆi-, j-, k- ä¸ºæ­£ï¼› i+ , j+, k+ ä¸ºè´Ÿï¼‰
+        Cfx1(mB) = Cfx1(mB)+B%Surf1(j, k, 1); Cfy1(mB) = Cfy1(mB)+B%Surf1(j, k, 2); Cfz1(mB) = Cfz1(mB)+B%Surf1(j, k, 3)
 
- ! --------------------------¼ÆËãÁ¦¾Ø (ÒÔ×ø±êÔ­µãÎªÖÐÐÄ) ---------------------------           
-               fx0=Pw*B%nj1(i,1,k)+B%Surf2(i,k,1)                
-               fy0=Pw*B%nj2(i,1,k)+B%Surf2(i,k,2)
-               fz0=Pw*B%nj3(i,1,k)+B%Surf2(i,k,3)
-               xc=(B%xc(i,1,k)+B%xc(i,0,k))*0.5d0 -centroid(1)            
-               yc=(B%yc(i,1,k)+B%yc(i,0,k))*0.5d0 -centroid(2)            
-               zc=(B%zc(i,1,k)+B%zc(i,0,k))*0.5d0 -centroid(3)            
-               Mx1(mB)=Mx1(mB)+ (yc*fz0-zc*fy0)
-               My1(mB)=My1(mB)+ (zc*fx0-xc*fz0)
-               Mz1(mB)=Mz1(mB)+ (xc*fy0-yc*fx0)
-             enddo
-           enddo        
+! --------------------------è®¡ç®—åŠ›çŸ© (çŸ©å¿ƒåæ ‡ centroid(1:3) )------------------------
+        fx0 = Pw*B%ni1(1, j, k)+B%Surf1(j, k, 1)
+        fy0 = Pw*B%ni2(1, j, k)+B%Surf1(j, k, 2)
+        fz0 = Pw*B%ni3(1, j, k)+B%Surf1(j, k, 3)
+        xc = (B%xc(1, j, k)+B%xc(0, j, k))*0.5d0-centroid(1)
+        yc = (B%yc(1, j, k)+B%yc(0, j, k))*0.5d0-centroid(2)
+        zc = (B%zc(1, j, k)+B%zc(0, j, k))*0.5d0-centroid(3)
+        Mx1(mB) = Mx1(mB)+(yc*fz0-zc*fy0)
+        My1(mB) = My1(mB)+(zc*fx0-xc*fz0)
+        Mz1(mB) = Mz1(mB)+(xc*fy0-yc*fx0)
+      end do
+      end do
 
+      else if (Bc%face .eq. 2) then       ! j- é¢
+      do k = Bc%kb, Bc%ke-1
+      do i = Bc%ib, Bc%ie-1
+        p1 = (gamma-1.d0)*(B%U(5, i, 1, k)-(B%U(2, i, 1, k)**2+B%U(3, i, 1, k)**2+B%U(4, i, 1, k)**2)/B%U(1, i, 1, k))
+        p2 = (gamma-1.d0)*(B%U(5, i, 0, k)-(B%U(2, i, 0, k)**2+B%U(3, i, 0, k)**2+B%U(4, i, 0, k)**2)/B%U(1, i, 0, k))
+        Pw = -(0.5d0*(p1+p2)-p_inf)*B%sj(i, 1, k)
+        Px1(mB) = Px1(mB)+Pw*B%nj1(i, 1, k); Py1(mB) = Py1(mB)+Pw*B%nj2(i, 1, k); Pz1(mB) = Pz1(mB)+Pw*B%nj3(i, 1, k)
+        Cfx1(mB) = Cfx1(mB)+B%Surf2(i, k, 1); Cfy1(mB) = Cfy1(mB)+B%Surf2(i, k, 2); Cfz1(mB) = Cfz1(mB)+B%Surf2(i, k, 3)
 
-         else if(Bc%face .eq. 3 ) then       ! k- Ãæ
-           do j=Bc%jb,Bc%je-1
-             do i=Bc%ib,Bc%ie-1   
-               p1=(gamma-1.d0)*(B%U(5,i,j,1)-(B%U(2,i,j,1)**2+B%U(3,i,j,1)**2+B%U(4,i,j,1)**2)/B%U(1,i,j,1))
-               p2=(gamma-1.d0)*(B%U(5,i,j,0)-(B%U(2,i,j,0)**2+B%U(3,i,j,0)**2+B%U(4,i,j,0)**2)/B%U(1,i,j,0))
-               Pw=-(0.5d0*(p1+p2)-p_inf )*B%sk(i,j,1)   
-               Px1(mB)=Px1(mB)+Pw*B%nk1(i,j,1);  Py1(mB)=Py1(mB)+Pw*B%nk2(i,j,1) ;  Pz1(mB)=Pz1(mB)+Pw*B%nk3(i,j,1)   
-               Cfx1(mB)=Cfx1(mB)+B%Surf3(i,j,1);  Cfy1(mB)=Cfy1(mB)+B%Surf3(i,j,2);  Cfz1(mB)=Cfz1(mB)+B%Surf3(i,j,3)         
-			     
-               fx0=Pw*B%nk1(i,j,1)+B%Surf3(i,j,1)          
-               fy0=Pw*B%nk2(i,j,1)+B%Surf3(i,j,2)
-               fz0=Pw*B%nk3(i,j,1)+B%Surf3(i,j,3)
+! --------------------------è®¡ç®—åŠ›çŸ© (ä»¥åæ ‡åŽŸç‚¹ä¸ºä¸­å¿ƒ) ---------------------------
+        fx0 = Pw*B%nj1(i, 1, k)+B%Surf2(i, k, 1)
+        fy0 = Pw*B%nj2(i, 1, k)+B%Surf2(i, k, 2)
+        fz0 = Pw*B%nj3(i, 1, k)+B%Surf2(i, k, 3)
+        xc = (B%xc(i, 1, k)+B%xc(i, 0, k))*0.5d0-centroid(1)
+        yc = (B%yc(i, 1, k)+B%yc(i, 0, k))*0.5d0-centroid(2)
+        zc = (B%zc(i, 1, k)+B%zc(i, 0, k))*0.5d0-centroid(3)
+        Mx1(mB) = Mx1(mB)+(yc*fz0-zc*fy0)
+        My1(mB) = My1(mB)+(zc*fx0-xc*fz0)
+        Mz1(mB) = Mz1(mB)+(xc*fy0-yc*fx0)
+      end do
+      end do
 
-               xc=(B%xc(i,j,1)+B%xc(i,j,0))*0.5d0  - centroid(1)
-               yc=(B%yc(i,j,1)+B%yc(i,j,0))*0.5d0  - centroid(2)
-               zc=(B%zc(i,j,1)+B%zc(i,j,0))*0.5d0  - centroid(3)
-               Mx1(mB)=Mx1(mB)+ (yc*fz0-zc*fy0)
-               My1(mB)=My1(mB)+ (zc*fx0-xc*fz0)
-               Mz1(mB)=Mz1(mB)+ (xc*fy0-yc*fx0)
-             enddo
-           enddo 
+      else if (Bc%face .eq. 3) then       ! k- é¢
+      do j = Bc%jb, Bc%je-1
+      do i = Bc%ib, Bc%ie-1
+        p1 = (gamma-1.d0)*(B%U(5, i, j, 1)-(B%U(2, i, j, 1)**2+B%U(3, i, j, 1)**2+B%U(4, i, j, 1)**2)/B%U(1, i, j, 1))
+        p2 = (gamma-1.d0)*(B%U(5, i, j, 0)-(B%U(2, i, j, 0)**2+B%U(3, i, j, 0)**2+B%U(4, i, j, 0)**2)/B%U(1, i, j, 0))
+        Pw = -(0.5d0*(p1+p2)-p_inf)*B%sk(i, j, 1)
+        Px1(mB) = Px1(mB)+Pw*B%nk1(i, j, 1); Py1(mB) = Py1(mB)+Pw*B%nk2(i, j, 1); Pz1(mB) = Pz1(mB)+Pw*B%nk3(i, j, 1)
+        Cfx1(mB) = Cfx1(mB)+B%Surf3(i, j, 1); Cfy1(mB) = Cfy1(mB)+B%Surf3(i, j, 2); Cfz1(mB) = Cfz1(mB)+B%Surf3(i, j, 3)
 
-         else if(Bc%face .eq. 4 ) then              ! i+ Ãæ
-           do k=Bc%kb,Bc%ke-1
-             do j=Bc%jb,Bc%je-1
- !-----------------------------------------±íÃæÑ¹Á¦ ---------------------------------------------------               
-               p1=(gamma-1.d0)*(B%U(5,nx-1,j,k)-(B%U(2,nx-1,j,k)**2+B%U(3,nx-1,j,k)**2+B%U(4,nx-1,j,k)**2)/B%U(1,nx-1,j,k))
-               p2=(gamma-1.d0)*(B%U(5,nx,j,k)-(B%U(2,nx,j,k)**2+B%U(3,nx,j,k)**2+B%U(4,nx,j,k)**2)/B%U(1,nx,j,k))
-               Pw= (0.5d0*(p1+p2)-p_inf )*B%si(nx,j,k)  ! Íâ·¨Ïò
-! ------------------------------»ý·Ö±íÃæÑ¹Á¦¼°±íÃæÄ¦²Á×èÁ¦------------------------------------------           
-               Px1(mB)=Px1(mB)+Pw*B%ni1(nx,j,k) ;   Py1(mB)=Py1(mB)+Pw*B%ni2(nx,j,k) ;  Pz1(mB)=Pz1(mB)+Pw*B%ni3(nx,j,k)   
-!            Õ³ÐÔÁ¦ £¨i+, j+, k+ ÃæÎª¸º£¬ ±ÚÃæËùÊÜÁ¦£©
+        fx0 = Pw*B%nk1(i, j, 1)+B%Surf3(i, j, 1)
+        fy0 = Pw*B%nk2(i, j, 1)+B%Surf3(i, j, 2)
+        fz0 = Pw*B%nk3(i, j, 1)+B%Surf3(i, j, 3)
+
+        xc = (B%xc(i, j, 1)+B%xc(i, j, 0))*0.5d0-centroid(1)
+        yc = (B%yc(i, j, 1)+B%yc(i, j, 0))*0.5d0-centroid(2)
+        zc = (B%zc(i, j, 1)+B%zc(i, j, 0))*0.5d0-centroid(3)
+        Mx1(mB) = Mx1(mB)+(yc*fz0-zc*fy0)
+        My1(mB) = My1(mB)+(zc*fx0-xc*fz0)
+        Mz1(mB) = Mz1(mB)+(xc*fy0-yc*fx0)
+      end do
+      end do
+
+      else if (Bc%face .eq. 4) then              ! i+ é¢
+      do k = Bc%kb, Bc%ke-1
+      do j = Bc%jb, Bc%je-1
+!-----------------------------------------è¡¨é¢åŽ‹åŠ› ---------------------------------------------------
+       p1 = (gamma-1.d0)*(B%U(5, nx-1, j, k)-(B%U(2, nx-1, j, k)**2+B%U(3, nx-1, j, k)**2+B%U(4, nx-1, j, k)**2)/B%U(1, nx-1, j, k))
+        p2 = (gamma-1.d0)*(B%U(5, nx, j, k)-(B%U(2, nx, j, k)**2+B%U(3, nx, j, k)**2+B%U(4, nx, j, k)**2)/B%U(1, nx, j, k))
+        Pw = (0.5d0*(p1+p2)-p_inf)*B%si(nx, j, k)  ! å¤–æ³•å‘
+! ------------------------------ç§¯åˆ†è¡¨é¢åŽ‹åŠ›åŠè¡¨é¢æ‘©æ“¦é˜»åŠ›------------------------------------------
+        Px1(mB) = Px1(mB)+Pw*B%ni1(nx, j, k); Py1(mB) = Py1(mB)+Pw*B%ni2(nx, j, k); Pz1(mB) = Pz1(mB)+Pw*B%ni3(nx, j, k)
+!            ç²˜æ€§åŠ› ï¼ˆi+, j+, k+ é¢ä¸ºè´Ÿï¼Œ å£é¢æ‰€å—åŠ›ï¼‰
 !               Cfx1(mB)=Cfx1(mB)+B%Surf4(j,k,1) ;  Cfy1(mB)=Cfy1(mB)+B%Surf4(j,k,2) ;  Cfz1(mB)=Cfz1(mB)+B%Surf4(j,k,3)         ! Bug removed
-               Cfx1(mB)=Cfx1(mB)-B%Surf4(j,k,1) ;  Cfy1(mB)=Cfy1(mB)-B%Surf4(j,k,2) ;  Cfz1(mB)=Cfz1(mB)-B%Surf4(j,k,3)
+        Cfx1(mB) = Cfx1(mB)-B%Surf4(j, k, 1); Cfy1(mB) = Cfy1(mB)-B%Surf4(j, k, 2); Cfz1(mB) = Cfz1(mB)-B%Surf4(j, k, 3)
 
-! -------------------------------¼ÆËãÁ¦¾Ø (ÒÔ×ø±êÔ­µãÎªÖÐÐÄ) --------------------------------------           
-               fx0=Pw*B%ni1(nx,j,k)-B%Surf4(j,k,1)              ! Bug removed 
-               fy0=Pw*B%ni2(nx,j,k)-B%Surf4(j,k,2)
-               fz0=Pw*B%ni3(nx,j,k)-B%Surf4(j,k,3)
-               xc=(B%xc(nx-1,j,k)+B%xc(nx,j,k))*0.5d0   - centroid(1)           
-               yc=(B%yc(nx-1,j,k)+B%yc(nx,j,k))*0.5d0   - centroid(2)          
-               zc=(B%zc(nx-1,j,k)+B%zc(nx,j,k))*0.5d0   - centroid(3)         
-               Mx1(mB)=Mx1(mB)+ (yc*fz0-zc*fy0)
-               My1(mB)=My1(mB)+ (zc*fx0-xc*fz0)
-               Mz1(mB)=Mz1(mB)+ (xc*fy0-yc*fx0)
-             enddo
-           enddo
+! -------------------------------è®¡ç®—åŠ›çŸ© (ä»¥åæ ‡åŽŸç‚¹ä¸ºä¸­å¿ƒ) --------------------------------------
+        fx0 = Pw*B%ni1(nx, j, k)-B%Surf4(j, k, 1)              ! Bug removed
+        fy0 = Pw*B%ni2(nx, j, k)-B%Surf4(j, k, 2)
+        fz0 = Pw*B%ni3(nx, j, k)-B%Surf4(j, k, 3)
+        xc = (B%xc(nx-1, j, k)+B%xc(nx, j, k))*0.5d0-centroid(1)
+        yc = (B%yc(nx-1, j, k)+B%yc(nx, j, k))*0.5d0-centroid(2)
+        zc = (B%zc(nx-1, j, k)+B%zc(nx, j, k))*0.5d0-centroid(3)
+        Mx1(mB) = Mx1(mB)+(yc*fz0-zc*fy0)
+        My1(mB) = My1(mB)+(zc*fx0-xc*fz0)
+        Mz1(mB) = Mz1(mB)+(xc*fy0-yc*fx0)
+      end do
+      end do
 
-
-         else if(Bc%face .eq. 5 ) then       ! j+ Ãæ
-           do k=Bc%kb,Bc%ke-1
-             do i=Bc%ib,Bc%ie-1
-               p1=(gamma-1.d0)*(B%U(5,i,ny-1,k)-(B%U(2,i,ny-1,k)**2+B%U(3,i,ny-1,k)**2+B%U(4,i,ny-1,k)**2)/B%U(1,i,ny-1,k))
-               p2=(gamma-1.d0)*(B%U(5,i,ny,k)-(B%U(2,i,ny,k)**2+B%U(3,i,ny,k)**2+B%U(4,i,ny,k)**2)/B%U(1,i,ny,k))
-               Pw= (0.5d0*(p1+p2)-p_inf )*B%sj(i,ny,k)
-               Px1(mB)=Px1(mB)+Pw*B%nj1(i,ny,k);   Py1(mB)=Py1(mB)+Pw*B%nj2(i,ny,k) ;   Pz1(mB)=Pz1(mB)+Pw*B%nj3(i,ny,k)   
+      else if (Bc%face .eq. 5) then       ! j+ é¢
+      do k = Bc%kb, Bc%ke-1
+      do i = Bc%ib, Bc%ie-1
+       p1 = (gamma-1.d0)*(B%U(5, i, ny-1, k)-(B%U(2, i, ny-1, k)**2+B%U(3, i, ny-1, k)**2+B%U(4, i, ny-1, k)**2)/B%U(1, i, ny-1, k))
+        p2 = (gamma-1.d0)*(B%U(5, i, ny, k)-(B%U(2, i, ny, k)**2+B%U(3, i, ny, k)**2+B%U(4, i, ny, k)**2)/B%U(1, i, ny, k))
+        Pw = (0.5d0*(p1+p2)-p_inf)*B%sj(i, ny, k)
+        Px1(mB) = Px1(mB)+Pw*B%nj1(i, ny, k); Py1(mB) = Py1(mB)+Pw*B%nj2(i, ny, k); Pz1(mB) = Pz1(mB)+Pw*B%nj3(i, ny, k)
 !              Cfx1(mB)=Cfx1(mB)+B%Surf5(i,k,1); Cfy1(mB)=Cfy1(mB)+B%Surf5(i,k,2);  Cfz1(mB)=Cfz1(mB)+B%Surf5(i,k,3)
-               Cfx1(mB)=Cfx1(mB)-B%Surf5(i,k,1); Cfy1(mB)=Cfy1(mB)-B%Surf5(i,k,2);  Cfz1(mB)=Cfz1(mB)-B%Surf5(i,k,3)
+        Cfx1(mB) = Cfx1(mB)-B%Surf5(i, k, 1); Cfy1(mB) = Cfy1(mB)-B%Surf5(i, k, 2); Cfz1(mB) = Cfz1(mB)-B%Surf5(i, k, 3)
 
-! --------------------------------¼ÆËãÁ¦¾Ø (ÒÔ×ø±êÔ­µãÎªÖÐÐÄ)  ---------------------------------------          
-               fx0=Pw*B%nj1(i,ny,k)-B%Surf5(i,k,1)                 ! Bug removed
-               fy0=Pw*B%nj2(i,ny,k)-B%Surf5(i,k,2)
-               fz0=Pw*B%nj3(i,ny,k)-B%Surf5(i,k,3)
-               xc=(B%xc(i,ny-1,k)+B%xc(i,ny,k))*0.5d0  - centroid(1)           
-               yc=(B%yc(i,ny-1,k)+B%yc(i,ny,k))*0.5d0  - centroid(2)          
-               zc=(B%zc(i,ny-1,k)+B%zc(i,ny,k))*0.5d0  - centroid(3)          
-               Mx1(mB)=Mx1(mB)+ (yc*fz0-zc*fy0)
-               My1(mB)=My1(mB)+ (zc*fx0-xc*fz0)
-               Mz1(mB)=Mz1(mB)+ (xc*fy0-yc*fx0)
-             enddo
-           enddo        
+! --------------------------------è®¡ç®—åŠ›çŸ© (ä»¥åæ ‡åŽŸç‚¹ä¸ºä¸­å¿ƒ)  ---------------------------------------
+        fx0 = Pw*B%nj1(i, ny, k)-B%Surf5(i, k, 1)                 ! Bug removed
+        fy0 = Pw*B%nj2(i, ny, k)-B%Surf5(i, k, 2)
+        fz0 = Pw*B%nj3(i, ny, k)-B%Surf5(i, k, 3)
+        xc = (B%xc(i, ny-1, k)+B%xc(i, ny, k))*0.5d0-centroid(1)
+        yc = (B%yc(i, ny-1, k)+B%yc(i, ny, k))*0.5d0-centroid(2)
+        zc = (B%zc(i, ny-1, k)+B%zc(i, ny, k))*0.5d0-centroid(3)
+        Mx1(mB) = Mx1(mB)+(yc*fz0-zc*fy0)
+        My1(mB) = My1(mB)+(zc*fx0-xc*fz0)
+        Mz1(mB) = Mz1(mB)+(xc*fy0-yc*fx0)
+      end do
+      end do
 
-
-         else if(Bc%face .eq. 6 ) then       ! k+ Ãæ
-           do j=Bc%jb,Bc%je-1
-             do i=Bc%ib,Bc%ie-1
-               p1=(gamma-1.d0)*(B%U(5,i,j,nz-1)-(B%U(2,i,j,nz-1)**2+B%U(3,i,j,nz-1)**2+B%U(4,i,j,nz-1)**2)/B%U(1,i,j,nz-1))
-               p2=(gamma-1.d0)*(B%U(5,i,j,nz)-(B%U(2,i,j,nz)**2+B%U(3,i,j,nz)**2+B%U(4,i,j,nz)**2)/B%U(1,i,j,nz))
-               Pw= (0.5d0*(p1+p2)-p_inf )*B%sk(i,j,nz)  
-               Px1(mB)=Px1(mB)+Pw*B%nk1(i,j,nz);  Py1(mB)=Py1(mB)+Pw*B%nk2(i,j,nz) ;  Pz1(mB)=Pz1(mB)+Pw*B%nk3(i,j,nz)   
+      else if (Bc%face .eq. 6) then       ! k+ é¢
+      do j = Bc%jb, Bc%je-1
+      do i = Bc%ib, Bc%ie-1
+       p1 = (gamma-1.d0)*(B%U(5, i, j, nz-1)-(B%U(2, i, j, nz-1)**2+B%U(3, i, j, nz-1)**2+B%U(4, i, j, nz-1)**2)/B%U(1, i, j, nz-1))
+        p2 = (gamma-1.d0)*(B%U(5, i, j, nz)-(B%U(2, i, j, nz)**2+B%U(3, i, j, nz)**2+B%U(4, i, j, nz)**2)/B%U(1, i, j, nz))
+        Pw = (0.5d0*(p1+p2)-p_inf)*B%sk(i, j, nz)
+        Px1(mB) = Px1(mB)+Pw*B%nk1(i, j, nz); Py1(mB) = Py1(mB)+Pw*B%nk2(i, j, nz); Pz1(mB) = Pz1(mB)+Pw*B%nk3(i, j, nz)
 !               Cfx1(mB)=Cfx1(mB)+B%Surf6(i,j,1);  Cfy1(mB)=Cfy1(mB)+B%Surf6(i,j,2);  Cfz1(mB)=Cfz1(mB)+B%Surf6(i,j,3)            ! Bug removed
-               Cfx1(mB)=Cfx1(mB)-B%Surf6(i,j,1);  Cfy1(mB)=Cfy1(mB)-B%Surf6(i,j,2);  Cfz1(mB)=Cfz1(mB)-B%Surf6(i,j,3)
+        Cfx1(mB) = Cfx1(mB)-B%Surf6(i, j, 1); Cfy1(mB) = Cfy1(mB)-B%Surf6(i, j, 2); Cfz1(mB) = Cfz1(mB)-B%Surf6(i, j, 3)
 
-               fx0=Pw*B%nk1(i,j,nz)-B%Surf6(i,j,1)        ! Bug removed
-               fy0=Pw*B%nk2(i,j,nz)-B%Surf6(i,j,2)
-               fz0=Pw*B%nk3(i,j,nz)-B%Surf6(i,j,3)
+        fx0 = Pw*B%nk1(i, j, nz)-B%Surf6(i, j, 1)        ! Bug removed
+        fy0 = Pw*B%nk2(i, j, nz)-B%Surf6(i, j, 2)
+        fz0 = Pw*B%nk3(i, j, nz)-B%Surf6(i, j, 3)
 
-               xc=(B%xc(i,j,nz-1)+B%xc(i,j,nz))*0.5d0 - centroid(1)
-               yc=(B%yc(i,j,nz-1)+B%yc(i,j,nz))*0.5d0 - centroid(2)
-               zc=(B%zc(i,j,nz-1)+B%zc(i,j,nz))*0.5d0 - centroid(3)
-               Mx1(mB)=Mx1(mB)+ (yc*fz0-zc*fy0)
-               My1(mB)=My1(mB)+ (zc*fx0-xc*fz0)
-               Mz1(mB)=Mz1(mB)+ (xc*fy0-yc*fx0)
-             enddo
-           enddo
-         endif
-       endif
-     enddo
-   enddo
- 
-   Fx=0.d0; Fy=0.d0; Fz=0.d0; Mx=0.d0; My=0.d0; Mz=0.d0
-   Px=0.d0; Py=0.d0; Pz=0.d0; Cfx=0.d0; Cfy=0.d0; Cfz=0.d0
- 
- !  °Ñ¸÷¿éµÄÆø¶¯Á¦¡¢Á¦¾Ø¼ÓÆðÀ´
-   do mB=1,NM
-   Px=Px+Px1(mB); Py=Py+Py1(mB); Pz=Pz+Pz1(mB)
-   Cfx=Cfx+Cfx1(mB); Cfy=Cfy+Cfy1(mB); Cfz=Cfz+Cfz1(mB)
-   Mx=Mx+Mx1(mB); My=My+My1(mB); Mz=Mz+Mz1(mB)
-   enddo
+        xc = (B%xc(i, j, nz-1)+B%xc(i, j, nz))*0.5d0-centroid(1)
+        yc = (B%yc(i, j, nz-1)+B%yc(i, j, nz))*0.5d0-centroid(2)
+        zc = (B%zc(i, j, nz-1)+B%zc(i, j, nz))*0.5d0-centroid(3)
+        Mx1(mB) = Mx1(mB)+(yc*fz0-zc*fy0)
+        My1(mB) = My1(mB)+(zc*fx0-xc*fz0)
+        Mz1(mB) = Mz1(mB)+(xc*fy0-yc*fx0)
+      end do
+      end do
+      end if
+      end if
+    end do
+  end do
 
-   Ft(1)=Px ; Ft(2)=Py ; Ft(3)=Pz
-   Ft(4)=Cfx; Ft(5)=Cfy; Ft(6)=Cfz
-   Ft(7)=Mx;  Ft(8)=My; Ft(9)=Mz
+  Fx = 0.d0; Fy = 0.d0; Fz = 0.d0; Mx = 0.d0; My = 0.d0; Mz = 0.d0
+  Px = 0.d0; Py = 0.d0; Pz = 0.d0; Cfx = 0.d0; Cfy = 0.d0; Cfz = 0.d0
 
-!  ¸÷½ø³Ì¹éÔ¼ÇóºÍ
-   call MPI_ALLREDUCE(Ft,Ft0,9,OCFD_DATA_TYPE,MPI_SUM,MPI_COMM_WORLD,ierr)
+!  æŠŠå„å—çš„æ°”åŠ¨åŠ›ã€åŠ›çŸ©åŠ èµ·æ¥
+  do mB = 1, NM
+    Px = Px+Px1(mB); Py = Py+Py1(mB); Pz = Pz+Pz1(mB)
+    Cfx = Cfx+Cfx1(mB); Cfy = Cfy+Cfy1(mB); Cfz = Cfz+Cfz1(mB)
+    Mx = Mx+Mx1(mB); My = My+My1(mB); Mz = Mz+Mz1(mB)
+  end do
+
+  Ft(1) = Px; Ft(2) = Py; Ft(3) = Pz
+  Ft(4) = Cfx; Ft(5) = Cfy; Ft(6) = Cfz
+  Ft(7) = Mx; Ft(8) = My; Ft(9) = Mz
+
+!  å„è¿›ç¨‹å½’çº¦æ±‚å’Œ
+  call MPI_ALLREDUCE(Ft, Ft0, 9, OCFD_DATA_TYPE, MPI_SUM, MPI_COMM_WORLD, ierr)
 
 !   Fx=Px+Cfx; Fy=Py+Cfy; Fz=Pz+Cfz
-    Ft0(1:6)=2.d0*Ft0(1:6)/Ref_S
-	Ft0(7:9)=2.d0*Ft0(7:9)/(Ref_S*Ref_L)
+  Ft0(1:6) = 2.d0*Ft0(1:6)/Ref_S
+  Ft0(7:9) = 2.d0*Ft0(7:9)/(Ref_S*Ref_L)
 
-	Fx=Ft0(1)+Ft0(4)              ! Æø¶¯Á¦ÏµÊý
-	Fy=Ft0(2)+Ft0(5)
-	Fz=Ft0(3)+Ft0(6)
+  Fx = Ft0(1)+Ft0(4)              ! æ°”åŠ¨åŠ›ç³»æ•°
+  Fy = Ft0(2)+Ft0(5)
+  Fz = Ft0(3)+Ft0(6)
 
+!------
+  if (Cood_Y_UP == 1) then   ! Y è½´åž‚ç›´å‘ä¸Š
+    CL = Fy*cos(AoA)-Fx*sin(AoA)
+    CD = Fx*cos(AoA)+Fy*sin(AoA)
+    Cs = Fz
+  else                      ! Zè½´åž‚ç›´å‘ä¸Š
+    CL = Fz*cos(AoA)-Fx*sin(AoA)
+    CD = Fx*cos(AoA)+Fz*sin(AoA)
+    Cs = Fy
+  end if
 
-!------   
- if(Cood_Y_UP ==1) then   ! Y Öá´¹Ö±ÏòÉÏ 
-	CL=Fy*cos(AoA)-Fx*sin(AoA)
-	CD=Fx*cos(AoA)+Fy*sin(AoA)
-    Cs=Fz
- else                      ! ZÖá´¹Ö±ÏòÉÏ 
-	CL=Fz*cos(AoA)-Fx*sin(AoA)
-	CD=Fx*cos(AoA)+Fz*sin(AoA)
-    Cs=Fy
- endif
+  if (my_id .eq. 0) then
+    print *, "--------------Force and Moment -----------------------------"
+    print *, "Total Force Coefficient (CL, CD, CS) ="
+    print *, CL, CD, CS
+    print *, "Total Moment Coefficient(CMx, CMy, CMz)="
+    print *, Ft0(7), Ft0(8), Ft0(9)
+    if (If_Debug == 1) then
+      print *, "Inviscous force: Fx, Fy, Fz="
+      print *, Ft0(1), Ft0(2), Ft0(3)
+      print *, "viscous force: Fx, Fy, Fz="
+      print *, Ft0(4), Ft0(5), Ft0(6)
+    end if
 
-
-   if(my_id .eq. 0) then
-   print*, "--------------Force and Moment -----------------------------"
-   print*, "Total Force Coefficient (CL, CD, CS) ="
-   print*, CL, CD, CS
-   print*, "Total Moment Coefficient(CMx, CMy, CMz)="
-   print*, Ft0(7),Ft0(8),Ft0(9)
-   if(If_Debug==1) then
-    print*, "Inviscous force: Fx, Fy, Fz="
-    print*, Ft0(1),Ft0(2),Ft0(3)
-    print*, "viscous force: Fx, Fy, Fz="
-    print*, Ft0(4),Ft0(5),Ft0(6)
-   endif
-
-
-
-   open(99,file="force.log",position="append")
-      write(99,"(I7,6E20.8)") Mesh(1)%Kstep, CL,CD,CS, Ft0(7),Ft0(8),Ft0(9)
-   close(99)
+    open (99, file="force.log", position="append")
+    write (99, "(I7,6E20.8)") Mesh(1)%Kstep, CL, CD, CS, Ft0(7), Ft0(8), Ft0(9)
+    close (99)
 
 !   if(If_Debug==1) then
-      open(99,file="force-invis-vis.log",position="append")
-      write(99,"(I7,6E20.8)") Mesh(1)%Kstep, Ft0(1), Ft0(2), Ft0(3), Ft0(4), Ft0(5), Ft0(6)
-   close(99)
+    open (99, file="force-invis-vis.log", position="append")
+    write (99, "(I7,6E20.8)") Mesh(1)%Kstep, Ft0(1), Ft0(2), Ft0(3), Ft0(4), Ft0(5), Ft0(6)
+    close (99)
 !   endif
 
-   endif
+  end if
 
-   if(If_Debug == 1) then
-      write(filename,"('force-debug-'3I3)") my_id
-	  open(88,file=filename)
-      do mB=1,NM
-	     B => Mesh(1)%Block(mB)                                        
-	    write(88,"(I4,6F20.10)")  B%Block_no,   Px1(mB), Py1(mB), Pz1(mB), Cfx1(mB), Cfy1(mB), Cfz1(mB)
-	  enddo
-      close(88)
-   endif
+  if (If_Debug == 1) then
+    write (filename, "('force-debug-',3I3)") my_id
+    open (88, file=filename)
+    do mB = 1, NM
+      B => Mesh(1)%Block(mB)
+      write (88, "(I4,6F20.10)") B%Block_no, Px1(mB), Py1(mB), Pz1(mB), Cfx1(mB), Cfy1(mB), Cfz1(mB)
+    end do
+    close (88)
+  end if
 
-	deallocate(Mx1,My1,Mz1,Px1,Py1,Pz1,Cfx1,Cfy1,Cfz1)
+  deallocate (Mx1, My1, Mz1, Px1, Py1, Pz1, Cfx1, Cfy1, Cfz1)
 
+end subroutine comput_force
 
-  end  subroutine comput_force   
-        
 !-----------------------------------------------------------------------------------
-!  ¹âË³£¨ÂË²¨£© ²Ù×÷£¬ ºÄÉ¢ºÜ´óµÄÂË²¨²Ù×÷¡£ ÓÃÓÚ¶Ô³õÖµµÄ¹âË³£¬»òÕß¼ÆËãÒì³££¨Èç¸ºÎÂ¶È£©Ê±µÄ¹âË³
-!  ÂË²¨ÔËËã¿ÉÒÔÏû³ý¸ßÆµÕñµ´£¬Ìá¸ß¼ÆËãµÄÎÈ¶¨ÐÔ£»µ«Ò²»áÔö¼ÓºÄÉ¢£¬½µµÍ¾«¶È
-!  2½×¾«¶ÈÂË²¨ºÄÉ¢·Ç³£´ó£¬Ö»ÄÜÔÚ´¦Àí³õÖµ»òÒì³£ÊÇÊ¹ÓÃ£¬²»¿ÉÔÚ³£¹æµÄ¼ÆËãÖÐÊ¹ÓÃ¡£
-!  4½×¾«¶ÈÂË²¨Ò²ÓÐÒ»¶¨ºÄÉ¢£¬¼ÆËã¹ý³ÌÖÐÐè½÷É÷Ê¹ÓÃ 
-  subroutine smoothing_oneMesh(nMesh,Smooth_method)     
-   use Global_Var
-   implicit none
-   integer:: nMesh,mBlock,Smooth_method
+!  å…‰é¡ºï¼ˆæ»¤æ³¢ï¼‰ æ“ä½œï¼Œ è€—æ•£å¾ˆå¤§çš„æ»¤æ³¢æ“ä½œã€‚ ç”¨äºŽå¯¹åˆå€¼çš„å…‰é¡ºï¼Œæˆ–è€…è®¡ç®—å¼‚å¸¸ï¼ˆå¦‚è´Ÿæ¸©åº¦ï¼‰æ—¶çš„å…‰é¡º
+!  æ»¤æ³¢è¿ç®—å¯ä»¥æ¶ˆé™¤é«˜é¢‘æŒ¯è¡ï¼Œæé«˜è®¡ç®—çš„ç¨³å®šæ€§ï¼›ä½†ä¹Ÿä¼šå¢žåŠ è€—æ•£ï¼Œé™ä½Žç²¾åº¦
+!  2é˜¶ç²¾åº¦æ»¤æ³¢è€—æ•£éžå¸¸å¤§ï¼Œåªèƒ½åœ¨å¤„ç†åˆå€¼æˆ–å¼‚å¸¸æ˜¯ä½¿ç”¨ï¼Œä¸å¯åœ¨å¸¸è§„çš„è®¡ç®—ä¸­ä½¿ç”¨ã€‚
+!  4é˜¶ç²¾åº¦æ»¤æ³¢ä¹Ÿæœ‰ä¸€å®šè€—æ•£ï¼Œè®¡ç®—è¿‡ç¨‹ä¸­éœ€è°¨æ…Žä½¿ç”¨
+subroutine smoothing_oneMesh(nMesh, Smooth_method)
+  use Global_Var
+  implicit none
+  integer:: nMesh, mBlock, Smooth_method
 !   print*, "Filtering ......", nMesh
-   do mBlock=1,Mesh(nMesh)%Num_Block
-   if(Smooth_method .eq. Smooth_2nd)then
-    call   smoothing_oneBlock_2nd(nMesh,mBlock)     
-   else
-    call   smoothing_oneBlock_4th(nMesh,mBlock)     
-   endif
-   enddo
-   call Boundary_condition_onemesh(nMesh)             ! ±ß½çÌõ¼þ £¨Éè¶¨Ghost CellµÄÖµ£©
-   call update_buffer_onemesh(nMesh)                  ! Í¬²½¸÷¿éµÄ½»½çÇø
-   end subroutine smoothing_oneMesh
+  do mBlock = 1, Mesh(nMesh)%Num_Block
+  if (Smooth_method .eq. Smooth_2nd) then
+    call smoothing_oneBlock_2nd(nMesh, mBlock)
+  else
+    call smoothing_oneBlock_4th(nMesh, mBlock)
+  end if
+  end do
+  call Boundary_condition_onemesh(nMesh)             ! è¾¹ç•Œæ¡ä»¶ ï¼ˆè®¾å®šGhost Cellçš„å€¼ï¼‰
+  call update_buffer_onemesh(nMesh)                  ! åŒæ­¥å„å—çš„äº¤ç•ŒåŒº
+end subroutine smoothing_oneMesh
 
 !----------------------------------------------------------
-! µÍ¾«¶ÈÂË²¨£¨2½×¾«¶È£©
-  subroutine smoothing_oneBlock_2nd(nMesh,mBlock)     
-   use Global_Var
-   implicit none
-   integer:: nMesh,mBlock
-   integer:: i,j,k,m,nx,ny,nz,NVAR1,istat
-   Type (Block_TYPE),pointer:: B
-   real(PRE_EC)::tmpa(0:2000),tmpb(0:2000),tmpc(0:2000)
-   NVAR1=Mesh(nMesh)%NVAR
-   B=>Mesh(nMesh)%block(mBlock)
-   nx=B%nx; ny=B%ny; nz=B%nz
+! ä½Žç²¾åº¦æ»¤æ³¢ï¼ˆ2é˜¶ç²¾åº¦ï¼‰
+subroutine smoothing_oneBlock_2nd(nMesh, mBlock)
+  use Global_Var
+  implicit none
+  integer:: nMesh, mBlock
+  integer:: i, j, k, m, nx, ny, nz, NVAR1, istat
+  Type(Block_TYPE), pointer:: B
+  real(PRE_EC)::tmpa(0:2000), tmpb(0:2000), tmpc(0:2000)
+  NVAR1 = Mesh(nMesh)%NVAR
+  B => Mesh(nMesh)%block(mBlock)
+  nx = B%nx; ny = B%ny; nz = B%nz
 !----------------------------------------------------------------------------
-! Warning, allocatable²»ÄÜ×÷ÎªË½ÓÐ±äÁ¿ !!!   
+! Warning, allocatableä¸èƒ½ä½œä¸ºç§æœ‰å˜é‡ !!!
 !$OMP PARALLEL DEFAULT(PRIVATE) SHARED(nx,ny,nz,NVAR1,B)
 
-!$OMP DO   
-   do k=1,nz-1
-   do j=1,ny-1
-   do m=1, NVAR1
-    do i=0,nx
-    tmpa(i)=B%U(m,i,j,k)
-    enddo
-   do i=1,nx-1
-     B%U(m,i,j,k)=0.25d0*(tmpa(i-1)+tmpa(i+1))+0.5d0*tmpa(i)
-   enddo
-   enddo
-   enddo
-   enddo
+!$OMP DO
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do m = 1, NVAR1
+  do i = 0, nx
+    tmpa(i) = B%U(m, i, j, k)
+  end do
+  do i = 1, nx-1
+    B%U(m, i, j, k) = 0.25d0*(tmpa(i-1)+tmpa(i+1))+0.5d0*tmpa(i)
+  end do
+  end do
+  end do
+  end do
 !$OMP END DO
 
-!$OMP DO   
-   do k=1,nz-1
-   do i=1,nx-1
-   do m=1, NVAR1
-   do j=0,ny
-    tmpb(j)=B%U(m,i,j,k)
-   enddo
-   do j=1,ny-1
-     B%U(m,i,j,k)=0.25d0*(tmpb(j-1)+tmpb(j+1))+0.5d0*tmpb(j)
-   enddo
-   enddo
-   enddo
-   enddo
+!$OMP DO
+  do k = 1, nz-1
+  do i = 1, nx-1
+  do m = 1, NVAR1
+  do j = 0, ny
+    tmpb(j) = B%U(m, i, j, k)
+  end do
+  do j = 1, ny-1
+    B%U(m, i, j, k) = 0.25d0*(tmpb(j-1)+tmpb(j+1))+0.5d0*tmpb(j)
+  end do
+  end do
+  end do
+  end do
 !$OMP END DO
 
-!$OMP DO   
-   do j=1,ny-1
-   do i=1,nx-1
-   do m=1, NVAR1
-   do k=0,nz
-    tmpc(k)=B%U(m,i,j,k)
-   enddo
-   do k=1,nz-1
-     B%U(m,i,j,k)=0.25d0*(tmpc(k-1)+tmpc(k+1))+0.5d0*tmpc(k)
-   enddo
-   enddo
-   enddo
-   enddo
+!$OMP DO
+  do j = 1, ny-1
+  do i = 1, nx-1
+  do m = 1, NVAR1
+  do k = 0, nz
+    tmpc(k) = B%U(m, i, j, k)
+  end do
+  do k = 1, nz-1
+    B%U(m, i, j, k) = 0.25d0*(tmpc(k-1)+tmpc(k+1))+0.5d0*tmpc(k)
+  end do
+  end do
+  end do
+  end do
 !$OMP END DO
 !$OMP END PARALLEL
 !-----------------------------------------------------------------------------------------------
-   end  subroutine smoothing_oneBlock_2nd
-   
-   
-!------------------------------------------------------------------------------------------------
-! ¸ß¾«¶ÈÂË²¨£¨4½×¾«¶È£©
-  subroutine smoothing_oneBlock_4th(nMesh,mBlock)     
-   use Global_Var
-   implicit none
-   integer:: nMesh,mBlock
-   integer:: i,j,k,m,nx,ny,nz,NVAR1
-   Type (Block_TYPE),pointer:: B
-   real(PRE_EC)::tmpa(0:2000),tmpb(0:2000),tmpc(0:2000)
+end subroutine smoothing_oneBlock_2nd
 
-   NVAR1=Mesh(nMesh)%NVAR
-   B=>Mesh(nMesh)%block(mBlock)
-   nx=B%nx; ny=B%ny; nz=B%nz
-   
-!---------------------------------------------------------------------------- 
+!------------------------------------------------------------------------------------------------
+! é«˜ç²¾åº¦æ»¤æ³¢ï¼ˆ4é˜¶ç²¾åº¦ï¼‰
+subroutine smoothing_oneBlock_4th(nMesh, mBlock)
+  use Global_Var
+  implicit none
+  integer:: nMesh, mBlock
+  integer:: i, j, k, m, nx, ny, nz, NVAR1
+  Type(Block_TYPE), pointer:: B
+  real(PRE_EC)::tmpa(0:2000), tmpb(0:2000), tmpc(0:2000)
+
+  NVAR1 = Mesh(nMesh)%NVAR
+  B => Mesh(nMesh)%block(mBlock)
+  nx = B%nx; ny = B%ny; nz = B%nz
+
+!----------------------------------------------------------------------------
 !$OMP PARALLEL DEFAULT(PRIVATE) SHARED(nx,ny,nz,NVAR1,B)
 
-!$OMP DO   
-   do k=1,nz-1
-   do j=1,ny-1
-   do m=1, NVAR1
-    do i=0,nx
-    tmpa(i)=B%U(m,i,j,k)
-    enddo
-    do i=2,nx-2
-     B%U(m,i,j,k)=(-tmpa(i-2)+4.d0*tmpa(i-1)+10.d0*tmpa(i)+4.d0*tmpa(i+1)-tmpa(i+2))/16.d0
-    enddo
-     B%U(m,1,j,k)=0.25d0*(tmpa(0)+tmpa(2))+0.5d0*tmpa(1)
-     B%U(m,nx-1,j,k)=0.25d0*(tmpa(nx-2)+tmpa(nx))+0.5d0*tmpa(nx-1)
-   enddo
-   enddo
-   enddo
+!$OMP DO
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do m = 1, NVAR1
+  do i = 0, nx
+    tmpa(i) = B%U(m, i, j, k)
+  end do
+  do i = 2, nx-2
+    B%U(m, i, j, k) = (-tmpa(i-2)+4.d0*tmpa(i-1)+10.d0*tmpa(i)+4.d0*tmpa(i+1)-tmpa(i+2))/16.d0
+  end do
+  B%U(m, 1, j, k) = 0.25d0*(tmpa(0)+tmpa(2))+0.5d0*tmpa(1)
+  B%U(m, nx-1, j, k) = 0.25d0*(tmpa(nx-2)+tmpa(nx))+0.5d0*tmpa(nx-1)
+  end do
+  end do
+  end do
 !$OMP END DO
 
-!$OMP DO   
-   do k=1,nz-1
-   do i=1,nx-1
-   do m=1, NVAR1
-   do j=0,ny
-    tmpb(j)=B%U(m,i,j,k)
-   enddo
-    do j=2,ny-2
-     B%U(m,i,j,k)=(-tmpb(j-2)+4.d0*tmpb(j-1)+10.d0*tmpb(j)+4.d0*tmpb(j+1)-tmpb(j+2))/16.d0
-    enddo
-     B%U(m,i,1,k)=0.25d0*(tmpb(0)+tmpb(2))+0.5d0*tmpb(1)
-     B%U(m,i,ny-1,k)=0.25d0*(tmpb(ny-2)+tmpb(ny))+0.5d0*tmpb(ny-1)
-   enddo
-   enddo
-   enddo
+!$OMP DO
+  do k = 1, nz-1
+  do i = 1, nx-1
+  do m = 1, NVAR1
+  do j = 0, ny
+    tmpb(j) = B%U(m, i, j, k)
+  end do
+  do j = 2, ny-2
+    B%U(m, i, j, k) = (-tmpb(j-2)+4.d0*tmpb(j-1)+10.d0*tmpb(j)+4.d0*tmpb(j+1)-tmpb(j+2))/16.d0
+  end do
+  B%U(m, i, 1, k) = 0.25d0*(tmpb(0)+tmpb(2))+0.5d0*tmpb(1)
+  B%U(m, i, ny-1, k) = 0.25d0*(tmpb(ny-2)+tmpb(ny))+0.5d0*tmpb(ny-1)
+  end do
+  end do
+  end do
 !$OMP END DO
 
-!$OMP DO   
-   do j=1,ny-1
-   do i=1,nx-1
-   do m=1, NVAR1
-   do k=0,nz
-    tmpc(k)=B%U(m,i,j,k)
-   enddo
-    do k=2,nz-2
-     B%U(m,i,j,k)=(-tmpc(k-2)+4.d0*tmpc(k-1)+10.d0*tmpc(k)+4.d0*tmpc(k+1)-tmpc(k+2))/16.d0
-    enddo
-     B%U(m,i,j,1)=0.25d0*(tmpc(0)+tmpc(2))+0.5d0*tmpc(1)
-     B%U(m,i,j,nz-1)=0.25d0*(tmpc(nz-2)+tmpc(nz))+0.5d0*tmpc(nz-1)
-   enddo
-   enddo
-   enddo
+!$OMP DO
+  do j = 1, ny-1
+  do i = 1, nx-1
+  do m = 1, NVAR1
+  do k = 0, nz
+    tmpc(k) = B%U(m, i, j, k)
+  end do
+  do k = 2, nz-2
+    B%U(m, i, j, k) = (-tmpc(k-2)+4.d0*tmpc(k-1)+10.d0*tmpc(k)+4.d0*tmpc(k+1)-tmpc(k+2))/16.d0
+  end do
+  B%U(m, i, j, 1) = 0.25d0*(tmpc(0)+tmpc(2))+0.5d0*tmpc(1)
+  B%U(m, i, j, nz-1) = 0.25d0*(tmpc(nz-2)+tmpc(nz))+0.5d0*tmpc(nz-1)
+  end do
+  end do
+  end do
 !$OMP END DO
 
 !$OMP END PARALLEL
 !-----------------------------------------------------------------------
-   end  subroutine smoothing_oneBlock_4th
-
-
-
+end subroutine smoothing_oneBlock_4th

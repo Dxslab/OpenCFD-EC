@@ -1,116 +1,115 @@
 !-----------------------------------------------------------
 ! Partation ver 1.1
 ! by Li Xinliang, 2012-11-13
-! ¶à¿é½á¹¹Íø¸ñµÄ¶à½ø³ÌÇøÓò·Ö¸î£¬Ê¹µÃ¸÷½ø³ÌµÄ×ÜÍø¸ñÊı¾¡Á¿¾ùÔÈ £¨±¾°æ±¾Ôİ²»¿¼ÂÇÍ¨ĞÅÁ¿ÊÇ·ñ¾ùÔÈ£©
-! Ëã·¨£º ¸÷¿é´Ó´óµ½Ğ¡ÅÅÁĞ£¬ÒÀ´ÎÓÅÏÈÍ¶Èëµ±Ç°×ÜÍø¸ñÊıÄ¿×îĞ¡µÄ½ø³ÌÖĞ
+! å¤šå—ç»“æ„ç½‘æ ¼çš„å¤šè¿›ç¨‹åŒºåŸŸåˆ†å‰²ï¼Œä½¿å¾—å„è¿›ç¨‹çš„æ€»ç½‘æ ¼æ•°å°½é‡å‡åŒ€ ï¼ˆæœ¬ç‰ˆæœ¬æš‚ä¸è€ƒè™‘é€šä¿¡é‡æ˜¯å¦å‡åŒ€ï¼‰
+! ç®—æ³•ï¼š å„å—ä»å¤§åˆ°å°æ’åˆ—ï¼Œä¾æ¬¡ä¼˜å…ˆæŠ•å…¥å½“å‰æ€»ç½‘æ ¼æ•°ç›®æœ€å°çš„è¿›ç¨‹ä¸­
 !------------------------------------------------------------
-    implicit none
-	integer:: formt,Num_Proc
-	print*, "Please input Mesh3d.dat format (0 for unformatted /  1 for formatted)"
-	read(*,*) formt
-	print*, "please input Proc number: Num_proc "
-	read(*,*) Num_Proc
-	call part(formt,Num_proc)
-	end
+program partation
+  implicit none
+  integer:: formt, Num_Proc
+  print *, "Please input Mesh3d.dat format (0 for unformatted /  1 for formatted)"
+  read (*, *) formt
+  print *, "please input Proc number: Num_proc "
+  read (*, *) Num_Proc
+  call part(formt, Num_proc)
+end
 !------------------------------
-  
-     subroutine part(formt,Num_Proc)
-     implicit none
-     integer,allocatable,dimension(:,:):: B_grid
-     integer,allocatable,dimension(:):: NI,NJ,NK,Pgrid,Bproc
-	 integer:: formt,Num_Proc,Num_Block,m,m0,m1,m2,G0,mb,mg,mp,n,t1,t2,k,Total_cell,Total_grid
-	 real:: grid_av
-     print*, "Partation ......"
-	 if(formt .eq. 0) then
-       open(99,file="Mesh3d.dat",form="unformatted")
-       read(99) Num_Block         
-       allocate(NI(Num_Block),NJ(Num_Block),NK(Num_Block) )   ! Size of each block
-       read(99) (NI(k), NJ(k), NK(k), k=1,Num_Block)
-	 else
-       open(99,file="Mesh3d.dat")
-       read(99,*) Num_Block         ! 
-       allocate(NI(Num_Block),NJ(Num_Block),NK(Num_Block) )   ! Size of each block
-       read(99,*) (NI(k), NJ(k), NK(k), k=1,Num_Block)
-     endif
-     close(99)
 
- !    ¶ÁÈëÃ¿¿éÍø¸ñÊı£¬°´´Ó¶àµ½ÉÙ´ÎĞòÅÅÁĞ
-     allocate(B_grid(Num_Block,2))
-	 allocate(Pgrid(Num_proc),Bproc(Num_Block))
+subroutine part(formt, Num_Proc)
+  implicit none
+  integer, allocatable, dimension(:, :):: B_grid
+  integer, allocatable, dimension(:):: NI, NJ, NK, Pgrid, Bproc
+  integer:: formt, Num_Proc, Num_Block, m, m0, m1, m2, G0, mb, mg, mp, n, t1, t2, k, Total_cell, Total_grid
+  real(kind=8):: grid_av
+  print *, "Partation ......"
+  if (formt .eq. 0) then
+    open (99, file="Mesh3d.dat", form="unformatted")
+    read (99) Num_Block
+    allocate (NI(Num_Block), NJ(Num_Block), NK(Num_Block))   ! Size of each block
+    read (99) (NI(k), NJ(k), NK(k), k=1, Num_Block)
+  else
+    open (99, file="Mesh3d.dat")
+    read (99, *) Num_Block         !
+    allocate (NI(Num_Block), NJ(Num_Block), NK(Num_Block))   ! Size of each block
+    read (99, *) (NI(k), NJ(k), NK(k), k=1, Num_Block)
+  end if
+  close (99)
 
-     Total_Cell=0
-	 Total_grid=0
-	  do m=1,Num_Block
-       B_grid(m,1)=NI(m)*NJ(m)*NK(m) 
-	   B_grid(m,2)=m
-	   Total_Cell=Total_Cell+(NI(m)-1)*(NJ(m)-1)*(NK(m)-1)
-	   Total_grid=Total_grid+NI(m)*NJ(m)*NK(m)
-      enddo
-	  print*, "Total Cell number=", Total_Cell
-	  print*, "Total Grid number=", Total_grid
- 
-!    °´Íø¸ñµã´Ó¶àµ½ÉÙµÄ´ÎĞòÅÅĞò
-     do m=1,Num_block
-	   G0=B_grid(m,1)     ! µãÊı
-	    mg=m
-	    do n=m+1,Num_block   ! ÕÒ³öÊıÄ¿×î´óµÄ
-         if(B_grid(n,1) .gt. G0 ) then
-		    G0=B_grid(n,1)
-			mg=n
-         endif
-       enddo
-!        mg¿éÓëm¿é½»»»
-         t1=B_grid(mg,1)
-		 t2=B_grid(mg,2)
-		 B_grid(mg,1)=B_grid(m,1)
-		 B_grid(mg,2)=B_grid(m,2)
-         B_grid(m,1)=t1
-		 B_grid(m,2)=t2
-	  enddo
+  !    è¯»å…¥æ¯å—ç½‘æ ¼æ•°ï¼ŒæŒ‰ä»å¤šåˆ°å°‘æ¬¡åºæ’åˆ—
+  allocate (B_grid(Num_Block, 2))
+  allocate (Pgrid(Num_proc), Bproc(Num_Block))
+
+  Total_Cell = 0
+  Total_grid = 0
+  do m = 1, Num_Block
+    B_grid(m, 1) = NI(m)*NJ(m)*NK(m)
+    B_grid(m, 2) = m
+    Total_Cell = Total_Cell+(NI(m)-1)*(NJ(m)-1)*(NK(m)-1)
+    Total_grid = Total_grid+NI(m)*NJ(m)*NK(m)
+  end do
+  print *, "Total Cell number=", Total_Cell
+  print *, "Total Grid number=", Total_grid
+
+!    æŒ‰ç½‘æ ¼ç‚¹ä»å¤šåˆ°å°‘çš„æ¬¡åºæ’åº
+  do m = 1, Num_block
+    G0 = B_grid(m, 1)     ! ç‚¹æ•°
+    mg = m
+    do n = m+1, Num_block   ! æ‰¾å‡ºæ•°ç›®æœ€å¤§çš„
+      if (B_grid(n, 1) .gt. G0) then
+        G0 = B_grid(n, 1)
+        mg = n
+      end if
+    end do
+!        mgå—ä¸må—äº¤æ¢
+    t1 = B_grid(mg, 1)
+    t2 = B_grid(mg, 2)
+    B_grid(mg, 1) = B_grid(m, 1)
+    B_grid(mg, 2) = B_grid(m, 2)
+    B_grid(m, 1) = t1
+    B_grid(m, 2) = t2
+  end do
 !----------------------------
-      Pgrid(:)=0
-	 do m=1,Num_Block
-        mb=B_grid(m,2) 
-  !     Ñ°ÕÒÍø¸ñÊıÄ¿×îĞ¡µÄ½ø³Ì
-        mg=Pgrid(1)
-		m0=1
-		do mp=1,Num_Proc
-         if(Pgrid(mp) .lt. mg) then
-		   mg=Pgrid(mp)
-		   m0=mp
-		 endif
-		enddo
-       Pgrid(m0)=Pgrid(m0)+B_grid(m,1)
-	   Bproc(mb)=m0-1
-     enddo
-!-------------Êä³ö--------------------------------------------------
-     open(99,file="partation-auto.dat")
-	 write(99,*) " Total_block_number    Total_Proc_number "
-	 write(99,*)  Num_block, Num_proc
-	 write(99,*) " Block_no, Proc_no "
-	 do m=1,Num_block
-	 write(99,*) m, Bproc(m)
-	 enddo
-	 close(99)
+  Pgrid(:) = 0
+  do m = 1, Num_Block
+    mb = B_grid(m, 2)
+    !     å¯»æ‰¾ç½‘æ ¼æ•°ç›®æœ€å°çš„è¿›ç¨‹
+    mg = Pgrid(1)
+    m0 = 1
+    do mp = 1, Num_Proc
+      if (Pgrid(mp) .lt. mg) then
+        mg = Pgrid(mp)
+        m0 = mp
+      end if
+    end do
+    Pgrid(m0) = Pgrid(m0)+B_grid(m, 1)
+    Bproc(mb) = m0-1
+  end do
+!-------------è¾“å‡º--------------------------------------------------
+  open (99, file="partation-auto.dat")
+  write (99, *) " Total_block_number    Total_Proc_number "
+  write (99, *) Num_block, Num_proc
+  write (99, *) " Block_no, Proc_no "
+  do m = 1, Num_block
+    write (99, *) m, Bproc(m)
+  end do
+  close (99)
 
-     open(100,file="part_grid.dat")
-	 do m=1,Num_proc
-	  write(100,*) m-1, Pgrid(m)
-	 enddo
-     close(100)
+  open (100, file="part_grid.dat")
+  do m = 1, Num_proc
+    write (100, *) m-1, Pgrid(m)
+  end do
+  close (100)
 
-     m1=Pgrid(1)
-	 m2=m1
-     do mp=1,Num_Proc
-      m1=max(m1,Pgrid(mp))
-	  m2=min(m2,Pgrid(mp))
-	 enddo
-	 
-	 grid_av=1.d0*Total_grid/Num_Proc
-	 print*, "Max grid number is ", m1,  " ... rato to mean grid is", m1/grid_av
-	 print*, "Min grid number is ", m2,  " ... rato to mean grid is", m2/grid_av
-	 print*, "rato max to min is ", 1.0*m1/m2
-   deallocate(NI,NJ,NK,Pgrid,Bproc,B_grid)
-   end subroutine part
+  m1 = Pgrid(1)
+  m2 = m1
+  do mp = 1, Num_Proc
+    m1 = max(m1, Pgrid(mp))
+    m2 = min(m2, Pgrid(mp))
+  end do
 
-
+  grid_av = 1.d0*Total_grid/Num_Proc
+  print *, "Max grid number is ", m1, " ... rato to mean grid is", m1/grid_av
+  print *, "Min grid number is ", m2, " ... rato to mean grid is", m2/grid_av
+  print *, "rato max to min is ", 1.0*m1/m2
+  deallocate (NI, NJ, NK, Pgrid, Bproc, B_grid)
+end subroutine part

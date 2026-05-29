@@ -1,432 +1,413 @@
-!  -----------------------¶ÁÈ¡Á÷¶¯²ÎÊı¼°¿ØÖÆ±äÁ¿----------------------
-  subroutine read_parameter
-   use Global_var
-   implicit none
-   logical ext1
+!  -----------------------è¯»å–æµåŠ¨å‚æ•°åŠæ§åˆ¶å˜é‡----------------------
+subroutine read_parameter
+  use Global_var
+  implicit none
+  logical ext1
 !-----------------------------------------------------------------------------
-   call set_default_parameter ! ÉèÖÃ²ÎÊıÄ¬ÈÏÖµ
+  call set_default_parameter ! è®¾ç½®å‚æ•°é»˜è®¤å€¼
 
-   if(my_id .eq. 0) then
-     inquire(file="control.ec",exist=ext1)
-      if(ext1) then           ! ÓÅÏÈ¶ÁÈ¡control.ec (Namelist ¸ñÊ½¿ØÖÆÎÄ¼ş) 
-       call read_parameter_ec
-      else
-       print*, "Can not find 'control.ec', stop !"
-	   stop
-	  endif
+  if (my_id .eq. 0) then
+    inquire (file="control.ec", exist=ext1)
+    if (ext1) then           ! ä¼˜å…ˆè¯»å–control.ec (Namelist æ ¼å¼æ§åˆ¶æ–‡ä»¶)
+      call read_parameter_ec
+    else
+      print *, "Can not find 'control.ec', stop !"
+      stop
+    end if
 
- 
-   endif
+  end if
 
-   call bcast_para      ! ¹ã²¥ÖÁÈ«²¿½ø³Ì
-   
-   call set_const_para
+  call bcast_para      ! å¹¿æ’­è‡³å…¨éƒ¨è¿›ç¨‹
+
+  call set_const_para
 !--------------------------------------------------------------------
 
-  end subroutine read_parameter
-   
-!--------------------------------------------------------------------    
-! ÉèÖÃ²ÎÊıµÄÄ¬ÈÏÖµ  
-  subroutine set_default_parameter 
-   use Global_var
-   implicit none
-    Ma=1.d0        ! Mach number     
-    Re= 1000.d0    ! Reynolds number
-    gamma=1.4d0    ! 
+end subroutine read_parameter
 
-	AOA=0.d0       ! Angle of attack    
-	AOS=0.d0       ! Angle of Slide
-	P_outlet=-1.d0   ! Outlet pressure (<0 extrapolation)  
-	t_end=100.d0     ! End time (non-dimensional)
-	Kstep_save=1000  ! Save data per xxx steps
-    Iflag_turbulence_model=0   ! turbulence model (0 none, 1 BL, 2 SA, 3 SST)
-	Iflag_init=0  ! 0 ´Ó³õÊ¼Öµ£¨¾ùÔÈÀ´Á÷£©¿ªÊ¼¼ÆËã£» 1  ĞøËã£» -1 ´Ó0 Á÷³¡¿ªÊ¼¼ÆËã
-    If_viscous=1  ! 0 ÎŞÕ³£» 1 ÓĞÕ³
-    Iflag_local_dt=1   ! 0 È«¾Ö²½³¤£»  1 ¾Ö²¿Ê±¼ä²½³¤
-    dt_global=0.01     ! Global time step
-    CFL=1.d0           ! CFL number 
-    dtmax=10.d0       !Limit of maximum time step 
-	dtmin=1.d-9       !Limit of minimum time step
-	Time_Method=0     ! Time_Euler1=1,Time_RK3=3,Time_LU_SGS=0, Time_dual_LU_SGS=-1
-    If_Residual_smoothing=0   ! 0 Do not need smoothing
-    w_LU=1.d0         ! factor in LU-SGS
-    If_dtime_mesh=1   ! decrease time step when grid quality is not good
-    Iflag_Scheme= 5    ! 0 UD1;  1 NND2 ; 2 UD3 ; 3 MUSCL2U ;  4 MUSCL2C; 5 MUSCL3; 6 OMUSCL2; 7 WENO5 ; 8 UD5; 9 WENO7 
-    Iflag_Flux=5      ! 1 Steger_Warming; 2 HLL, 3 HLLC,  4 Roe, 5  Van_Leer, 6 Ausm
-    IFlag_Reconstruction=0   !  0 Original, 1 Conservative, 2 Characteristic
-    Mesh_File_Format=0    ! 0 unformatted, 1 formatted
-    Kstep_show=1          ! show per xxx steps
-    Kstep_average=0       ! do not average
-    Kstep_smooth=-1       ! Smoothing flow per xxx steps (<0 donot smooth)
-    Kstep_init_smooth=0   ! Smoothing flow at initial time
-    Num_Mesh=1            ! Number of mesh (1 single-grid), 2,3 multi-grid
-    T_inf=288.15d0        ! Reference temperature  (in viscous coefficient)
-    Twall=-1.d0           ! Wall temperature (in K degree) (<0 adabitic)
-    Kt_inf=1.d-5          ! initial of Kt for SST model
-    Wt_inf=0.01d0         ! Initial of Wt for SST model
-    IF_Debug=0            ! 1 Debug mode
-    NUM_THREADS=1         ! Threads for OpenMP
-    Step_Inner_Limit=20   ! Inner time advance limit (Dual-time)
-    Res_Inner_Limit=1.d-10 ! Inner Resdial limit (Dual-time)
-    MUT_MAX=-1.d0          ! Limit for vt/vs (<0 no limit)
-	Bound_Scheme= Scheme_MUSCL2C         ! Boundary scheme (Default: MUSCL2C)
-    Pre_Step_Mesh(1:3)=0   ! Pre step for multi-grid
-    Ref_S=1.d0             ! Ref. area
-	Ref_L=1.d0             ! Ref. length
-	Centroid(1:3)=0.d0  ! Centroid coordinate  
-    Cood_Y_UP=1   !       Ä¬ÈÏYÖá´¹Ö±ÏòÉÏ
-	  IFLAG_LIMIT_FLOW=1         ! ÏŞÖÆÁ÷³¡£¨ÃÜ¶È¡¢ËÙ¶È¡¢Ñ¹Á¦£©£¬Éè¶¨Îª1 £¬ 2016-10-21
-	Pdebug(1:4)=1
-    PrL=0.7d0          ! Linear Prandtl number
-	PrT=0.9d0          ! Turbulent Prandtl number
-    Ldmin=1.d-6
-	Ldmax=1000.d0
-	Lpmin=1.d-6
-	Lpmax=1000.d0
-	Lumax=1000.d0
-	LSAmax=1000.d0
-	CP1_NSA=0.2d0   ! for New SA
-	CP2_NSA=100.d0
-	Periodic_dX=0.d0   ! ÖÜÆÚ±ß½çµÄ¼¸ºÎÔöÁ¿
-	Periodic_dY=0.d0 
-	Periodic_dZ=0.d0
+!--------------------------------------------------------------------
+! è®¾ç½®å‚æ•°çš„é»˜è®¤å€¼
+subroutine set_default_parameter
+  use Global_var
+  implicit none
+  Ma = 1.d0        ! Mach number
+  Re = 1000.d0    ! Reynolds number
+  gamma = 1.4d0    !
 
-    Iflag_savefile=0       ! Ä¬ÈÏĞ´Èëflow3d.dat
+  AOA = 0.d0       ! Angle of attack
+  AOS = 0.d0       ! Angle of Slide
+  P_outlet = -1.d0   ! Outlet pressure (<0 extrapolation)
+  t_end = 100.d0     ! End time (non-dimensional)
+  Kstep_save = 1000  ! Save data per xxx steps
+  Iflag_turbulence_model = 0   ! turbulence model (0 none, 1 BL, 2 SA, 3 SST)
+  Iflag_init = 0  ! 0 ä»åˆå§‹å€¼ï¼ˆå‡åŒ€æ¥æµï¼‰å¼€å§‹è®¡ç®—ï¼› 1  ç»­ç®—ï¼› -1 ä»0 æµåœºå¼€å§‹è®¡ç®—
+  If_viscous = 1  ! 0 æ— ç²˜ï¼› 1 æœ‰ç²˜
+  Iflag_local_dt = 1   ! 0 å…¨å±€æ­¥é•¿ï¼›  1 å±€éƒ¨æ—¶é—´æ­¥é•¿
+  dt_global = 0.01     ! Global time step
+  CFL = 1.d0           ! CFL number
+  dtmax = 10.d0       !Limit of maximum time step
+  dtmin = 1.d-9       !Limit of minimum time step
+  Time_Method = 0     ! Time_Euler1=1,Time_RK3=3,Time_LU_SGS=0, Time_dual_LU_SGS=-1
+  If_Residual_smoothing = 0   ! 0 Do not need smoothing
+  w_LU = 1.d0         ! factor in LU-SGS
+  If_dtime_mesh = 1   ! decrease time step when grid quality is not good
+  Iflag_Scheme = 5    ! 0 UD1;  1 NND2 ; 2 UD3 ; 3 MUSCL2U ;  4 MUSCL2C; 5 MUSCL3; 6 OMUSCL2; 7 WENO5 ; 8 UD5; 9 WENO7
+  Iflag_Flux = 5      ! 1 Steger_Warming; 2 HLL, 3 HLLC,  4 Roe, 5  Van_Leer, 6 Ausm
+  IFlag_Reconstruction = 0   !  0 Original, 1 Conservative, 2 Characteristic
+  Mesh_File_Format = 0    ! 0 unformatted, 1 formatted
+  Kstep_show = 1          ! show per xxx steps
+  Kstep_average = 0       ! do not average
+  Kstep_smooth = -1       ! Smoothing flow per xxx steps (<0 donot smooth)
+  Kstep_init_smooth = 0   ! Smoothing flow at initial time
+  Num_Mesh = 1            ! Number of mesh (1 single-grid), 2,3 multi-grid
+  T_inf = 288.15d0        ! Reference temperature  (in viscous coefficient)
+  Twall = -1.d0           ! Wall temperature (in K degree) (<0 adabitic)
+  Kt_inf = 1.d-5          ! initial of Kt for SST model
+  Wt_inf = 0.01d0         ! Initial of Wt for SST model
+  IF_Debug = 0            ! 1 Debug mode
+  NUM_THREADS = 1         ! Threads for OpenMP
+  Step_Inner_Limit = 20   ! Inner time advance limit (Dual-time)
+  Res_Inner_Limit = 1.d-10 ! Inner Resdial limit (Dual-time)
+  MUT_MAX = -1.d0          ! Limit for vt/vs (<0 no limit)
+  Bound_Scheme = Scheme_MUSCL2C         ! Boundary scheme (Default: MUSCL2C)
+  Pre_Step_Mesh(1:3) = 0   ! Pre step for multi-grid
+  Ref_S = 1.d0             ! Ref. area
+  Ref_L = 1.d0             ! Ref. length
+  Centroid(1:3) = 0.d0  ! Centroid coordinate
+  Cood_Y_UP = 1   !       é»˜è®¤Yè½´å‚ç›´å‘ä¸Š
+  IFLAG_LIMIT_FLOW = 1         ! é™åˆ¶æµåœºï¼ˆå¯†åº¦ã€é€Ÿåº¦ã€å‹åŠ›ï¼‰ï¼Œè®¾å®šä¸º1 ï¼Œ 2016-10-21
+  Pdebug(1:4) = 1
+  PrL = 0.7d0          ! Linear Prandtl number
+  PrT = 0.9d0          ! Turbulent Prandtl number
+  Ldmin = 1.d-6
+  Ldmax = 1000.d0
+  Lpmin = 1.d-6
+  Lpmax = 1000.d0
+  Lumax = 1000.d0
+  LSAmax = 1000.d0
+  CP1_NSA = 0.2d0   ! for New SA
+  CP2_NSA = 100.d0
+  Periodic_dX = 0.d0   ! å‘¨æœŸè¾¹ç•Œçš„å‡ ä½•å¢é‡
+  Periodic_dY = 0.d0
+  Periodic_dZ = 0.d0
+
+  Iflag_savefile = 0       ! é»˜è®¤å†™å…¥flow3d.dat
 !----for Turbomachinary solver------------
-    IF_TurboMachinary=0    ! ÆôÓÃÒ¶ÂÖ»ú¼ÆËãÄ£Ê½
-	Ref_medium_usrdef=0    ! ÆôÓÃ×Ô¶¨Òå½éÖÊ £¨ÎªÄ¬ÈÏ¿ÕÆø£©
-    IF_Scheme_Positivity=1     ! ¼ì²é²åÖµ¹ı³ÌÖĞÑ¹Á¦¡¢ÃÜ¶ÈÊÇ·ñ·Ç¸º£¬·ñÔòÊ¹ÓÃ1½×Ó­·ç£»
-    Turbo_P0= 101330.d0    ! ×ÜÑ¹ £¨Ä¬ÈÏÎª1¸ö´óÆøÑ¹£©
-	Turbo_T0= 288.15d0     ! ×ÜÎÂ £¨Ä¬ÈÏ288.15K)
-    Turbo_L0= 1.d0         ! ²Î¿¼³¤¶È £¨Ä¬ÈÏÎª1m)
-    Turbo_w=0.d0           ! ×ªËÙ  ( ×ª/Ãë £¬ Ä¬ÈÏ0)
-    Turbo_Periodic_seta=0.d0   ! ÖÜÆÚ·½Ïò¼ÆËãÓò£¬½Ç
+  IF_TurboMachinary = 0    ! å¯ç”¨å¶è½®æœºè®¡ç®—æ¨¡å¼
+  Ref_medium_usrdef = 0    ! å¯ç”¨è‡ªå®šä¹‰ä»‹è´¨ ï¼ˆä¸ºé»˜è®¤ç©ºæ°”ï¼‰
+  IF_Scheme_Positivity = 1     ! æ£€æŸ¥æ’å€¼è¿‡ç¨‹ä¸­å‹åŠ›ã€å¯†åº¦æ˜¯å¦éè´Ÿï¼Œå¦åˆ™ä½¿ç”¨1é˜¶è¿é£ï¼›
+  Turbo_P0 = 101330.d0    ! æ€»å‹ ï¼ˆé»˜è®¤ä¸º1ä¸ªå¤§æ°”å‹ï¼‰
+  Turbo_T0 = 288.15d0     ! æ€»æ¸© ï¼ˆé»˜è®¤288.15K)
+  Turbo_L0 = 1.d0         ! å‚è€ƒé•¿åº¦ ï¼ˆé»˜è®¤ä¸º1m)
+  Turbo_w = 0.d0           ! è½¬é€Ÿ  ( è½¬/ç§’ ï¼Œ é»˜è®¤0)
+  Turbo_Periodic_seta = 0.d0   ! å‘¨æœŸæ–¹å‘è®¡ç®—åŸŸï¼Œè§’
 !-------------------------------------
-    IF_InnerFlow=0   ! ÄÚÁ÷Ä£Ê½
+  IF_InnerFlow = 0   ! å†…æµæ¨¡å¼
 end
 
-!------read parameter (Namelist type)---------------- 
-  subroutine read_parameter_ec 
-   use Global_var
-   implicit none
-   real(PRE_EC):: R0, a0, d0, mu0,mu1
+!------read parameter (Namelist type)----------------
+subroutine read_parameter_ec
+  use Global_var
+  implicit none
+  real(PRE_EC):: R0, a0, d0, mu0, mu1
 
- 	namelist /control_ec/ Ma, Re, AoA, AoS, p_outlet, t_end, &
-	    gamma, PrL, PrT, &
-	    Kstep_save, &
-	    Iflag_turbulence_model,Iflag_init,If_viscous,  &
-        Iflag_local_dt,dt_global,CFL,dtmax,dtmin,Time_Method, &
-		If_Residual_smoothing,w_LU,If_dtime_mesh,  &
-        Iflag_Scheme,Iflag_Flux,IFlag_Reconstruction, &
-		Mesh_File_Format,Kstep_show,Kstep_average,Kstep_smooth,Kstep_init_smooth,  &
-        Num_Mesh,T_inf,Twall,Kt_inf,Wt_inf,IF_Debug,NUM_THREADS,  &
-		Step_Inner_Limit, Res_Inner_Limit, MUT_MAX, Bound_Scheme, &
-        Pre_Step_Mesh,Ref_S,Ref_L,Centroid,Cood_Y_UP,IFLAG_LIMIT_FLOW,Pdebug, &
-		Ldmin,Ldmax,Lpmin,Lpmax,Lumax,LSAmax,CP1_NSA,CP2_NSA, &
-        IF_TurboMachinary, Ref_medium_usrdef, IF_Scheme_Positivity, &
-		Turbo_P0,Turbo_T0, Turbo_L0,Turbo_w, Turbo_Periodic_seta, &
-		Periodic_dX, Periodic_dY, Periodic_dZ, &
-		IF_Innerflow, Iflag_savefile
+  namelist /control_ec/ Ma, Re, AoA, AoS, p_outlet, t_end, &
+    gamma, PrL, PrT, &
+    Kstep_save, &
+    Iflag_turbulence_model, Iflag_init, If_viscous, &
+    Iflag_local_dt, dt_global, CFL, dtmax, dtmin, Time_Method, &
+    If_Residual_smoothing, w_LU, If_dtime_mesh, &
+    Iflag_Scheme, Iflag_Flux, IFlag_Reconstruction, &
+    Mesh_File_Format, Kstep_show, Kstep_average, Kstep_smooth, Kstep_init_smooth, &
+    Num_Mesh, T_inf, Twall, Kt_inf, Wt_inf, IF_Debug, NUM_THREADS, &
+    Step_Inner_Limit, Res_Inner_Limit, MUT_MAX, Bound_Scheme, &
+    Pre_Step_Mesh, Ref_S, Ref_L, Centroid, Cood_Y_UP, IFLAG_LIMIT_FLOW, Pdebug, &
+    Ldmin, Ldmax, Lpmin, Lpmax, Lumax, LSAmax, CP1_NSA, CP2_NSA, &
+    IF_TurboMachinary, Ref_medium_usrdef, IF_Scheme_Positivity, &
+    Turbo_P0, Turbo_T0, Turbo_L0, Turbo_w, Turbo_Periodic_seta, &
+    Periodic_dX, Periodic_dY, Periodic_dZ, &
+    IF_Innerflow, Iflag_savefile
 
+  open (99, file="control.ec")
+  read (99, nml=control_ec)
+  close (99)
 
-	open(99,file="control.ec")
-	read(99,nml=control_ec)
-    close(99)
- 
- !---- convert parameters ----------------------
- ! Ref_medium_usrdef==0 Ê¹ÓÃÄ¬ÈÏ½éÖÊ (Ma=1, ¸ù¾İ×ÜÎÂ¡¢×ÜÑ¹¼ÆËã Re) £» ==1 Ê¹ÓÃ×Ô¶¨Òå½éÖÊ £¨ÈËÎªÊäÈëMa, ReµÈ£©
- ! ½öÊÊÓÃÓÚÒ¶ÂÖ»ú»òÄÚÁ÷Ä£Ê½£»
+!---- convert parameters ----------------------
+! Ref_medium_usrdef==0 ä½¿ç”¨é»˜è®¤ä»‹è´¨ (Ma=1, æ ¹æ®æ€»æ¸©ã€æ€»å‹è®¡ç®— Re) ï¼› ==1 ä½¿ç”¨è‡ªå®šä¹‰ä»‹è´¨ ï¼ˆäººä¸ºè¾“å…¥Ma, Reç­‰ï¼‰
+! ä»…é€‚ç”¨äºå¶è½®æœºæˆ–å†…æµæ¨¡å¼ï¼›
 
-    if( (IF_TurboMachinary ==1 .or. IF_Innerflow==1 )    &  
-	  .and.  Ref_medium_usrdef == 0) then   ! Ä¬ÈÏ¿ÕÆø½éÖÊ£¬¼ÆËãMachÊı£¬ ReynoldsÊı
-      
-	  T_inf=Turbo_T0  ! ²Î¿¼ÎÂ¶È £¨À´Á÷×ÜÎÂ£©
-      gamma=1.4d0    ! 
-	  PrL=0.7d0   ! PrandtlÊı
-	  PrT=0.9d0
-      R0= 287.06d0   ! ¿ÕÆøµÄÆøÌå³£ÊıR
-	  a0= sqrt(gamma*R0*Turbo_T0)    ! ²Î¿¼ÎÂ¶ÈÏÂµÄÉùËÙ 
-	  mu0=1.179d-5     ! ¿ÕÆøÕ³ĞÔÏµÊı (288.15K)  
-      mu1=mu0* sqrt((Turbo_T0/288.15d0)**3)*(288.15d0+110.4d0)/(Turbo_T0+110.4d0)  ! ²Î¿¼ÎÂ¶ÈÏÂµÄ¿ÕÆøÕ³ĞÔÏµÊı
-      d0=Turbo_P0/(R0*Turbo_T0)
-	  Re=d0*a0*Turbo_L0/mu1    ! ²Î¿¼ÎÂ¶ÈÏÂ£¬ÒÔÉùËÙÔË¶¯µÄReynoldsÊı
-	  Ma=1.d0     ! MachÊı    £¨ÒÔÉùËÙ×÷Îª²Î¿¼ËÙ¶È£¬Òò¶ø²Î¿¼MachÊıÎª1£©
-      Turbo_w= 2.d0*PI*Turbo_w/(a0/Turbo_L0)   ! ÎŞÁ¿¸Ù½ÇËÙ¶È Turbo_W£¨×ª/Ãë£©
-!	  P_outlet=P_outlet/Turbo_P0    ! ±³Ñ¹,  Bug !!
-	  P_outlet=P_outlet/(d0*a0*a0)    ! ±³Ñ¹ £¨ÓÃ¶¯Ñ¹ ÎŞÁ¿¸Ù£©
-	endif
-      Turbo_Periodic_seta=Turbo_Periodic_seta*PI/180.d0                 ! Turbo_Periodic_seta ½Ç¶È
+  if ((IF_TurboMachinary == 1 .or. IF_Innerflow == 1) &
+      .and. Ref_medium_usrdef == 0) then   ! é»˜è®¤ç©ºæ°”ä»‹è´¨ï¼Œè®¡ç®—Machæ•°ï¼Œ Reynoldsæ•°
 
+    T_inf = Turbo_T0  ! å‚è€ƒæ¸©åº¦ ï¼ˆæ¥æµæ€»æ¸©ï¼‰
+    gamma = 1.4d0    !
+    PrL = 0.7d0   ! Prandtlæ•°
+    PrT = 0.9d0
+    R0 = 287.06d0   ! ç©ºæ°”çš„æ°”ä½“å¸¸æ•°R
+    a0 = sqrt(gamma*R0*Turbo_T0)    ! å‚è€ƒæ¸©åº¦ä¸‹çš„å£°é€Ÿ
+    mu0 = 1.179d-5     ! ç©ºæ°”ç²˜æ€§ç³»æ•° (288.15K)
+    mu1 = mu0*sqrt((Turbo_T0/288.15d0)**3)*(288.15d0+110.4d0)/(Turbo_T0+110.4d0)  ! å‚è€ƒæ¸©åº¦ä¸‹çš„ç©ºæ°”ç²˜æ€§ç³»æ•°
+    d0 = Turbo_P0/(R0*Turbo_T0)
+    Re = d0*a0*Turbo_L0/mu1    ! å‚è€ƒæ¸©åº¦ä¸‹ï¼Œä»¥å£°é€Ÿè¿åŠ¨çš„Reynoldsæ•°
+    Ma = 1.d0     ! Machæ•°    ï¼ˆä»¥å£°é€Ÿä½œä¸ºå‚è€ƒé€Ÿåº¦ï¼Œå› è€Œå‚è€ƒMachæ•°ä¸º1ï¼‰
+    Turbo_w = 2.d0*PI*Turbo_w/(a0/Turbo_L0)   ! æ— é‡çº²è§’é€Ÿåº¦ Turbo_Wï¼ˆè½¬/ç§’ï¼‰
+!          P_outlet=P_outlet/Turbo_P0    ! èƒŒå‹,  Bug !!
+    P_outlet = P_outlet/(d0*a0*a0)    ! èƒŒå‹ ï¼ˆç”¨åŠ¨å‹ æ— é‡çº²ï¼‰
+  end if
+  Turbo_Periodic_seta = Turbo_Periodic_seta*PI/180.d0                 ! Turbo_Periodic_seta è§’åº¦
 
- !---output paramters----------------------------
-    open(99,file="output_para.out")
-	write(99,*) "-------OpenCFD-EC (Ver 1.1t), (c) Li Xinliang, lixl@imech.ac.cn--"
-	write(99,*) "-------------------------------------------"
-	write(99,*) "Ma=", Ma,  "  Re= ", Re , "gamma=", gamma
-	write(99,*) "PrL=", PrL, "PrT=",PrT
+!---output paramters----------------------------
+  open (99, file="output_para.out")
+  write (99, *) "-------OpenCFD-EC (Ver 1.1t), (c) Li Xinliang, lixl@imech.ac.cn--"
+  write (99, *) "-------------------------------------------"
+  write (99, *) "Ma=", Ma, "  Re= ", Re, "gamma=", gamma
+  write (99, *) "PrL=", PrL, "PrT=", PrT
 
-	write(99,*) "A_alfa=", A_alfa, " A_beta=", A_beta 
-	write(99,*) "P_outlet=", P_outlet
-	write(99,*) "t_end=", t_end, " Iflag_local_dt=", Iflag_local_dt
-	write(99,*) "dt_global=",dt_global 
-	write(99,*) "Time_Method=", Time_Method,  " CFL= ", CFL 
-	write(99,*) "dtmax=", dtmax, " dtmin=", dtmin 
-    write(99,*) "Iflag_init=", Iflag_init," If_viscous=", If_viscous
-	write(99,*) "Iflag_turbulence_model=",Iflag_turbulence_model
-    write(99,*) "Iflag_Scheme= ",Iflag_Scheme, " Iflag_Flux=", Iflag_Flux
-	write(99,*) "IFlag_Reconstruction=", IFlag_Reconstruction, "Bound_Scheme= ", Bound_Scheme
-    write(99,*) "Kstep_save= ",Kstep_save,  " Kstep_show=", Kstep_show, "Kstep_average=",Kstep_average
-	write(99,*) "Kstep_smooth= ", Kstep_smooth, " Kstep_init_smooth=",Kstep_init_smooth
-    write(99,*) "If_Residual_smoothing=", If_Residual_smoothing, " If_dtime_mesh=",If_dtime_mesh
-	write(99,*) "w_LU=",w_LU
-    write(99,*) "Mesh_File_Format=",Mesh_File_Format, " Num_Mesh=",Num_Mesh
-    write(99,*) "T_inf=", T_inf, " Twall=", Twall
-	write(99,*) "Kt_inf=",Kt_inf,  " Wt_inf=",Wt_inf
-    write(99,*) "Step_Inner_Limit=",Step_Inner_Limit, " MUT_MAX=", MUT_MAX
-	write(99,*) "Pre_Step_Mesh(:)=", Pre_Step_Mesh(1:Num_Mesh)
-    write(99,*) "IF_Debug=",IF_Debug
-	write(99,*) "Ref_S=", Ref_S, "Ref_L=", Ref_L
-	write(99,*) "Centroid=", Centroid(1:3)
-	write(99,*) "Cood_Y_UP=",Cood_Y_UP
-    write(99,*) "Periodic_dX, dY, dZ=", Periodic_dX,Periodic_dY,Periodic_dZ
-	write(99,*) "IFLAG_LIMIT_FLOW=",IFLAG_LIMIT_FLOW
-	write(99,*) "Ldmin,Ldmax,Lpmin,Lpmax,Lumax=", Ldmin,Ldmax,Lpmin,Lpmax,Lumax
-	write(99,*) "CP1_NSA,CP2_NSA=",CP1_NSA,CP2_NSA
-    write(99,*) "IF_TurboMachinary=",  IF_TurboMachinary
-	write(99,*) "Turbo_Periodic_seta=", Turbo_Periodic_seta
-    write(99,*) "Ref_medium_usrdef=", Ref_medium_usrdef
-	write(99,*) "Turbo_w= ", Turbo_w, "Turbo_L0=", Turbo_L0
-	write(99,*) "a0 (Reference velocity)=", a0
-	write(99,*) "d0, T0, p0 (Reference values)=", d0,Turbo_T0, Turbo_P0
-	write(99,*) "IF_Scheme_Positivity =", IF_Scheme_Positivity
-	write(99,*) "Iflag_savefile=", Iflag_savefile
-	write(99,*) "NUM_THREADS=",NUM_THREADS
-    write(99,*) "--------------------------------------------"
+  write (99, *) "A_alfa=", A_alfa, " A_beta=", A_beta
+  write (99, *) "P_outlet=", P_outlet
+  write (99, *) "t_end=", t_end, " Iflag_local_dt=", Iflag_local_dt
+  write (99, *) "dt_global=", dt_global
+  write (99, *) "Time_Method=", Time_Method, " CFL= ", CFL
+  write (99, *) "dtmax=", dtmax, " dtmin=", dtmin
+  write (99, *) "Iflag_init=", Iflag_init, " If_viscous=", If_viscous
+  write (99, *) "Iflag_turbulence_model=", Iflag_turbulence_model
+  write (99, *) "Iflag_Scheme= ", Iflag_Scheme, " Iflag_Flux=", Iflag_Flux
+  write (99, *) "IFlag_Reconstruction=", IFlag_Reconstruction, "Bound_Scheme= ", Bound_Scheme
+  write (99, *) "Kstep_save= ", Kstep_save, " Kstep_show=", Kstep_show, "Kstep_average=", Kstep_average
+  write (99, *) "Kstep_smooth= ", Kstep_smooth, " Kstep_init_smooth=", Kstep_init_smooth
+  write (99, *) "If_Residual_smoothing=", If_Residual_smoothing, " If_dtime_mesh=", If_dtime_mesh
+  write (99, *) "w_LU=", w_LU
+  write (99, *) "Mesh_File_Format=", Mesh_File_Format, " Num_Mesh=", Num_Mesh
+  write (99, *) "T_inf=", T_inf, " Twall=", Twall
+  write (99, *) "Kt_inf=", Kt_inf, " Wt_inf=", Wt_inf
+  write (99, *) "Step_Inner_Limit=", Step_Inner_Limit, " MUT_MAX=", MUT_MAX
+  write (99, *) "Pre_Step_Mesh(:)=", Pre_Step_Mesh(1:Num_Mesh)
+  write (99, *) "IF_Debug=", IF_Debug
+  write (99, *) "Ref_S=", Ref_S, "Ref_L=", Ref_L
+  write (99, *) "Centroid=", Centroid(1:3)
+  write (99, *) "Cood_Y_UP=", Cood_Y_UP
+  write (99, *) "Periodic_dX, dY, dZ=", Periodic_dX, Periodic_dY, Periodic_dZ
+  write (99, *) "IFLAG_LIMIT_FLOW=", IFLAG_LIMIT_FLOW
+  write (99, *) "Ldmin,Ldmax,Lpmin,Lpmax,Lumax=", Ldmin, Ldmax, Lpmin, Lpmax, Lumax
+  write (99, *) "CP1_NSA,CP2_NSA=", CP1_NSA, CP2_NSA
+  write (99, *) "IF_TurboMachinary=", IF_TurboMachinary
+  write (99, *) "Turbo_Periodic_seta=", Turbo_Periodic_seta
+  write (99, *) "Ref_medium_usrdef=", Ref_medium_usrdef
+  write (99, *) "Turbo_w= ", Turbo_w, "Turbo_L0=", Turbo_L0
+  write (99, *) "a0 (Reference velocity)=", a0
+  write (99, *) "d0, T0, p0 (Reference values)=", d0, Turbo_T0, Turbo_P0
+  write (99, *) "IF_Scheme_Positivity =", IF_Scheme_Positivity
+  write (99, *) "Iflag_savefile=", Iflag_savefile
+  write (99, *) "NUM_THREADS=", NUM_THREADS
+  write (99, *) "--------------------------------------------"
 
-    close(99)
+  close (99)
 
- !----------------------------------------------
- end
+!----------------------------------------------
+end
 !--------------------------------------------------
- 
 
 !------------------------------------------------------------------
-  
-  
-   subroutine bcast_para
-   use Global_var
-   implicit none
-    integer:: Ipara(100),ierr
-    real(PRE_EC):: rpara(100)
-    Ipara=0
-	rpara=0.d0
+
+subroutine bcast_para
+  use Global_var
+  implicit none
+  integer:: Ipara(100), ierr
+  real(PRE_EC):: rpara(100)
+  Ipara = 0
+  rpara = 0.d0
 !----
-	rpara(1)=Ma 
-	rpara(2)=Re
-	rpara(3)=AoA
-	rpara(4)=AoS
-	rpara(5)=p_outlet
-	rpara(6)=t_end
-	rpara(7)=dt_global
-	rpara(8)=CFL
-	rpara(9)=dtmax
-	rpara(10)=dtmin
-	rpara(11)=w_LU
-	rpara(12)=T_inf
-	rpara(13)=Twall
-	rpara(14)=Kt_inf
-	rpara(15)=Wt_inf
-    rpara(16)=Res_Inner_Limit
-    rpara(17)=MUT_MAX
-    rpara(18)=Ref_S
-	rpara(19)=Ref_L
-	rpara(20:22)=Centroid(1:3)
-	rpara(23)=Ldmin
-	rpara(24)=Ldmax
-	rpara(25)=Lpmin
-	rpara(26)=Lpmax
-	rpara(27)=Lumax
-	rpara(28)=LSAmax
-	rpara(29)=CP1_NSA
-	rpara(30)=CP2_NSA
-	rpara(31)=gamma
-	rpara(32)=PrL
-	rpara(33)=PrT
-    rpara(34)=Turbo_w
-    rpara(35)=Turbo_Periodic_seta
-    rpara(36)=Periodic_dX
-	rpara(37)=Periodic_dY
-	rpara(38)=Periodic_dZ
+  rpara(1) = Ma
+  rpara(2) = Re
+  rpara(3) = AoA
+  rpara(4) = AoS
+  rpara(5) = p_outlet
+  rpara(6) = t_end
+  rpara(7) = dt_global
+  rpara(8) = CFL
+  rpara(9) = dtmax
+  rpara(10) = dtmin
+  rpara(11) = w_LU
+  rpara(12) = T_inf
+  rpara(13) = Twall
+  rpara(14) = Kt_inf
+  rpara(15) = Wt_inf
+  rpara(16) = Res_Inner_Limit
+  rpara(17) = MUT_MAX
+  rpara(18) = Ref_S
+  rpara(19) = Ref_L
+  rpara(20:22) = Centroid(1:3)
+  rpara(23) = Ldmin
+  rpara(24) = Ldmax
+  rpara(25) = Lpmin
+  rpara(26) = Lpmax
+  rpara(27) = Lumax
+  rpara(28) = LSAmax
+  rpara(29) = CP1_NSA
+  rpara(30) = CP2_NSA
+  rpara(31) = gamma
+  rpara(32) = PrL
+  rpara(33) = PrT
+  rpara(34) = Turbo_w
+  rpara(35) = Turbo_Periodic_seta
+  rpara(36) = Periodic_dX
+  rpara(37) = Periodic_dY
+  rpara(38) = Periodic_dZ
 
+  Ipara(1) = Kstep_save
+  Ipara(2) = Iflag_turbulence_model
+  Ipara(3) = Iflag_init
+  Ipara(4) = If_viscous
+  Ipara(5) = Iflag_local_dt
+  Ipara(6) = Time_Method
+  Ipara(7) = If_Residual_smoothing
+  Ipara(8) = If_dtime_mesh
+  Ipara(9) = Iflag_Scheme
+  Ipara(10) = Iflag_Flux
+  Ipara(11) = IFlag_Reconstruction
+  Ipara(12) = Mesh_File_Format
+  Ipara(13) = Kstep_show
+  Ipara(14) = Kstep_smooth
+  Ipara(15) = Kstep_init_smooth
+  Ipara(16) = Num_Mesh
+  Ipara(17) = IF_Debug
+  Ipara(18) = NUM_THREADS
+  Ipara(19) = Step_Inner_Limit
+  Ipara(20) = Bound_Scheme
+  Ipara(21) = Cood_Y_UP
+  Ipara(22) = IFLAG_LIMIT_Flow
+  Ipara(23:26) = Pdebug(1:4)
+  Ipara(27) = IF_TurboMachinary
+  Ipara(28) = IF_Scheme_Positivity
+  Ipara(29) = IF_Innerflow
+  Ipara(30) = Kstep_average
+  Ipara(31) = Iflag_savefile
 
+  call MPI_bcast(rpara, 100, OCFD_DATA_TYPE, 0, MPI_COMM_WORLD, ierr)
+  call MPI_bcast(Ipara, 100, MPI_Integer, 0, MPI_COMM_WORLD, ierr)
 
+  Ma = rpara(1)
+  Re = rpara(2)
+  AoA = rpara(3)
+  AoS = rpara(4)
+  p_outlet = rpara(5)
+  t_end = rpara(6)
+  dt_global = rpara(7)
+  CFL = rpara(8)
+  dtmax = rpara(9)
+  dtmin = rpara(10)
+  w_LU = rpara(11)
+  T_inf = rpara(12)
+  Twall = rpara(13)
+  Kt_inf = rpara(14)
+  Wt_inf = rpara(15)
+  Res_Inner_Limit = rpara(16)
+  MUT_MAX = rpara(17)
+  Ref_S = rpara(18)
+  Ref_L = rpara(19)
+  Centroid(1:3) = rpara(20:22)
+  Ldmin = rpara(23)
+  Ldmax = rpara(24)
+  Lpmin = rpara(25)
+  Lpmax = rpara(26)
+  Lumax = rpara(27)
+  LSAmax = rpara(28)
+  CP1_NSA = rpara(29)
+  CP2_NSA = rpara(30)
+  gamma = rpara(31)
+  PrL = rpara(32)
+  PrT = rpara(33)
+  Turbo_w = rpara(34)
+  Turbo_Periodic_seta = rpara(35)
+  Periodic_dX = rpara(36)
+  Periodic_dY = rpara(37)
+  Periodic_dZ = rpara(38)
 
-    Ipara(1)=Kstep_save
-	Ipara(2)=Iflag_turbulence_model
-	Ipara(3)=Iflag_init
-	Ipara(4)=If_viscous
-    Ipara(5)=Iflag_local_dt
-	Ipara(6)=Time_Method
-	Ipara(7)=If_Residual_smoothing
-	Ipara(8)=If_dtime_mesh
-    Ipara(9)=Iflag_Scheme
-	Ipara(10)=Iflag_Flux
-	Ipara(11)=IFlag_Reconstruction
-	Ipara(12)=Mesh_File_Format
-	Ipara(13)=Kstep_show
-	Ipara(14)=Kstep_smooth
-	Ipara(15)=Kstep_init_smooth
-    Ipara(16)=Num_Mesh
-	Ipara(17)=IF_Debug
-	Ipara(18)=NUM_THREADS
-    Ipara(19)=Step_Inner_Limit
-    Ipara(20)=Bound_Scheme
-    Ipara(21)=Cood_Y_UP
-	Ipara(22)=IFLAG_LIMIT_Flow
-    Ipara(23:26)=Pdebug(1:4)
-    Ipara(27)=IF_TurboMachinary
-	Ipara(28)=IF_Scheme_Positivity
-   	Ipara(29)=IF_Innerflow
-   	Ipara(30)=Kstep_average
-    Ipara(31)=Iflag_savefile
+  Kstep_save = Ipara(1)
+  Iflag_turbulence_model = Ipara(2)
+  Iflag_init = Ipara(3)
+  If_viscous = Ipara(4)
+  Iflag_local_dt = Ipara(5)
+  Time_Method = Ipara(6)
+  If_Residual_smoothing = Ipara(7)
+  If_dtime_mesh = Ipara(8)
+  Iflag_Scheme = Ipara(9)
+  Iflag_Flux = Ipara(10)
+  IFlag_Reconstruction = Ipara(11)
+  Mesh_File_Format = Ipara(12)
+  Kstep_show = Ipara(13)
+  Kstep_smooth = Ipara(14)
+  Kstep_init_smooth = Ipara(15)
+  Num_Mesh = Ipara(16)
+  IF_Debug = Ipara(17)
+  NUM_THREADS = Ipara(18)
+  Step_Inner_Limit = Ipara(19)
+  Bound_Scheme = Ipara(20)
+  Cood_Y_UP = Ipara(21)
+  IFLAG_LIMIT_FLOW = Ipara(22)
+  Pdebug(1:4) = Ipara(23:26)
+  IF_TurboMachinary = Ipara(27)
+  IF_Scheme_Positivity = Ipara(28)
+  IF_Innerflow = Ipara(29)
+  Kstep_average = Ipara(30)
+  Iflag_savefile = Ipara(31)
 
-	 call MPI_bcast(rpara,100,OCFD_DATA_TYPE,0,  MPI_COMM_WORLD,ierr)
-	 call MPI_bcast(Ipara,100,MPI_Integer,0,  MPI_COMM_WORLD,ierr)
+  call MPI_bcast(Pre_Step_Mesh, Num_Mesh, MPI_Integer, 0, MPI_COMM_WORLD, ierr)
+end subroutine bcast_para
 
-	Ma=rpara(1) 
-	Re=rpara(2)
-	AoA=rpara(3)
-	AoS=rpara(4)
-	p_outlet=rpara(5)
-	t_end=rpara(6)
-	dt_global=rpara(7)
-	CFL=rpara(8)
-	dtmax=rpara(9)
-	dtmin=rpara(10)
-	w_LU=rpara(11)
-	T_inf=rpara(12)
-	Twall=rpara(13)
-	Kt_inf=rpara(14)
-	Wt_inf=rpara(15)
-    Res_Inner_Limit=rpara(16)
-    MUT_MAX=rpara(17)
-    Ref_S=rpara(18)
-	Ref_L=rpara(19)
-	Centroid(1:3)=rpara(20:22)
-	Ldmin=rpara(23)
-	Ldmax=rpara(24)
-	Lpmin=rpara(25)
-	Lpmax=rpara(26)
-	Lumax=rpara(27)
-	LSAmax=rpara(28)
-	CP1_NSA=rpara(29)
-	CP2_NSA=rpara(30)
-	gamma=rpara(31)
-	PrL=rpara(32)
-	PrT=rpara(33)
-    Turbo_w=rpara(34)
-    Turbo_Periodic_seta=rpara(35)
-    Periodic_dX=rpara(36)
-	Periodic_dY=rpara(37)
-	Periodic_dZ=rpara(38)
+! è®¾å®šå¸¸æ•°
+subroutine set_const_para
+  use Global_var
+  implicit none
 
+  Twall = Twall/T_inf                         ! wall temperature
+  Lpmin = Lpmin/(gamma*Ma*Ma)                 ! rato of free-stream pressure
+  Lpmax = Lpmax/(gamma*Ma*Ma)
 
+  if (Bound_Scheme == Scheme_none) Bound_Scheme = Iflag_Scheme    ! å¦‚ä¸ä½¿ç”¨è¾¹ç•Œæ ¼å¼ï¼Œåˆ™ä¸å†…ç‚¹æ ¼å¼ä¸€è‡´
+  if (If_viscous .eq. 0) Iflag_turbulence_model = Turbulence_NONE !    æ±‚è§£æ— ç²˜æ–¹ç¨‹ï¼Œä¸é‡‡ç”¨æ¹æµæ¨¡å‹
 
-    Kstep_save=Ipara(1)
-	Iflag_turbulence_model=Ipara(2)
-	Iflag_init=Ipara(3)
-	If_viscous=Ipara(4)
-    Iflag_local_dt=Ipara(5)
-	Time_Method=Ipara(6)
-	If_Residual_smoothing=Ipara(7)
-	If_dtime_mesh=Ipara(8)
-    Iflag_Scheme=Ipara(9)
-	Iflag_Flux=Ipara(10)
-	IFlag_Reconstruction=Ipara(11)
-	Mesh_File_Format=Ipara(12)
-	Kstep_show=Ipara(13)
-	Kstep_smooth=Ipara(14)
-	Kstep_init_smooth=Ipara(15)
-    Num_Mesh=Ipara(16)
-	IF_Debug=Ipara(17)
-	NUM_THREADS=Ipara(18)
-    Step_Inner_Limit=Ipara(19)
-    Bound_Scheme=Ipara(20)
-    Cood_Y_UP=Ipara(21)
-	IFLAG_LIMIT_FLOW=Ipara(22)
-    Pdebug(1:4)=Ipara(23:26)
-    IF_TurboMachinary=Ipara(27)
-	IF_Scheme_Positivity=Ipara(28)
-   	IF_Innerflow=Ipara(29)
-   	Kstep_average=Ipara(30)
-    Iflag_savefile=Ipara(31)
-
-
-    call MPI_bcast(Pre_Step_Mesh,Num_Mesh,MPI_Integer,0,  MPI_COMM_WORLD,ierr)
-    end  subroutine bcast_para
-  
-  
-      
-! Éè¶¨³£Êı
-   subroutine set_const_para 
-   use Global_var
-   implicit none
-
-   Twall=Twall/T_inf                         ! wall temperature
-   Lpmin=Lpmin/(gamma*Ma*Ma)                 ! rato of free-stream pressure
-   Lpmax=Lpmax/(gamma*Ma*Ma)
-
-
-
-   if(Bound_Scheme== Scheme_none)  Bound_Scheme=Iflag_Scheme    ! Èç²»Ê¹ÓÃ±ß½ç¸ñÊ½£¬ÔòÓëÄÚµã¸ñÊ½Ò»ÖÂ   
-   if(If_viscous .eq. 0) Iflag_turbulence_model=Turbulence_NONE !    Çó½âÎŞÕ³·½³Ì£¬²»²ÉÓÃÍÄÁ÷Ä£ĞÍ
-    
-   if(Iflag_turbulence_model .eq. Turbulence_SA .or. & 
+  if (Iflag_turbulence_model .eq. Turbulence_SA .or. &
       Iflag_turbulence_model .eq. Turbulence_NewSA) then
-     NVAR=6                       ! SAÄ£ĞÍ£¬×Ü¹²6¸ö±äÁ¿
-   else if (Iflag_turbulence_model .eq. Turbulence_SST) then
-     NVAR=7                       ! SST Ä£ĞÍ£¬×Ü¹²7¸ö±äÁ¿
-   else
-     NVAR=5                       ! 5¸ö±äÁ¿
-   endif
-
-  if(Iflag_turbulence_model .eq. 0) then
-   IF_Walldist=0                   ! ÎŞĞè¸ÃÊı¾İ
+    NVAR = 6                       ! SAæ¨¡å‹ï¼Œæ€»å…±6ä¸ªå˜é‡
+  else if (Iflag_turbulence_model .eq. Turbulence_SST) then
+    NVAR = 7                       ! SST æ¨¡å‹ï¼Œæ€»å…±7ä¸ªå˜é‡
   else
-   IF_Walldist=1
-  endif
- 
+    NVAR = 5                       ! 5ä¸ªå˜é‡
+  end if
+
+  if (Iflag_turbulence_model .eq. 0) then
+    IF_Walldist = 0                   ! æ— éœ€è¯¥æ•°æ®
+  else
+    IF_Walldist = 1
+  end if
+
 !--------------------------------------------------------------------------------
-  AoA=AoA*PI/180.d0   ! Angle of attack
-  AoS=AoS*PI/180.d0   ! Angle of Slide
- if(Cood_Y_UP ==1) then   ! Y Öá´¹Ö±ÏòÉÏ or ZÖá´¹Ö±ÏòÉÏ 
-   A_alfa=AoA             ! YÖáÏòÉÏ£¬ A_alfaÎª¹¥½Ç
-   A_beta=AoS
- else
-   A_alfa=AoS  
-   A_beta=AoA
- endif
-   
-  
-   Cv=1.d0/(gamma*(gamma-1.d0)*Ma*Ma) 
-   Cp=Cv*gamma 
+  AoA = AoA*PI/180.d0   ! Angle of attack
+  AoS = AoS*PI/180.d0   ! Angle of Slide
+  if (Cood_Y_UP == 1) then   ! Y è½´å‚ç›´å‘ä¸Š or Zè½´å‚ç›´å‘ä¸Š
+    A_alfa = AoA             ! Yè½´å‘ä¸Šï¼Œ A_alfaä¸ºæ”»è§’
+    A_beta = AoS
+  else
+    A_alfa = AoS
+    A_beta = AoA
+  end if
+
+  Cv = 1.d0/(gamma*(gamma-1.d0)*Ma*Ma)
+  Cp = Cv*gamma
 !--------------------------------------------------------------------
 
-!  ¼ÆËãµ½±ÚÃæµÄ¾àÀë
+!  è®¡ç®—åˆ°å£é¢çš„è·ç¦»
 !   if(Iflag_turbulence_model .eq. Turbulence_SA .or. Iflag_turbulence_model .eq. Turbulence_SST) then
 !     inquire(file="wall_dist.dat",exist=file_exist)
-!	 if( .not. file_exist) then
-!	   call  comput_wall_dist  
+!         if( .not. file_exist) then
+!           call  comput_wall_dist
 !     endif
 !   endif
-    
-	if(Num_Mesh .ne. 1) then
-	   if(Time_Method .eq. Time_LU_SGS .or. Time_Method .eq. Time_Dual_LU_SGS) then
-	    print*, "In this version, LU_SGS (or Dual_time_LU_SGS) DO NOT Support Multi-Grid !!!"
-		stop
-	   endif
-	endif
-  end
 
-
-
+  if (Num_Mesh .ne. 1) then
+  if (Time_Method .eq. Time_LU_SGS .or. Time_Method .eq. Time_Dual_LU_SGS) then
+    print *, "In this version, LU_SGS (or Dual_time_LU_SGS) DO NOT Support Multi-Grid !!!"
+    stop
+  end if
+  end if
+end

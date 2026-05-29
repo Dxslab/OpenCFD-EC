@@ -1,349 +1,343 @@
 !------------------------------------------------------------------------------
-! SST model  (See: J. Blazek's book, section 7.2.3) 
+! SST model  (See: J. Blazek's book, section 7.2.3)
 ! Do not consider transition (full turbulence)
 ! See:  CFL3D 5.0 manual
 ! 2018-9-29:  A bug is removed;
 
-  subroutine  Turbulence_model_SST(nMesh,mBlock)
-   use Global_Var
-   Use Flow_Var
-   implicit none
-   integer:: mBlock,nx,ny,nz,i,j,k,nMesh
-   real(PRE_EC):: ix,iy,iz,jx,jy,jz,kx,ky,kz
-   real(PRE_EC):: s1x,s1y,s1z
-   real(PRE_EC):: ui,vi,wi,Kti,Wti,uj,vj,wj,Ktj,Wtj,uk,vk,wk,Ktk,Wtk,  &
-                  ux,vx,wx,Ktx,Wtx,uy,vy,wy,Kty,Wty,uz,vz,wz,Ktz,Wtz
-   real(PRE_EC):: omega,arg1,arg2,arg3,f2,Kws,CD_kw,Pk,Pk1,Pk0,Qk,Qw
-   real(PRE_EC):: t11,t22,t33,t12,t13,t23,muk,muw,vn1,vn2,kfi,wfi
-   real(PRE_EC):: Cw_SST,beta_SST,sigma_k_SST,sigma_w_SST
-   
-   real*8,parameter:: sigma_k1_SST=0.85d0,sigma_w1_SST=0.5d0,beta1_SST=0.075d0,Cw1_SST=0.533d0, &
-                        sigma_k2_SST=1.d0,  sigma_w2_SST=0.856d0,beta2_SST=0.0828d0,Cw2_SST=0.440d0
-   real*8,parameter::a1_SST=0.31d0, betas_SST=0.09d0
-   real(PRE_EC),Pointer,dimension(:,:,:):: Kt,Wt,Fluxk,Fluxw  ! ÍÄÄÜ¡¢ÍÄÄÜ±ÈºÄÉ¢ÂÊ£»Ô´Ïî£»Í¨Á¿Ïî
-   real(PRE_EC),Pointer,dimension(:,:,:):: f1
+subroutine Turbulence_model_SST(nMesh, mBlock)
+  use Global_Var
+  Use Flow_Var
+  implicit none
+  integer:: mBlock, nx, ny, nz, i, j, k, nMesh
+  real(PRE_EC):: ix, iy, iz, jx, jy, jz, kx, ky, kz
+  real(PRE_EC):: s1x, s1y, s1z
+  real(PRE_EC):: ui, vi, wi, Kti, Wti, uj, vj, wj, Ktj, Wtj, uk, vk, wk, Ktk, Wtk, &
+                 ux, vx, wx, Ktx, Wtx, uy, vy, wy, Kty, Wty, uz, vz, wz, Ktz, Wtz
+  real(PRE_EC):: omega, arg1, arg2, arg3, f2, Kws, CD_kw, Pk, Pk1, Pk0, Qk, Qw
+  real(PRE_EC):: t11, t22, t33, t12, t13, t23, muk, muw, vn1, vn2, kfi, wfi
+  real(PRE_EC):: Cw_SST, beta_SST, sigma_k_SST, sigma_w_SST
 
-   TYPE (Mesh_TYPE),pointer:: MP
-   Type (Block_TYPE),pointer:: B
- 
-   MP=> Mesh(nMesh)
-   B => MP%Block(mBlock)
-   nx=B%nx ; ny=B%ny; nz=B%nz
- ! ¼ÆËãÍÄÁ÷Õ³ĞÔÏµÊı
-   allocate(Kt(0:nx,0:ny,0:nz),Wt(0:nx,0:ny,0:nz),Fluxk(nx,ny,nz),Fluxw(nx,ny,nz))
-   allocate(f1(nx,ny,nz))
+  real*8, parameter:: sigma_k1_SST = 0.85d0, sigma_w1_SST = 0.5d0, beta1_SST = 0.075d0, Cw1_SST = 0.533d0, &
+                      sigma_k2_SST = 1.d0, sigma_w2_SST = 0.856d0, beta2_SST = 0.0828d0, Cw2_SST = 0.440d0
+  real*8, parameter::a1_SST = 0.31d0, betas_SST = 0.09d0
+  real(PRE_EC), Pointer, dimension(:, :, :):: Kt, Wt, Fluxk, Fluxw  ! æ¹èƒ½ã€æ¹èƒ½æ¯”è€—æ•£ç‡ï¼›æºé¡¹ï¼›é€šé‡é¡¹
+  real(PRE_EC), Pointer, dimension(:, :, :):: f1
 
-! OpenMPµÄ±àÒëÖ¸Ê¾·û£¨²»ÊÇ×¢ÊÍ£©£¬ Ö¸¶¨Do Ñ­»·²¢ĞĞÖ´ĞĞ£» Ö¸¶¨Ò»Ğ©¸÷½ø³ÌË½ÓĞµÄ±äÁ¿
+  TYPE(Mesh_TYPE), pointer:: MP
+  Type(Block_TYPE), pointer:: B
+
+  MP => Mesh(nMesh)
+  B => MP%Block(mBlock)
+  nx = B%nx; ny = B%ny; nz = B%nz
+! è®¡ç®—æ¹æµç²˜æ€§ç³»æ•°
+  allocate (Kt(0:nx, 0:ny, 0:nz), Wt(0:nx, 0:ny, 0:nz), Fluxk(nx, ny, nz), Fluxw(nx, ny, nz))
+  allocate (f1(nx, ny, nz))
+
+! OpenMPçš„ç¼–è¯‘æŒ‡ç¤ºç¬¦ï¼ˆä¸æ˜¯æ³¨é‡Šï¼‰ï¼Œ æŒ‡å®šDo å¾ªç¯å¹¶è¡Œæ‰§è¡Œï¼› æŒ‡å®šä¸€äº›å„è¿›ç¨‹ç§æœ‰çš„å˜é‡
 !$OMP PARALLEL DEFAULT(PRIVATE) SHARED(nx,ny,nz,B,Kt,Wt,Fluxk,Fluxw,d,uu,v,w,f1)
-    
-!$OMP DO   
-   do k=0,nz
-   do j=0,ny
-   do i=0,nx
-    B%mu(i,j,k)=B%mu(i,j,k)*Re             ! Á¿¸Ù×ª»»
-   enddo
-   enddo
-   enddo
-!$OMP END DO   
 
-!$OMP DO   
-    do k=0,nz
-	do j=0,ny
-	do i=0,nx
-	 Kt(i,j,k)=B%U(6,i,j,k)/B%U(1,i,j,k)
-	 Wt(i,j,k)=B%U(7,i,j,k)/B%U(1,i,j,k)
-    enddo
-	enddo
-	enddo
-!$OMP END DO   
-   
+!$OMP DO
+  do k = 0, nz
+  do j = 0, ny
+  do i = 0, nx
+    B%mu(i, j, k) = B%mu(i, j, k)*Re             ! é‡çº²è½¬æ¢
+  end do
+  end do
+  end do
+!$OMP END DO
 
-!$OMP DO   
-    do k=1,nz-1
-    do j=1,ny-1
-    do i=1,nx-1
-! ¼ÆËãÎĞÁ¿, ½»²æ¶ÔÁ÷Ïî
-    ui=uu(i+1,j,k)-uu(i-1,j,k)            
-    vi=v(i+1,j,k)-v(i-1,j,k)  
-    wi=w(i+1,j,k)-w(i-1,j,k)  
-    Kti=Kt(i+1,j,k)-Kt(i-1,j,k)  
-    wti=wt(i+1,j,k)-wt(i-1,j,k)  
- 
-    uj=uu(i,j+1,k)-uu(i,j-1,k)   
-    vj=v(i,j+1,k)-v(i,j-1,k)
-    wj=w(i,j+1,k)-w(i,j-1,k) 
-    Ktj=Kt(i,j+1,k)-Kt(i,j-1,k) 
-    wtj=wt(i,j+1,k)-wt(i,j-1,k) 
-    
-	uk=uu(i,j,k+1)-uu(i,j,k-1)  
-    vk=v(i,j,k+1)-v(i,j,k-1)
-    wk=w(i,j,k+1)-w(i,j,k-1)  
-    Ktk=Kt(i,j,k+1)-Kt(i,j,k-1)  
-    wtk=wt(i,j,k+1)-wt(i,j,k-1) 
-	 
-    ix=B%ix0(i,j,k); iy=B%iy0(i,j,k); iz=B%iz0(i,j,k)
-    jx=B%jx0(i,j,k); jy=B%jy0(i,j,k); jz=B%jz0(i,j,k)
-    kx=B%kx0(i,j,k); ky=B%ky0(i,j,k); kz=B%kz0(i,j,k)
-   
-    ux=ui*ix+uj*jx+uk*kx
-    vx=vi*ix+vj*jx+vk*kx
-    wx=wi*ix+wj*jx+wk*kx
-    Ktx=kti*ix+ktj*jx+ktk*kx
-    wtx=wti*ix+wtj*jx+wtk*kx
+!$OMP DO
+  do k = 0, nz
+  do j = 0, ny
+  do i = 0, nx
+    Kt(i, j, k) = B%U(6, i, j, k)/B%U(1, i, j, k)
+    Wt(i, j, k) = B%U(7, i, j, k)/B%U(1, i, j, k)
+  end do
+  end do
+  end do
+!$OMP END DO
 
-    uy=ui*iy+uj*jy+uk*ky
-    vy=vi*iy+vj*jy+vk*ky
-    wy=wi*iy+wj*jy+wk*ky
-    Kty=kti*iy+ktj*jy+ktk*ky
-    wty=wti*iy+wtj*jy+wtk*ky
+!$OMP DO
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do i = 1, nx-1
+! è®¡ç®—æ¶¡é‡, äº¤å‰å¯¹æµé¡¹
+    ui = uu(i+1, j, k)-uu(i-1, j, k)
+    vi = v(i+1, j, k)-v(i-1, j, k)
+    wi = w(i+1, j, k)-w(i-1, j, k)
+    Kti = Kt(i+1, j, k)-Kt(i-1, j, k)
+    wti = wt(i+1, j, k)-wt(i-1, j, k)
 
-    uz=ui*iz+uj*jz+uk*kz
-    vz=vi*iz+vj*jz+vk*kz
-    wz=wi*iz+wj*jz+wk*kz
-    Ktz=kti*iz+ktj*jz+ktk*kz
-    wtz=wti*iz+wtj*jz+wtk*kz
+    uj = uu(i, j+1, k)-uu(i, j-1, k)
+    vj = v(i, j+1, k)-v(i, j-1, k)
+    wj = w(i, j+1, k)-w(i, j-1, k)
+    Ktj = Kt(i, j+1, k)-Kt(i, j-1, k)
+    wtj = wt(i, j+1, k)-wt(i, j-1, k)
 
-! ÎĞÁ¿
-     omega=sqrt((wy-vz)**2+(uz-wx)**2+(vx-uy)**2)
-	 arg2=max( 2.d0* sqrt(abs(Kt(i,j,k)))/(0.09*Wt(i,j,k)*B%dw(i,j,k)*Re) , &
-	          500.d0*B%mu(i,j,k)/(d(i,j,k)*Wt(i,j,k)*B%dw(i,j,k)**2 *Re*Re) )
-     f2=tanh(arg2**2)
-     B%mu_t(i,j,k)=a1_SST*d(i,j,k)*Kt(i,j,k)/max(a1_SST*Wt(i,j,k),f2*abs(omega)/Re)
+    uk = uu(i, j, k+1)-uu(i, j, k-1)
+    vk = v(i, j, k+1)-v(i, j, k-1)
+    wk = w(i, j, k+1)-w(i, j, k-1)
+    Ktk = Kt(i, j, k+1)-Kt(i, j, k-1)
+    wtk = wt(i, j, k+1)-wt(i, j, k-1)
 
+    ix = B%ix0(i, j, k); iy = B%iy0(i, j, k); iz = B%iz0(i, j, k)
+    jx = B%jx0(i, j, k); jy = B%jy0(i, j, k); jz = B%jz0(i, j, k)
+    kx = B%kx0(i, j, k); ky = B%ky0(i, j, k); kz = B%kz0(i, j, k)
 
- ! ¼ÆËãf1 (Ê¶±ğÊÇ·ñÎª½ü±ÚÇø£¬½ü±ÚÇøÇ÷½üÓÚ1£©      
-     
- !    Kws=2.d0*(ktx*wtx+kty*wty+ktz*ktz)*d(i,j,k)*sigma_w2_SST/(Wt(i,j,k)+1.d-20)      ! Bug
-      Kws=2.d0*(ktx*wtx+kty*wty+ktz*wtz)*d(i,j,k)*sigma_w2_SST/(Wt(i,j,k)+1.d-20)      ! ½»²æÊäÔËÏî
-    
-     CD_kw=max(Kws,1.d-20)
-     arg3=max(sqrt(abs(Kt(i,j,k)))/(0.09*Wt(i,j,k)*B%dw(i,j,k) *Re)  , &
-	          500.d0*B%mu(i,j,k)/(d(i,j,k)*Wt(i,j,k)*B%dw(i,j,k)**2 *Re*Re) )
-	 arg1=min(arg3,4.d0*d(i,j,k)*sigma_w2_SST*Kt(i,j,k)/(CD_kw*B%dw(i,j,k)**2 ))
-     f1(i,j,k)=tanh(arg1**4)             ! ¿ª¹Øº¯Êı£¬½ü±ÚÇøÇ÷½üÓÚ1£¬Ô¶±ÚÇøÇ÷½üÓÚ0  £¨ÓÃÀ´ÇĞ»»k-w¼°k-epsl·½³Ì)
-     
-     
-!    ÍÄÓ¦Á¦ £¨Ê¹ÓÃÁËÎĞÕ³Ä£ĞÍ£©     ! Blazek's Book, Eq. (7.25)
-        
-!	     t11=(4.d0/3.d0)*ux-(2.d0/3.d0)*(vy+wz)  
-!         t22=(4.d0/3.d0)*vy-(2.d0/3.d0)*(ux+wz) 
-!         t33=(4.d0/3.d0)*wz-(2.d0/3.d0)*(ux+vy) 
+    ux = ui*ix+uj*jx+uk*kx
+    vx = vi*ix+vj*jx+vk*kx
+    wx = wi*ix+wj*jx+wk*kx
+    Ktx = kti*ix+ktj*jx+ktk*kx
+    wtx = wti*ix+wtj*jx+wtk*kx
+
+    uy = ui*iy+uj*jy+uk*ky
+    vy = vi*iy+vj*jy+vk*ky
+    wy = wi*iy+wj*jy+wk*ky
+    Kty = kti*iy+ktj*jy+ktk*ky
+    wty = wti*iy+wtj*jy+wtk*ky
+
+    uz = ui*iz+uj*jz+uk*kz
+    vz = vi*iz+vj*jz+vk*kz
+    wz = wi*iz+wj*jz+wk*kz
+    Ktz = kti*iz+ktj*jz+ktk*kz
+    wtz = wti*iz+wtj*jz+wtk*kz
+
+! æ¶¡é‡
+    omega = sqrt((wy-vz)**2+(uz-wx)**2+(vx-uy)**2)
+    arg2 = max(2.d0*sqrt(abs(Kt(i, j, k)))/(0.09*Wt(i, j, k)*B%dw(i, j, k)*Re), &
+               500.d0*B%mu(i, j, k)/(d(i, j, k)*Wt(i, j, k)*B%dw(i, j, k)**2*Re*Re))
+    f2 = tanh(arg2**2)
+    B%mu_t(i, j, k) = a1_SST*d(i, j, k)*Kt(i, j, k)/max(a1_SST*Wt(i, j, k), f2*abs(omega)/Re)
+
+! è®¡ç®—f1 (è¯†åˆ«æ˜¯å¦ä¸ºè¿‘å£åŒºï¼Œè¿‘å£åŒºè¶‹è¿‘äº1ï¼‰
+
+!    Kws=2.d0*(ktx*wtx+kty*wty+ktz*ktz)*d(i,j,k)*sigma_w2_SST/(Wt(i,j,k)+1.d-20)      ! Bug
+    Kws = 2.d0*(ktx*wtx+kty*wty+ktz*wtz)*d(i, j, k)*sigma_w2_SST/(Wt(i, j, k)+1.d-20)      ! äº¤å‰è¾“è¿é¡¹
+
+    CD_kw = max(Kws, 1.d-20)
+    arg3 = max(sqrt(abs(Kt(i, j, k)))/(0.09*Wt(i, j, k)*B%dw(i, j, k)*Re), &
+               500.d0*B%mu(i, j, k)/(d(i, j, k)*Wt(i, j, k)*B%dw(i, j, k)**2*Re*Re))
+    arg1 = min(arg3, 4.d0*d(i, j, k)*sigma_w2_SST*Kt(i, j, k)/(CD_kw*B%dw(i, j, k)**2))
+    f1(i, j, k) = tanh(arg1**4)             ! å¼€å…³å‡½æ•°ï¼Œè¿‘å£åŒºè¶‹è¿‘äº1ï¼Œè¿œå£åŒºè¶‹è¿‘äº0  ï¼ˆç”¨æ¥åˆ‡æ¢k-wåŠk-epslæ–¹ç¨‹)
+
+!    æ¹åº”åŠ› ï¼ˆä½¿ç”¨äº†æ¶¡ç²˜æ¨¡å‹ï¼‰     ! Blazek's Book, Eq. (7.25)
+
+!             t11=(4.d0/3.d0)*ux-(2.d0/3.d0)*(vy+wz)
+!         t22=(4.d0/3.d0)*vy-(2.d0/3.d0)*(ux+wz)
+!         t33=(4.d0/3.d0)*wz-(2.d0/3.d0)*(ux+vy)
 !         t12=uy+vx
 !         t13=uz+wx
 !         t23=vz+wy
 
+!    æ¹èƒ½æ–¹ç¨‹çš„æºé¡¹ï¼ˆç”Ÿæˆ-è€—æ•£)
+!     Pk1=t11*ux+t22*vy+t33*wz+t12*(uy+vx)+t13*(uz+wx)+t23*(vz+wy)
+!          Pk=B%mu_t(i,j,k)*Pk1                                                   ! æ¹èƒ½ç”Ÿæˆé¡¹ ï¼ˆæ¹åº”åŠ›ä¹˜ä»¥åº”å˜ç‡ï¼‰
 
-!    ÍÄÄÜ·½³ÌµÄÔ´Ïî£¨Éú³É-ºÄÉ¢)     
-!     Pk1=t11*ux+t22*vy+t33*wz+t12*(uy+vx)+t13*(uz+wx)+t23*(vz+wy)     
-!	  Pk=B%mu_t(i,j,k)*Pk1                                                   ! ÍÄÄÜÉú³ÉÏî £¨ÍÄÓ¦Á¦³ËÒÔÓ¦±äÂÊ£©       
+    Pk = B%mu_t(i, j, k)*omega*omega
+!     Pk0=min(Pk,20.d0*betas_SST*Kt(i,j,k)*Wt(i,j,k)*Re*Re)                        ! å¯¹æ¹èƒ½ç”Ÿæˆé¡¹è¿›è¡Œé™åˆ¶ï¼Œé˜²æ­¢æ¹èƒ½è¿‡å¤§
 
-      Pk=B%mu_t(i,j,k)*omega*omega
-!     Pk0=min(Pk,20.d0*betas_SST*Kt(i,j,k)*Wt(i,j,k)*Re*Re)                        ! ¶ÔÍÄÄÜÉú³ÉÏî½øĞĞÏŞÖÆ£¬·ÀÖ¹ÍÄÄÜ¹ı´ó
-   
-     Pk0=Pk        ! ²»½øĞĞÏŞÖÆ
+    Pk0 = Pk        ! ä¸è¿›è¡Œé™åˆ¶
 
-	 Qk=Pk0/Re-Re*betas_SST*d(i,j,k)*Wt(i,j,k)*Kt(i,j,k)    ! k·½³ÌµÄÔ´Ïî  £¨Éú³ÉÏî-ºÄÉ¢Ïî£©
+    Qk = Pk0/Re-Re*betas_SST*d(i, j, k)*Wt(i, j, k)*Kt(i, j, k)    ! kæ–¹ç¨‹çš„æºé¡¹  ï¼ˆç”Ÿæˆé¡¹-è€—æ•£é¡¹ï¼‰
 
-     Cw_SST=f1(i,j,k)*Cw1_SST+(1.d0-f1(i,j,k))*Cw2_SST    ! Ä£ĞÍÏµÊı£¬ÀûÓÃf1º¯Êı½øĞĞÇĞ»»
-     beta_SST=f1(i,j,k)*beta1_SST+(1.d0-f1(i,j,k))*beta2_SST    ! Ä£ĞÍÏµÊı£¬ÀûÓÃf1º¯Êı½øĞĞÇĞ»»
+    Cw_SST = f1(i, j, k)*Cw1_SST+(1.d0-f1(i, j, k))*Cw2_SST    ! æ¨¡å‹ç³»æ•°ï¼Œåˆ©ç”¨f1å‡½æ•°è¿›è¡Œåˆ‡æ¢
+    beta_SST = f1(i, j, k)*beta1_SST+(1.d0-f1(i, j, k))*beta2_SST    ! æ¨¡å‹ç³»æ•°ï¼Œåˆ©ç”¨f1å‡½æ•°è¿›è¡Œåˆ‡æ¢
 !    Qw= Cw_SST*d(i,j,k)*Pk1          &
-!	           -beta_SST*d(i,j,k)*Wt(i,j,k)**2+(1.d0-f1(i,j,k))*Kws     ! W·½³ÌµÄÔ´Ïî    
-     Qw= Cw_SST*d(i,j,k)*omega*omega/Re          &
-	           -Re*beta_SST*d(i,j,k)*Wt(i,j,k)**2+(1.d0-f1(i,j,k))*Kws/Re     ! W·½³ÌµÄÔ´Ïî    
+!                   -beta_SST*d(i,j,k)*Wt(i,j,k)**2+(1.d0-f1(i,j,k))*Kws     ! Wæ–¹ç¨‹çš„æºé¡¹
+    Qw = Cw_SST*d(i, j, k)*omega*omega/Re &
+         -Re*beta_SST*d(i, j, k)*Wt(i, j, k)**2+(1.d0-f1(i, j, k))*Kws/Re     ! Wæ–¹ç¨‹çš„æºé¡¹
 
 !-------------------------------------------
 
-	B%Res(6,i,j,k)=QK*B%vol(i,j,k)
-	B%Res(7,i,j,k)=Qw*B%vol(i,j,k)
- 
-	enddo
-	enddo
-    enddo
-!$OMP END DO   
+    B%Res(6, i, j, k) = QK*B%vol(i, j, k)
+    B%Res(7, i, j, k) = Qw*B%vol(i, j, k)
+
+  end do
+  end do
+  end do
+!$OMP END DO
 !$OMP END PARALLEL
-	
 
-! Éè¶¨ÍÄÁ÷Õ³ĞÔÏµÊıĞéÍø¸ñµÄÖµ
+! è®¾å®šæ¹æµç²˜æ€§ç³»æ•°è™šç½‘æ ¼çš„å€¼
 ! mut in Ghost Cell of the boundary
-! ²ÉÓÃÁÙ½üµãµÄÖµ
+! é‡‡ç”¨ä¸´è¿‘ç‚¹çš„å€¼
 
-   B%mu_t(0,:,:)=B%mu_t(1,:,:)
-   B%mu_t(nx,:,:)=B%mu_t(nx-1,:,:)
-   B%mu_t(:,0,:)=B%mu_t(:,1,:)
-   B%mu_t(:,ny,:)=B%mu_t(:,ny-1,:)
-   B%mu_t(:,:,0)=B%mu_t(:,:,1)
-   B%mu_t(:,:,nz)=B%mu_t(:,:,nz-1)
-!  ¹Ì±ÚÉÏ
-   call  Amut_boundary(nMesh,mBlock)
- 
+  B%mu_t(0, :, :) = B%mu_t(1, :, :)
+  B%mu_t(nx, :, :) = B%mu_t(nx-1, :, :)
+  B%mu_t(:, 0, :) = B%mu_t(:, 1, :)
+  B%mu_t(:, ny, :) = B%mu_t(:, ny-1, :)
+  B%mu_t(:, :, 0) = B%mu_t(:, :, 1)
+  B%mu_t(:, :, nz) = B%mu_t(:, :, nz-1)
+!  å›ºå£ä¸Š
+  call Amut_boundary(nMesh, mBlock)
+
 !$OMP PARALLEL DEFAULT(PRIVATE) SHARED(nx,ny,nz,B,Kt,Wt,Fluxk,Fluxw,d,uu,v,w,f1)
-!$OMP DO   
+!$OMP DO
 !------i- direcion ---------------------------
-     do k=1,nz-1 
-     do j=1,ny-1
-     do i=1,nx
-! À©É¢Ïî
-! À©É¢ÏµÊı£¬½çÃæÉÏµÄÖµ=Á½²àÖµµÄÆ½¾ù, ±ß½çÉÏµÄÀ©É¢ÏµÊı=ÄÚ²àµÄÖµ   
-       sigma_K_SST=f1(i,j,k)*sigma_k1_SST+(1.d0-f1(i,j,k))*sigma_k2_SST
-       sigma_W_SST=f1(i,j,k)*sigma_w1_SST+(1.d0-f1(i,j,k))*sigma_w2_SST
-       muk=(B%mu(i-1,j,k)+B%mu(i,j,k) + sigma_K_SST*(B%mu_t(i-1,j,k)+B%mu_t(i,j,k)) )*0.5d0 /Re        ! À©É¢ÏµÊı (k·½³Ì), ½çÃæÉÏµÄÖµ=Á½²àÖµµÄÆ½¾ù
-       muw=(B%mu(i-1,j,k)+B%mu(i,j,k) + sigma_W_SST*(B%mu_t(i-1,j,k)+B%mu_t(i,j,k)) )*0.5d0 /Re       ! À©É¢ÏµÊı (w·½³Ì)
-       s1x=B%ni1(i,j,k); s1y=B%ni2(i,j,k) ; s1z= B%ni3(i,j,k)  ! ¹éÒ»»¯µÄ·¨·½Ïò
-          Kti=Kt(i,j,k)-Kt(i-1,j,k)                               ! K
-          Wti=wt(i,j,k)-wt(i-1,j,k)                               ! W
-          Ktj=0.25d0*(Kt(i,j+1,k)-Kt(i,j-1,k)+Kt(i-1,j+1,k)-Kt(i-1,j-1,k))
-          Wtj=0.25d0*(Wt(i,j+1,k)-Wt(i,j-1,k)+Wt(i-1,j+1,k)-Wt(i-1,j-1,k))
-          Ktk=0.25d0*(Kt(i,j,k+1)-Kt(i,j,k-1)+Kt(i-1,j,k+1)-Kt(i-1,j,k-1))
-          Wtk=0.25d0*(Wt(i,j,k+1)-Wt(i,j,k-1)+Wt(i-1,j,k+1)-wt(i-1,j,k-1))
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do i = 1, nx
+! æ‰©æ•£é¡¹
+! æ‰©æ•£ç³»æ•°ï¼Œç•Œé¢ä¸Šçš„å€¼=ä¸¤ä¾§å€¼çš„å¹³å‡, è¾¹ç•Œä¸Šçš„æ‰©æ•£ç³»æ•°=å†…ä¾§çš„å€¼
+    sigma_K_SST = f1(i, j, k)*sigma_k1_SST+(1.d0-f1(i, j, k))*sigma_k2_SST
+    sigma_W_SST = f1(i, j, k)*sigma_w1_SST+(1.d0-f1(i, j, k))*sigma_w2_SST
+    muk = (B%mu(i-1, j, k)+B%mu(i, j, k)+sigma_K_SST*(B%mu_t(i-1, j, k)+B%mu_t(i, j, k)))*0.5d0/Re        ! æ‰©æ•£ç³»æ•° (kæ–¹ç¨‹), ç•Œé¢ä¸Šçš„å€¼=ä¸¤ä¾§å€¼çš„å¹³å‡
+    muw = (B%mu(i-1, j, k)+B%mu(i, j, k)+sigma_W_SST*(B%mu_t(i-1, j, k)+B%mu_t(i, j, k)))*0.5d0/Re       ! æ‰©æ•£ç³»æ•° (wæ–¹ç¨‹)
+    s1x = B%ni1(i, j, k); s1y = B%ni2(i, j, k); s1z = B%ni3(i, j, k)  ! å½’ä¸€åŒ–çš„æ³•æ–¹å‘
+    Kti = Kt(i, j, k)-Kt(i-1, j, k)                               ! K
+    Wti = wt(i, j, k)-wt(i-1, j, k)                               ! W
+    Ktj = 0.25d0*(Kt(i, j+1, k)-Kt(i, j-1, k)+Kt(i-1, j+1, k)-Kt(i-1, j-1, k))
+    Wtj = 0.25d0*(Wt(i, j+1, k)-Wt(i, j-1, k)+Wt(i-1, j+1, k)-Wt(i-1, j-1, k))
+    Ktk = 0.25d0*(Kt(i, j, k+1)-Kt(i, j, k-1)+Kt(i-1, j, k+1)-Kt(i-1, j, k-1))
+    Wtk = 0.25d0*(Wt(i, j, k+1)-Wt(i, j, k-1)+Wt(i-1, j, k+1)-wt(i-1, j, k-1))
 
-          ix=B%ix1(i,j,k); iy=B%iy1(i,j,k); iz=B%iz1(i,j,k)
-          jx=B%jx1(i,j,k); jy=B%jy1(i,j,k); jz=B%jz1(i,j,k)
-          kx=B%kx1(i,j,k); ky=B%ky1(i,j,k); kz=B%kz1(i,j,k)
-          ktx=kti*ix+ktj*jx+ktk*kx                                ! Kt¶Ô×ø±êµÄµ¼Êı
-          wtx=wti*ix+wtj*jx+wtk*kx
-          kty=kti*iy+ktj*jy+ktk*ky
-          wty=wti*iy+wtj*jy+wtk*ky
-          ktz=kti*iz+ktj*jz+ktk*kz
-          wtz=wti*iz+wtj*jz+wtk*kz
-!          ¶ÔÁ÷Ïî
-          vn1=uu(i-1,j,k)*s1x+v(i-1,j,k)*s1y+w(i-1,j,k)*s1z   ! ·¨ÏòËÙ¶È
-          vn2=uu(i,j,k)*s1x+v(i,j,k)*s1y+w(i,j,k)*s1z
-          kfi=0.5d0*((vn1+abs(vn1))*kt(i-1,j,k)+(vn2-abs(vn2))*kt(i,j,k))  ! ¶ÔÁ÷Ïî£¬Ò»½× L-F¸ñÊ½
-          wfi=0.5d0*((vn1+abs(vn1))*wt(i-1,j,k)+(vn2-abs(vn2))*wt(i,j,k))  ! ¶ÔÁ÷Ïî£¬Ò»½× L-F¸ñÊ½
-		  Fluxk(i,j,k)= (-kfi+muk*(ktx*s1x+kty*s1y+ktz*s1z))* B%Si(i,j,k)
-		  Fluxw(i,j,k)= (-wfi+muw*(wtx*s1x+wty*s1y+wtz*s1z))* B%Si(i,j,k)
-      enddo
-     enddo
-    enddo
-!$OMP END DO   
+    ix = B%ix1(i, j, k); iy = B%iy1(i, j, k); iz = B%iz1(i, j, k)
+    jx = B%jx1(i, j, k); jy = B%jy1(i, j, k); jz = B%jz1(i, j, k)
+    kx = B%kx1(i, j, k); ky = B%ky1(i, j, k); kz = B%kz1(i, j, k)
+    ktx = kti*ix+ktj*jx+ktk*kx                                ! Ktå¯¹åæ ‡çš„å¯¼æ•°
+    wtx = wti*ix+wtj*jx+wtk*kx
+    kty = kti*iy+ktj*jy+ktk*ky
+    wty = wti*iy+wtj*jy+wtk*ky
+    ktz = kti*iz+ktj*jz+ktk*kz
+    wtz = wti*iz+wtj*jz+wtk*kz
+!          å¯¹æµé¡¹
+    vn1 = uu(i-1, j, k)*s1x+v(i-1, j, k)*s1y+w(i-1, j, k)*s1z   ! æ³•å‘é€Ÿåº¦
+    vn2 = uu(i, j, k)*s1x+v(i, j, k)*s1y+w(i, j, k)*s1z
+    kfi = 0.5d0*((vn1+abs(vn1))*kt(i-1, j, k)+(vn2-abs(vn2))*kt(i, j, k))  ! å¯¹æµé¡¹ï¼Œä¸€é˜¶ L-Fæ ¼å¼
+    wfi = 0.5d0*((vn1+abs(vn1))*wt(i-1, j, k)+(vn2-abs(vn2))*wt(i, j, k))  ! å¯¹æµé¡¹ï¼Œä¸€é˜¶ L-Fæ ¼å¼
+    Fluxk(i, j, k) = (-kfi+muk*(ktx*s1x+kty*s1y+ktz*s1z))*B%Si(i, j, k)
+    Fluxw(i, j, k) = (-wfi+muw*(wtx*s1x+wty*s1y+wtz*s1z))*B%Si(i, j, k)
+  end do
+  end do
+  end do
+!$OMP END DO
 
-!$OMP DO   
-      do k=1,nz-1
-      do j=1,ny-1
-      do i=1,nx-1
-         B%Res(6,i,j,k)=B%Res(6,i,j,k)+Fluxk(i+1,j,k)-Fluxk(i,j,k)        
-         B%Res(7,i,j,k)=B%Res(7,i,j,k)+Fluxw(i+1,j,k)-Fluxw(i,j,k)        
-	  enddo
-      enddo
-      enddo
-!$OMP END DO   
+!$OMP DO
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do i = 1, nx-1
+    B%Res(6, i, j, k) = B%Res(6, i, j, k)+Fluxk(i+1, j, k)-Fluxk(i, j, k)
+    B%Res(7, i, j, k) = B%Res(7, i, j, k)+Fluxw(i+1, j, k)-Fluxw(i, j, k)
+  end do
+  end do
+  end do
+!$OMP END DO
 
 !-----j- direction ------------------------
 
-!$OMP  DO   
-    do k=1,nz-1 
-    do j=1,ny
-    do i=1,nx-1
-       sigma_K_SST=f1(i,j,k)*sigma_k1_SST+(1.d0-f1(i,j,k))*sigma_k2_SST
-       sigma_W_SST=f1(i,j,k)*sigma_w1_SST+(1.d0-f1(i,j,k))*sigma_w2_SST
-       muk=(B%mu(i,j-1,k)+B%mu(i,j,k) + sigma_K_SST*(B%mu_t(i,j-1,k)+B%mu_t(i,j,k)) )*0.5d0 /Re       ! À©É¢ÏµÊı (k·½³Ì), ½çÃæÉÏµÄÖµ=Á½²àÖµµÄÆ½¾ù
-       muw=(B%mu(i,j-1,k)+B%mu(i,j,k) + sigma_W_SST*(B%mu_t(i,j-1,k)+B%mu_t(i,j,k)) )*0.5d0 /Re       ! À©É¢ÏµÊı (w·½³Ì)
+!$OMP  DO
+  do k = 1, nz-1
+  do j = 1, ny
+  do i = 1, nx-1
+    sigma_K_SST = f1(i, j, k)*sigma_k1_SST+(1.d0-f1(i, j, k))*sigma_k2_SST
+    sigma_W_SST = f1(i, j, k)*sigma_w1_SST+(1.d0-f1(i, j, k))*sigma_w2_SST
+    muk = (B%mu(i, j-1, k)+B%mu(i, j, k)+sigma_K_SST*(B%mu_t(i, j-1, k)+B%mu_t(i, j, k)))*0.5d0/Re       ! æ‰©æ•£ç³»æ•° (kæ–¹ç¨‹), ç•Œé¢ä¸Šçš„å€¼=ä¸¤ä¾§å€¼çš„å¹³å‡
+    muw = (B%mu(i, j-1, k)+B%mu(i, j, k)+sigma_W_SST*(B%mu_t(i, j-1, k)+B%mu_t(i, j, k)))*0.5d0/Re       ! æ‰©æ•£ç³»æ•° (wæ–¹ç¨‹)
 
-      s1x=B%nj1(i,j,k); s1y=B%nj2(i,j,k) ; s1z= B%nj3(i,j,k)  ! ¹éÒ»»¯µÄ·¨·½Ïò
-      kti=0.25d0*(kt(i+1,j,k)-kt(i-1,j,k)+kt(i+1,j-1,k)-kt(i-1,j-1,k))
-      ktj=kt(i,j,k)-kt(i,j-1,k)
-      ktk=0.25d0*(kt(i,j,k+1)-kt(i,j,k-1)+kt(i,j-1,k+1)-kt(i,j-1,k-1))
-      wti=0.25d0*(wt(i+1,j,k)-wt(i-1,j,k)+wt(i+1,j-1,k)-wt(i-1,j-1,k))
-      wtj=wt(i,j,k)-wt(i,j-1,k)
-      wtk=0.25d0*(wt(i,j,k+1)-wt(i,j,k-1)+wt(i,j-1,k+1)-wt(i,j-1,k-1))
-     
-	  ix=B%ix2(i,j,k); iy=B%iy2(i,j,k); iz=B%iz2(i,j,k)
-      jx=B%jx2(i,j,k); jy=B%jy2(i,j,k); jz=B%jz2(i,j,k)
-      kx=B%kx2(i,j,k); ky=B%ky2(i,j,k); kz=B%kz2(i,j,k)
-      ktx=kti*ix+ktj*jx+ktk*kx
-      kty=kti*iy+ktj*jy+ktk*ky
-      ktz=kti*iz+ktj*jz+ktk*kz
-      wtx=wti*ix+wtj*jx+wtk*kx
-      wty=wti*iy+wtj*jy+wtk*ky
-      wtz=wti*iz+wtj*jz+wtk*kz
-      vn1=uu(i,j-1,k)*s1x+v(i,j-1,k)*s1y+w(i,j-1,k)*s1z   ! ·¨ÏòËÙ¶È
-      vn2=uu(i,j,k)*s1x+v(i,j,k)*s1y+w(i,j,k)*s1z
-      kfi=0.5d0*((vn1+abs(vn1))*kt(i,j-1,k)+(vn2-abs(vn2))*kt(i,j,k))  ! Ò»½× L-F¸ñÊ½
-      wfi=0.5d0*((vn1+abs(vn1))*wt(i,j-1,k)+(vn2-abs(vn2))*wt(i,j,k))  ! Ò»½× L-F¸ñÊ½
-      
-	  Fluxk(i,j,k)= (-kfi+muk*(ktx*s1x+kty*s1y+ktz*s1z))* B%Sj(i,j,k)
-	  Fluxw(i,j,k)= (-wfi+muw*(wtx*s1x+wty*s1y+wtz*s1z))* B%Sj(i,j,k)
+    s1x = B%nj1(i, j, k); s1y = B%nj2(i, j, k); s1z = B%nj3(i, j, k)  ! å½’ä¸€åŒ–çš„æ³•æ–¹å‘
+    kti = 0.25d0*(kt(i+1, j, k)-kt(i-1, j, k)+kt(i+1, j-1, k)-kt(i-1, j-1, k))
+    ktj = kt(i, j, k)-kt(i, j-1, k)
+    ktk = 0.25d0*(kt(i, j, k+1)-kt(i, j, k-1)+kt(i, j-1, k+1)-kt(i, j-1, k-1))
+    wti = 0.25d0*(wt(i+1, j, k)-wt(i-1, j, k)+wt(i+1, j-1, k)-wt(i-1, j-1, k))
+    wtj = wt(i, j, k)-wt(i, j-1, k)
+    wtk = 0.25d0*(wt(i, j, k+1)-wt(i, j, k-1)+wt(i, j-1, k+1)-wt(i, j-1, k-1))
 
-    enddo
-    enddo
-    enddo
-!$OMP END DO 
-!$OMP  DO 
-     do k=1,nz-1
-     do j=1,ny-1
-     do i=1,nx-1
-      B%Res(6,i,j,k)=B%Res(6,i,j,k)+Fluxk(i,j+1,k)-Fluxk(i,j,k)           
-      B%Res(7,i,j,k)=B%Res(7,i,j,k)+Fluxw(i,j+1,k)-Fluxw(i,j,k)           
-	 enddo
-     enddo
-     enddo
-!$OMP END DO 
-!-----k- direction ------------------------
-!$OMP  DO 
-   do k=1,nz 
-   do j=1,ny-1
-   do i=1,nx-1
-      sigma_K_SST=f1(i,j,k)*sigma_k1_SST+(1.d0-f1(i,j,k))*sigma_k2_SST
-      sigma_W_SST=f1(i,j,k)*sigma_w1_SST+(1.d0-f1(i,j,k))*sigma_w2_SST
-      muk=(B%mu(i,j,k-1)+B%mu(i,j,k) + sigma_K_SST*(B%mu_t(i,j,k-1)+B%mu_t(i,j,k)) )*0.5d0 /Re       ! À©É¢ÏµÊı (k·½³Ì), ½çÃæÉÏµÄÖµ=Á½²àÖµµÄÆ½¾ù
-      muw=(B%mu(i,j,k-1)+B%mu(i,j,k) + sigma_W_SST*(B%mu_t(i,j,k-1)+B%mu_t(i,j,k)) )*0.5d0 /Re       ! À©É¢ÏµÊı (w·½³Ì)
+    ix = B%ix2(i, j, k); iy = B%iy2(i, j, k); iz = B%iz2(i, j, k)
+    jx = B%jx2(i, j, k); jy = B%jy2(i, j, k); jz = B%jz2(i, j, k)
+    kx = B%kx2(i, j, k); ky = B%ky2(i, j, k); kz = B%kz2(i, j, k)
+    ktx = kti*ix+ktj*jx+ktk*kx
+    kty = kti*iy+ktj*jy+ktk*ky
+    ktz = kti*iz+ktj*jz+ktk*kz
+    wtx = wti*ix+wtj*jx+wtk*kx
+    wty = wti*iy+wtj*jy+wtk*ky
+    wtz = wti*iz+wtj*jz+wtk*kz
+    vn1 = uu(i, j-1, k)*s1x+v(i, j-1, k)*s1y+w(i, j-1, k)*s1z   ! æ³•å‘é€Ÿåº¦
+    vn2 = uu(i, j, k)*s1x+v(i, j, k)*s1y+w(i, j, k)*s1z
+    kfi = 0.5d0*((vn1+abs(vn1))*kt(i, j-1, k)+(vn2-abs(vn2))*kt(i, j, k))  ! ä¸€é˜¶ L-Fæ ¼å¼
+    wfi = 0.5d0*((vn1+abs(vn1))*wt(i, j-1, k)+(vn2-abs(vn2))*wt(i, j, k))  ! ä¸€é˜¶ L-Fæ ¼å¼
 
-      s1x=B%nk1(i,j,k); s1y=B%nk2(i,j,k) ; s1z= B%nk3(i,j,k)  ! ¹éÒ»»¯µÄ·¨·½Ïò
-      kti=0.25d0*(kt(i+1,j,k)-kt(i-1,j,k)+kt(i+1,j,k-1)-kt(i-1,j,k-1))
-      ktj=0.25d0*(kt(i,j+1,k)-kt(i,j-1,k)+kt(i,j+1,k-1)-kt(i,j-1,k-1))
-      ktk=kt(i,j,k)-kt(i,j,k-1)
-      wti=0.25d0*(wt(i+1,j,k)-wt(i-1,j,k)+wt(i+1,j,k-1)-wt(i-1,j,k-1))
-      wtj=0.25d0*(wt(i,j+1,k)-wt(i,j-1,k)+wt(i,j+1,k-1)-wt(i,j-1,k-1))
-      wtk=wt(i,j,k)-wt(i,j,k-1)
-      ix=B%ix3(i,j,k); iy=B%iy3(i,j,k); iz=B%iz3(i,j,k)
-      jx=B%jx3(i,j,k); jy=B%jy3(i,j,k); jz=B%jz3(i,j,k)
-      kx=B%kx3(i,j,k); ky=B%ky3(i,j,k); kz=B%kz3(i,j,k)
-      ktx=kti*ix+ktj*jx+ktk*kx
-      kty=kti*iy+ktj*jy+ktk*ky
-      ktz=kti*iz+ktj*jz+ktk*kz
-      wtx=wti*ix+wtj*jx+wtk*kx
-      wty=wti*iy+wtj*jy+wtk*ky
-      wtz=wti*iz+wtj*jz+wtk*kz
+    Fluxk(i, j, k) = (-kfi+muk*(ktx*s1x+kty*s1y+ktz*s1z))*B%Sj(i, j, k)
+    Fluxw(i, j, k) = (-wfi+muw*(wtx*s1x+wty*s1y+wtz*s1z))*B%Sj(i, j, k)
 
-     vn1=uu(i,j,k-1)*s1x+v(i,j,k-1)*s1y+w(i,j,k-1)*s1z   ! ·¨ÏòËÙ¶È
-     vn2=uu(i,j,k)*s1x+v(i,j,k)*s1y+w(i,j,k)*s1z
-     kfi=0.5d0*((vn1+abs(vn1))*kt(i,j,k-1)+(vn2-abs(vn2))*kt(i,j,k))  ! Ò»½× L-F¸ñÊ½
-     wfi=0.5d0*((vn1+abs(vn1))*wt(i,j,k-1)+(vn2-abs(vn2))*wt(i,j,k))  ! Ò»½× L-F¸ñÊ½
-    
-	 Fluxk(i,j,k)= ( -kfi+muk*(ktx*s1x+kty*s1y+ktz*s1z))*B%Sk(i,j,k)    ! ÎŞÕ³+Õ³ĞÔÍ¨Á¿
- 	 Fluxw(i,j,k)= ( -wfi+muw*(wtx*s1x+wty*s1y+wtz*s1z))*B%Sk(i,j,k)    ! ÎŞÕ³+Õ³ĞÔÍ¨Á¿
-   
-	enddo
-    enddo
-    enddo
+  end do
+  end do
+  end do
 !$OMP END DO
- 
-!$OMP  DO 
-     do k=1,nz-1
-     do j=1,ny-1
-     do i=1,nx-1
-       B%Res(6,i,j,k)=B%Res(6,i,j,k)+Fluxk(i,j,k+1)-Fluxk(i,j,k)           
-       B%Res(7,i,j,k)=B%Res(7,i,j,k)+Fluxw(i,j,k+1)-Fluxw(i,j,k)           
-	 enddo
-     enddo
-     enddo
-!$OMP END DO 
+!$OMP  DO
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do i = 1, nx-1
+    B%Res(6, i, j, k) = B%Res(6, i, j, k)+Fluxk(i, j+1, k)-Fluxk(i, j, k)
+    B%Res(7, i, j, k) = B%Res(7, i, j, k)+Fluxw(i, j+1, k)-Fluxw(i, j, k)
+  end do
+  end do
+  end do
+!$OMP END DO
+!-----k- direction ------------------------
+!$OMP  DO
+  do k = 1, nz
+  do j = 1, ny-1
+  do i = 1, nx-1
+    sigma_K_SST = f1(i, j, k)*sigma_k1_SST+(1.d0-f1(i, j, k))*sigma_k2_SST
+    sigma_W_SST = f1(i, j, k)*sigma_w1_SST+(1.d0-f1(i, j, k))*sigma_w2_SST
+    muk = (B%mu(i, j, k-1)+B%mu(i, j, k)+sigma_K_SST*(B%mu_t(i, j, k-1)+B%mu_t(i, j, k)))*0.5d0/Re       ! æ‰©æ•£ç³»æ•° (kæ–¹ç¨‹), ç•Œé¢ä¸Šçš„å€¼=ä¸¤ä¾§å€¼çš„å¹³å‡
+    muw = (B%mu(i, j, k-1)+B%mu(i, j, k)+sigma_W_SST*(B%mu_t(i, j, k-1)+B%mu_t(i, j, k)))*0.5d0/Re       ! æ‰©æ•£ç³»æ•° (wæ–¹ç¨‹)
 
- !$OMP DO   
-   do k=0,nz
-   do j=0,ny
-   do i=0,nx
-    B%mu(i,j,k)=B%mu(i,j,k)/Re
-    B%mu_t(i,j,k)=B%mu_t(i,j,k)/Re
-   enddo
-   enddo
-   enddo
-!$OMP END DO   
+    s1x = B%nk1(i, j, k); s1y = B%nk2(i, j, k); s1z = B%nk3(i, j, k)  ! å½’ä¸€åŒ–çš„æ³•æ–¹å‘
+    kti = 0.25d0*(kt(i+1, j, k)-kt(i-1, j, k)+kt(i+1, j, k-1)-kt(i-1, j, k-1))
+    ktj = 0.25d0*(kt(i, j+1, k)-kt(i, j-1, k)+kt(i, j+1, k-1)-kt(i, j-1, k-1))
+    ktk = kt(i, j, k)-kt(i, j, k-1)
+    wti = 0.25d0*(wt(i+1, j, k)-wt(i-1, j, k)+wt(i+1, j, k-1)-wt(i-1, j, k-1))
+    wtj = 0.25d0*(wt(i, j+1, k)-wt(i, j-1, k)+wt(i, j+1, k-1)-wt(i, j-1, k-1))
+    wtk = wt(i, j, k)-wt(i, j, k-1)
+    ix = B%ix3(i, j, k); iy = B%iy3(i, j, k); iz = B%iz3(i, j, k)
+    jx = B%jx3(i, j, k); jy = B%jy3(i, j, k); jz = B%jz3(i, j, k)
+    kx = B%kx3(i, j, k); ky = B%ky3(i, j, k); kz = B%kz3(i, j, k)
+    ktx = kti*ix+ktj*jx+ktk*kx
+    kty = kti*iy+ktj*jy+ktk*ky
+    ktz = kti*iz+ktj*jz+ktk*kz
+    wtx = wti*ix+wtj*jx+wtk*kx
+    wty = wti*iy+wtj*jy+wtk*ky
+    wtz = wti*iz+wtj*jz+wtk*kz
 
+    vn1 = uu(i, j, k-1)*s1x+v(i, j, k-1)*s1y+w(i, j, k-1)*s1z   ! æ³•å‘é€Ÿåº¦
+    vn2 = uu(i, j, k)*s1x+v(i, j, k)*s1y+w(i, j, k)*s1z
+    kfi = 0.5d0*((vn1+abs(vn1))*kt(i, j, k-1)+(vn2-abs(vn2))*kt(i, j, k))  ! ä¸€é˜¶ L-Fæ ¼å¼
+    wfi = 0.5d0*((vn1+abs(vn1))*wt(i, j, k-1)+(vn2-abs(vn2))*wt(i, j, k))  ! ä¸€é˜¶ L-Fæ ¼å¼
 
-!$OMP END PARALLEL 
-!--------------Ô´Ïî---------------------------------------------------------
-  deallocate(f1,Kt,Wt,Fluxk,Fluxw)
+    Fluxk(i, j, k) = (-kfi+muk*(ktx*s1x+kty*s1y+ktz*s1z))*B%Sk(i, j, k)    ! æ— ç²˜+ç²˜æ€§é€šé‡
+    Fluxw(i, j, k) = (-wfi+muw*(wtx*s1x+wty*s1y+wtz*s1z))*B%Sk(i, j, k)    ! æ— ç²˜+ç²˜æ€§é€šé‡
 
-end  subroutine  Turbulence_model_SST
+  end do
+  end do
+  end do
+!$OMP END DO
+
+!$OMP  DO
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do i = 1, nx-1
+    B%Res(6, i, j, k) = B%Res(6, i, j, k)+Fluxk(i, j, k+1)-Fluxk(i, j, k)
+    B%Res(7, i, j, k) = B%Res(7, i, j, k)+Fluxw(i, j, k+1)-Fluxw(i, j, k)
+  end do
+  end do
+  end do
+!$OMP END DO
+
+!$OMP DO
+  do k = 0, nz
+  do j = 0, ny
+  do i = 0, nx
+    B%mu(i, j, k) = B%mu(i, j, k)/Re
+    B%mu_t(i, j, k) = B%mu_t(i, j, k)/Re
+  end do
+  end do
+  end do
+!$OMP END DO
+
+!$OMP END PARALLEL
+!--------------æºé¡¹---------------------------------------------------------
+  deallocate (f1, Kt, Wt, Fluxk, Fluxw)
+
+end subroutine Turbulence_model_SST
 

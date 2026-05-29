@@ -1,15 +1,15 @@
 !-----------------------------------------------------------
 ! Copyright by LiXinliang
-! Ver 1.2   ½«¸ñĞÄ×ø±ê×ª»»µ½¸ñµãÉÏ
-! Ver 1.3 ¿É¶ÁÈ¡flow3d.dat (tecplot¸ñÊ½ÎÄ¼ş)¼°flow.dat (ÎŞ¸ñÊ½ÎÄ¼ş)
-! Ver 1.4  ¶ÁÈ¡ ver 0.8 ÒÔÉÏ°æ±¾µÄÊı¾İ £¨°üº¬k,w,mu_tµÈ£©
-! Ver 1.5 ¶ÁÈ¡ver0.82ÒÔÉÏµÄÊı¾İ
-! Ver 1.6 ¶ÁÈ¡ver 0.84ÒÔÉÏ°æ±¾µÄÊı¾İ£¨.inpÎÄ¼ş£©
+! Ver 1.2   å°†æ ¼å¿ƒåæ ‡è½¬æ¢åˆ°æ ¼ç‚¹ä¸Š
+! Ver 1.3 å¯è¯»å–flow3d.dat (tecplotæ ¼å¼æ–‡ä»¶)åŠflow.dat (æ— æ ¼å¼æ–‡ä»¶)
+! Ver 1.4  è¯»å– ver 0.8 ä»¥ä¸Šç‰ˆæœ¬çš„æ•°æ® ï¼ˆåŒ…å«k,w,mu_tç­‰ï¼‰
+! Ver 1.5 è¯»å–ver0.82ä»¥ä¸Šçš„æ•°æ®
+! Ver 1.6 è¯»å–ver 0.84ä»¥ä¸Šç‰ˆæœ¬çš„æ•°æ®ï¼ˆ.inpæ–‡ä»¶ï¼‰
 ! Ver 1.7 Plot 3D flow
 ! Ver 1.8 Plot Cp and Cf on the wall
-! Ver 1.8a, vt ÎŞĞè³ËÒÔRe
-! Ver 2.3, ¿É¶ÁÈ¡BC_user
-! Ver 2.4a, ĞŞÕıÁËread wall_dist() ÖĞµÄBug
+! Ver 1.8a, vt æ— éœ€ä¹˜ä»¥Re
+! Ver 2.3, å¯è¯»å–BC_user
+! Ver 2.4a, ä¿®æ­£äº†read wall_dist() ä¸­çš„Bug
 !------------------------------------------------------------
   module Const_Variables
   implicit none
@@ -31,15 +31,15 @@ end module Const_Variables
   real(PRE_EC),save:: Ma,Re,gamma,T_inf,p00
   integer,save:: Num_Block, Mesh_File_Format, BC_number,BC_type(100)
 !-----------------------------------------------------------------------------------------
-! Íø¸ñÁ¬½ÓĞÅÏ¢ 
+! ç½‘æ ¼è¿æ¥ä¿¡æ¯ 
   TYPE BC_MSG_TYPE
    integer::   ib,ie,jb,je,kb,ke,bc
   END TYPE BC_MSG_TYPE
 
-!  ºËĞÄ±äÁ¿¡ª¡ªÃ¿¿éÍø¸ñ´æ´¢µÄĞÅÏ¢ £¨È«¾Ö±äÁ¿£©
+!  æ ¸å¿ƒå˜é‡â€”â€”æ¯å—ç½‘æ ¼å­˜å‚¨çš„ä¿¡æ¯ ï¼ˆå…¨å±€å˜é‡ï¼‰
    TYPE Block_TYPE           !  variables for each block 
      integer :: Block_no,nx,ny,nz,subface
-     real(PRE_EC),pointer,dimension(:,:,:):: xc,yc,zc  ! coordinates of cell center, Íø¸ñÖĞĞÄ×ø±ê 
+     real(PRE_EC),pointer,dimension(:,:,:):: xc,yc,zc  ! coordinates of cell center, ç½‘æ ¼ä¸­å¿ƒåæ ‡ 
      real(PRE_EC),pointer,dimension(:,:,:):: dc,uc,vc,wc,Tc,pc,mut,vt,kt,wt
 	 real(PRE_EC),pointer,dimension(:,:,:):: d,u,v,w,T,p,mut1,vt1
 	 real(PRE_EC),pointer,dimension(:,:,:):: x,y,z,dw
@@ -311,9 +311,9 @@ end module Const_Variables
 
 !------------------------------------------------------------------------------     
 ! Read the message of the mesh and the initial flow;
-! ¶ÁÈ¡Íø¸ñ£¬³õÊ¼Á÷³¡ĞÅÏ¢; 
-! ·ÖÅäÄÚ´æ±äÁ¿£»
-! ¼ÆËã¼¸ºÎÁ¿£»
+! è¯»å–ç½‘æ ¼ï¼Œåˆå§‹æµåœºä¿¡æ¯; 
+! åˆ†é…å†…å­˜å˜é‡ï¼›
+! è®¡ç®—å‡ ä½•é‡ï¼›
 !------------------------------------------------------------------------------
    subroutine init
    use  Global_Variables
@@ -337,33 +337,33 @@ end module Const_Variables
     p00=1.d0/(gamma*Ma*Ma)
 
 ! ---------node Coordinates----------------------------------------  
-!  Íø¸ñÎÄ¼ş£ºPLOT3D¸ñÊ½£»   
+!  ç½‘æ ¼æ–‡ä»¶ï¼šPLOT3Dæ ¼å¼ï¼›   
    print*, "read Mesh3d.dat... (PLOT3D Format)"
    if(Mesh_File_Format .eq. 0) then
     open(99,file="Mesh3d.dat",form="unformatted")
-    read(99) Num_Block         ! ×Ü¿éÊı
+    read(99) Num_Block         ! æ€»å—æ•°
    else
     open(99,file="Mesh3d.dat")
-    read(99,*) Num_Block         ! ×Ü¿éÊı
+    read(99,*) Num_Block         ! æ€»å—æ•°
    endif
    print*, "Num_Block=", Num_Block
    
    
       
     allocate(Block(Num_Block))             
-    allocate(NI(Num_Block),NJ(Num_Block),NK(Num_Block) )   ! Ã¿¿éµÄ´óĞ¡
+    allocate(NI(Num_Block),NJ(Num_Block),NK(Num_Block) )   ! æ¯å—çš„å¤§å°
   if(Mesh_File_Format .eq. 0) then
    read(99) (NI(k), NJ(k), NK(k), k=1,Num_Block)
   else
    read(99,*) (NI(k), NJ(k), NK(k), k=1,Num_Block)
   endif
 
-! ¶ÁÈ¡Ã¿¿éĞÅÏ¢----------------------------------------   
+! è¯»å–æ¯å—ä¿¡æ¯----------------------------------------   
     do m=1,Num_Block
      B => Block(m)
-     B%nx=NI(m); B%ny=NJ(m) ; B%nz=NK(m)   ! nx,ny,nz Ã¿¿éµÄ´óĞ¡
+     B%nx=NI(m); B%ny=NJ(m) ; B%nz=NK(m)   ! nx,ny,nz æ¯å—çš„å¤§å°
      nx=B%nx ; ny= B%ny ; nz=B%nz
-! ----------  ¼¸ºÎÁ¿ -----------------------------------------------
+! ----------  å‡ ä½•é‡ -----------------------------------------------
     allocate(B%xc(0:nx,0:ny,0:nz), B%yc(0:nx,0:ny,0:nz), B%zc(0:nx,0:ny,0:nz)) 
     allocate(B%dc(0:nx,0:ny,0:nz),B%uc(0:nx,0:ny,0:nz),B%vc(0:nx,0:ny,0:nz), &
        B%wc(0:nx,0:ny,0:nz),B%Tc(0:nx,0:ny,0:nz),B%pc(0:nx,0:ny,0:nz), &
@@ -392,7 +392,7 @@ end module Const_Variables
                (((B%z(i,j,k),i=1,nx),j=1,ny),k=1,nz)
    endif
    print*, "read mesh ok "
-!----------²åÖµ³öÍø¸ñÖĞĞÄµãµÄÊı¾İ-----------------------------------
+!----------æ’å€¼å‡ºç½‘æ ¼ä¸­å¿ƒç‚¹çš„æ•°æ®-----------------------------------
    do k=1,B%nz-1
    do j=1,B%ny-1
    do i=1,B%nx-1
@@ -423,7 +423,7 @@ end module Const_Variables
      close(100)
    endif
    
-!---------------´Óflow3d.datÖĞ¶ÁÈ¡³¡×÷Îª³õÖµ----------------------
+!---------------ä»flow3d.datä¸­è¯»å–åœºä½œä¸ºåˆå€¼----------------------
   print*, "input 1 or 2,  1 read flow3d.dat,  2 read flow3d_average.dat "
   read(*,*) Iflag
   
@@ -540,7 +540,7 @@ end module Const_Variables
    do m=1, NUM_BLOCK
    B=> Block(m)
    nx=B%nx; ny=B%ny; nz=B%nz
-!  ½«¸ñĞÄ´¦µÄÎïÀíÁ¿²åÖµµ½¸ñµãÉÏ   
+!  å°†æ ¼å¿ƒå¤„çš„ç‰©ç†é‡æ’å€¼åˆ°æ ¼ç‚¹ä¸Š   
    do k=1,B%nz
    do j=1,B%ny
    do i=1,B%nx
@@ -630,22 +630,22 @@ end module Const_Variables
     close(99)
  
  !---- convert parameters ----------------------
- ! Ref_medium_usrdef==0 Ê¹ÓÃÄ¬ÈÏ½éÖÊ (Ma=1, ¸ù¾İ×ÜÎÂ¡¢×ÜÑ¹¼ÆËã Re) £» ==1 Ê¹ÓÃ×Ô¶¨Òå½éÖÊ £¨ÈËÎªÊäÈëMa, ReµÈ£©
-    if( (IF_TurboMachinary ==1 .or. IF_Innerflow ==1) .and.  Ref_medium_usrdef == 0) then   ! Ä¬ÈÏ¿ÕÆø½éÖÊ£¬¼ÆËãMachÊı£¬ ReynoldsÊı
+ ! Ref_medium_usrdef==0 ä½¿ç”¨é»˜è®¤ä»‹è´¨ (Ma=1, æ ¹æ®æ€»æ¸©ã€æ€»å‹è®¡ç®— Re) ï¼› ==1 ä½¿ç”¨è‡ªå®šä¹‰ä»‹è´¨ ï¼ˆäººä¸ºè¾“å…¥Ma, Reç­‰ï¼‰
+    if( (IF_TurboMachinary ==1 .or. IF_Innerflow ==1) .and.  Ref_medium_usrdef == 0) then   ! é»˜è®¤ç©ºæ°”ä»‹è´¨ï¼Œè®¡ç®—Machæ•°ï¼Œ Reynoldsæ•°
       
-	  T_inf=Turbo_T0  ! ²Î¿¼ÎÂ¶È £¨À´Á÷×ÜÎÂ£©
+	  T_inf=Turbo_T0  ! å‚è€ƒæ¸©åº¦ ï¼ˆæ¥æµæ€»æ¸©ï¼‰
       gamma=1.4d0    ! 
-	  PrL=0.7d0   ! PrandtlÊı
+	  PrL=0.7d0   ! Prandtlæ•°
 	  PrT=0.9d0
-      R0= 287.06d0   ! ¿ÕÆøµÄÆøÌå³£ÊıR
-	  a0= sqrt(gamma*R0*Turbo_T0)    ! ²Î¿¼ÎÂ¶ÈÏÂµÄÉùËÙ 
-	  mu0=1.179d-5     ! ¿ÕÆøÕ³ĞÔÏµÊı (288.15K)  
-      mu1=mu0* sqrt((Turbo_T0/288.15d0)**3)*(288.15d0+110.4d0)/(Turbo_T0+110.4d0)  ! ²Î¿¼ÎÂ¶ÈÏÂµÄ¿ÕÆøÕ³ĞÔÏµÊı
+      R0= 287.06d0   ! ç©ºæ°”çš„æ°”ä½“å¸¸æ•°R
+	  a0= sqrt(gamma*R0*Turbo_T0)    ! å‚è€ƒæ¸©åº¦ä¸‹çš„å£°é€Ÿ 
+	  mu0=1.179d-5     ! ç©ºæ°”ç²˜æ€§ç³»æ•° (288.15K)  
+      mu1=mu0* sqrt((Turbo_T0/288.15d0)**3)*(288.15d0+110.4d0)/(Turbo_T0+110.4d0)  ! å‚è€ƒæ¸©åº¦ä¸‹çš„ç©ºæ°”ç²˜æ€§ç³»æ•°
       d0=Turbo_P0/(R0*Turbo_T0)
-	  Re=d0*a0*Turbo_L0/mu1    ! ²Î¿¼ÎÂ¶ÈÏÂ£¬ÒÔÉùËÙÔË¶¯µÄReynoldsÊı
-	  Ma=1.d0     ! MachÊı    £¨ÒÔÉùËÙ×÷Îª²Î¿¼ËÙ¶È£¬Òò¶ø²Î¿¼MachÊıÎª1£©
-      Turbo_w= 2.d0*PI*Turbo_w/(a0/Turbo_L0)   ! ÎŞÁ¿¸Ù½ÇËÙ¶È Turbo_W£¨×ª/Ãë£©
-      P_outlet=P_outlet/Turbo_P0    ! ±³Ñ¹ £¨ÎŞÁ¿¸Ù£©
+	  Re=d0*a0*Turbo_L0/mu1    ! å‚è€ƒæ¸©åº¦ä¸‹ï¼Œä»¥å£°é€Ÿè¿åŠ¨çš„Reynoldsæ•°
+	  Ma=1.d0     ! Machæ•°    ï¼ˆä»¥å£°é€Ÿä½œä¸ºå‚è€ƒé€Ÿåº¦ï¼Œå› è€Œå‚è€ƒMachæ•°ä¸º1ï¼‰
+      Turbo_w= 2.d0*PI*Turbo_w/(a0/Turbo_L0)   ! æ— é‡çº²è§’é€Ÿåº¦ Turbo_Wï¼ˆè½¬/ç§’ï¼‰
+      P_outlet=P_outlet/Turbo_P0    ! èƒŒå‹ ï¼ˆæ— é‡çº²ï¼‰
 	endif
 
  !  print*, "Re, Ma, gamma, T_inf=", Re, Ma, gamma, T_inf

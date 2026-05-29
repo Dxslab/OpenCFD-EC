@@ -1,1459 +1,1404 @@
- !-----The core subroutines: Comput inviscous and viscous flux ------------------------------
- !     OpenCFD-EC 3D 
- !     Copyright by Li Xinliang, LHD, Institute of Mechanics, CAS. lixl@imech.ac.cn
- !     Code by Li Xinliang and Leng Yan
- !     Ver 0.43 2010-11-28
- !     Ver 0.50 2010-12-9
- !     Ver 0.74 2011-12-29
- !     Ver 0.8  2012-5-5
- !     Ver 0.97a 2013-5-4:  viscous flux code modified, corner points is not used
- !     Ver 1.01  2013-11-13:  boundary scheme can be used 
- !     Ver 1.16  2017-7-11:   Èç¹ûÎïÀíÁ¿³¬ÏŞ£¬Ôò±¾¿é½µÎª1½×Ó­·ç£¬ÇÒ¹Ø±ÕÕ³ĞÔÏî£»
-  
-! ¼ÆËã²Ğ²î£¨Íø¸ñµÄÈ«²¿¿é£©
-  Subroutine Comput_Residual_one_mesh(nMesh)
-   use Global_Var
-   use Flow_Var 
-   implicit none
-   integer:: nMesh,NVAR1,mBlock,nx,ny,nz,i,j,k,m,KL,IR,JR,KR
-   integer,save:: Iflag1=0
-   real(PRE_EC):: Sfac,Sfac1
-   Type (Mesh_TYPE),pointer:: MP
-   Type (Block_TYPE),pointer:: B
+!-----The core subroutines: Comput inviscous and viscous flux ------------------------------
+!     OpenCFD-EC 3D
+!     Copyright by Li Xinliang, LHD, Institute of Mechanics, CAS. lixl@imech.ac.cn
+!     Code by Li Xinliang and Leng Yan
+!     Ver 0.43 2010-11-28
+!     Ver 0.50 2010-12-9
+!     Ver 0.74 2011-12-29
+!     Ver 0.8  2012-5-5
+!     Ver 0.97a 2013-5-4:  viscous flux code modified, corner points is not used
+!     Ver 1.01  2013-11-13:  boundary scheme can be used
+!     Ver 1.16  2017-7-11:   å¦‚æœç‰©ç†é‡è¶…é™ï¼Œåˆ™æœ¬å—é™ä¸º1é˜¶è¿é£ï¼Œä¸”å…³é—­ç²˜æ€§é¡¹ï¼›
 
-!---------------------------------------------  
-  if(Time_Method .eq. Time_Dual_LU_SGS) then
-	 if(Iflag1 .eq. 0) then
-	   Iflag1=1
-	   Sfac=1.d0/(3.d0*dt_global)  ! µÚÒ»¸öÊ±¼ä²½£¬ Un=U(n-1), Ê±¼ä¾«¶È1½×
-	   Sfac1=1.d0/dt_global
-	 else
-	   Sfac=1.d0/(2.d0*dt_global) 
-	   Sfac1=3.d0/(2.d0*dt_global)       
-	 endif
+! è®¡ç®—æ®‹å·®ï¼ˆç½‘æ ¼çš„å…¨éƒ¨å—ï¼‰
+Subroutine Comput_Residual_one_mesh(nMesh)
+  use Global_Var
+  use Flow_Var
+  implicit none
+  integer:: nMesh, NVAR1, mBlock, nx, ny, nz, i, j, k, m, KL, IR, JR, KR
+  integer, save:: Iflag1 = 0
+  real(PRE_EC):: Sfac, Sfac1
+  Type(Mesh_TYPE), pointer:: MP
+  Type(Block_TYPE), pointer:: B
+
+!---------------------------------------------
+  if (Time_Method .eq. Time_Dual_LU_SGS) then
+  if (Iflag1 .eq. 0) then
+    Iflag1 = 1
+    Sfac = 1.d0/(3.d0*dt_global)  ! ç¬¬ä¸€ä¸ªæ—¶é—´æ­¥ï¼Œ Un=U(n-1), æ—¶é—´ç²¾åº¦1é˜¶
+    Sfac1 = 1.d0/dt_global
   else
-     Sfac=0.d0
-	 Sfac1=0.d0
-  endif
+    Sfac = 1.d0/(2.d0*dt_global)
+    Sfac1 = 3.d0/(2.d0*dt_global)
+  end if
+  else
+  Sfac = 0.d0
+  Sfac1 = 0.d0
+  end if
 
-!----------------------------------------------- 
-   MP=>Mesh(nMesh)
-   MP%Res_max(:) =0.d0  ! ×î´ó²Ğ²î
-   MP%Res_rms(:) =0.d0  ! ¾ù·½¸ù²Ğ²î            
-   NVAR1=MP%NVAR
+!-----------------------------------------------
+  MP => Mesh(nMesh)
+  MP%Res_max(:) = 0.d0  ! æœ€å¤§æ®‹å·®
+  MP%Res_rms(:) = 0.d0  ! å‡æ–¹æ ¹æ®‹å·®
+  NVAR1 = MP%NVAR
 !----------------------------------------------
-   do mBlock=1,MP%Num_Block
-     B => MP%Block(mBlock)                  ! µÚnMesh ÖØÍø¸ñµÄµÚmBlock¿é
-     nx=B%nx; ny=B%ny; nz=B%nz
-     KL=1-LAP
-	 IR=nx+LAP-1
-	 JR=ny+LAP-1
-	 KR=nz+LAP-1
-	 allocate(d(KL:IR,KL:JR,KL:KR),uu(KL:IR,KL:JR,KL:KR),v(KL:IR,KL:JR,KL:KR),  &
-              w(KL:IR,KL:JR,KL:KR), T(KL:IR,KL:JR,KL:KR), &
-              cc(KL:IR,KL:JR,KL:KR),p(KL:IR,KL:JR,KL:KR))
-    
-	
-	 allocate(Flux(NVAR1,nx,ny,nz))                            ! Í¨Á¿(Á÷Ìå·½³Ì)
-     allocate(Lci(nx,ny,nz),Lcj(nx,ny,nz),Lck(nx,ny,nz),Lvi(nx,ny,nz),Lvj(nx,ny,nz),Lvk(nx,ny,nz))  ! Æ×°ë¾¶£¨ÎŞÕ³¡¢Õ³ĞÔ£©
+  do mBlock = 1, MP%Num_Block
+    B => MP%Block(mBlock)                  ! ç¬¬nMesh é‡ç½‘æ ¼çš„ç¬¬mBlockå—
+    nx = B%nx; ny = B%ny; nz = B%nz
+    KL = 1-LAP
+    IR = nx+LAP-1
+    JR = ny+LAP-1
+    KR = nz+LAP-1
+    allocate (d(KL:IR, KL:JR, KL:KR), uu(KL:IR, KL:JR, KL:KR), v(KL:IR, KL:JR, KL:KR), &
+              w(KL:IR, KL:JR, KL:KR), T(KL:IR, KL:JR, KL:KR), &
+              cc(KL:IR, KL:JR, KL:KR), p(KL:IR, KL:JR, KL:KR))
 
-!------------------------------------------------------------------------------------     
-	 call limit_vt(nMesh,mBlock)    ! ¶ÔSA£¬SST·½³ÌµÄÎïÀíÁ¿(vt,Kt,Wt)½øĞĞÏŞÖÆ
+    allocate (Flux(NVAR1, nx, ny, nz))                            ! é€šé‡(æµä½“æ–¹ç¨‹)
+    allocate (Lci(nx, ny, nz), Lcj(nx, ny, nz), Lck(nx, ny, nz), Lvi(nx, ny, nz), Lvj(nx, ny, nz), Lvk(nx, ny, nz))  ! è°±åŠå¾„ï¼ˆæ— ç²˜ã€ç²˜æ€§ï¼‰
 
-	 call comput_duvtpc(nMesh,mBlock)                      ! ¼ÆËã»ù±¾Á¿ d,u,v,T,p,cc , vt,kt,Wt
+!------------------------------------------------------------------------------------
+    call limit_vt(nMesh, mBlock)    ! å¯¹SAï¼ŒSSTæ–¹ç¨‹çš„ç‰©ç†é‡(vt,Kt,Wt)è¿›è¡Œé™åˆ¶
+
+    call comput_duvtpc(nMesh, mBlock)                      ! è®¡ç®—åŸºæœ¬é‡ d,u,v,T,p,cc , vt,kt,Wt
 
 !---------------------------------------------------------------------------------------
-!  Çó½âN-S·½³ÌµÄºËĞÄÄ£¿é£º ¼ÆËã²Ğ²î£¨ÓÒ¶ËÏî£©  
-     call Residual (nMesh,mBlock)                          ! ¼ÆËãÒ»¸öÍø¸ñ¿éµÄ²Ğ²î£¨ÓÒ¶ËÏî£© ; µÚnMesh ÖØÍø¸ñµÄµÚmBlock¿é
+!  æ±‚è§£N-Sæ–¹ç¨‹çš„æ ¸å¿ƒæ¨¡å—ï¼š è®¡ç®—æ®‹å·®ï¼ˆå³ç«¯é¡¹ï¼‰
+    call Residual(nMesh, mBlock)                          ! è®¡ç®—ä¸€ä¸ªç½‘æ ¼å—çš„æ®‹å·®ï¼ˆå³ç«¯é¡¹ï¼‰ ; ç¬¬nMesh é‡ç½‘æ ¼çš„ç¬¬mBlockå—
 !----------------------------------------------
-!    OpenCFD-SEC£º ²ÉÓÃ²î·Ö·¨¼ÆËã¸Ã¿éµÄ²Ğ²î
+!    OpenCFD-SECï¼š é‡‡ç”¨å·®åˆ†æ³•è®¡ç®—è¯¥å—çš„æ®‹å·®
 ! !!! FVM-FDM --------------
-   	 if(B%IFLAG_FVM_FDM  .eq. Method_FDM) call Residual_FDM(nMesh,mBlock)  ! ÓÃÓĞÏŞÌå»ı·¨¼ÆËã²Ğ²î£¨²¹¶¡³ÌĞò£©   !!!SEC!!!
+    if (B%IFLAG_FVM_FDM .eq. Method_FDM) call Residual_FDM(nMesh, mBlock)  ! ç”¨æœ‰é™ä½“ç§¯æ³•è®¡ç®—æ®‹å·®ï¼ˆè¡¥ä¸ç¨‹åºï¼‰   !!!SEC!!!
 !---FVM-FDM-------------
 
-! ¶ÔÓÚÒ¶ÂÖ»úÇó½âÆ÷£¬Ìí¼ÓÔ´Ïî £¨¹ßĞÔÁ¦Ïî£©
-    if(IF_TurboMachinary .eq. 1) then
+! å¯¹äºå¶è½®æœºæ±‚è§£å™¨ï¼Œæ·»åŠ æºé¡¹ ï¼ˆæƒ¯æ€§åŠ›é¡¹ï¼‰
+    if (IF_TurboMachinary .eq. 1) then
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i,j,k)
-	  do k=1,nz-1
-	  do j=1,ny-1
-      do i=1,nx-1
-       B%Res(3,i,j,k)=B%Res(3,i,j,k)+B%vol(i,j,k)*d(i,j,k)*(Turbo_w**2*B%yc(i,j,k)+2.d0*Turbo_w*w(i,j,k))
-       B%Res(4,i,j,k)=B%Res(4,i,j,k)+B%vol(i,j,k)*d(i,j,k)*(Turbo_w**2*B%zc(i,j,k)-2.d0*Turbo_w*v(i,j,k))
-       B%Res(5,i,j,k)=B%Res(5,i,j,k)+B%vol(i,j,k)*d(i,j,k)*Turbo_w**2*(v(i,j,k)*B%yc(i,j,k)+w(i,j,k)*B%zc(i,j,k))
-	  enddo
-	  enddo
-	  enddo
+      do k = 1, nz-1
+      do j = 1, ny-1
+      do i = 1, nx-1
+        B%Res(3, i, j, k) = B%Res(3, i, j, k)+B%vol(i, j, k)*d(i, j, k)*(Turbo_w**2*B%yc(i, j, k)+2.d0*Turbo_w*w(i, j, k))
+        B%Res(4, i, j, k) = B%Res(4, i, j, k)+B%vol(i, j, k)*d(i, j, k)*(Turbo_w**2*B%zc(i, j, k)-2.d0*Turbo_w*v(i, j, k))
+      B%Res(5, i, j, k) = B%Res(5, i, j, k)+B%vol(i, j, k)*d(i, j, k)*Turbo_w**2*(v(i, j, k)*B%yc(i, j, k)+w(i, j, k)*B%zc(i, j, k))
+      end do
+      end do
+      end do
 !$OMP END PARALLEL DO
-   endif
+    end if
 
-
-
-
-!  Ë«Ê±¼ä²½³¤·¨£¬Ìí¼Ó¸½¼Ó²Ğ²î     
-	 if(Time_Method .eq. Time_Dual_LU_SGS) then
+!  åŒæ—¶é—´æ­¥é•¿æ³•ï¼Œæ·»åŠ é™„åŠ æ®‹å·®
+    if (Time_Method .eq. Time_Dual_LU_SGS) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i,j,k,m)
-	  do k=1,nz-1
-	  do j=1,ny-1
-      do i=1,nx-1
-      do m=1,NVAR1
-       B%Res(m,i,j,k)=B%Res(m,i,j,k)-(3.d0*B%U(m,i,j,k)-4.d0*B%Un(m,i,j,k)+B%Un1(m,i,j,k))*B%vol(i,j,k)*Sfac
-      enddo
-	  enddo
-	  enddo
-	  enddo
+      do k = 1, nz-1
+      do j = 1, ny-1
+      do i = 1, nx-1
+      do m = 1, NVAR1
+        B%Res(m, i, j, k) = B%Res(m, i, j, k)-(3.d0*B%U(m, i, j, k)-4.d0*B%Un(m, i, j, k)+B%Un1(m, i, j, k))*B%vol(i, j, k)*Sfac
+      end do
+      end do
+      end do
+      end do
 !$OMP END PARALLEL DO
-     endif
+    end if
 
+    call comput_Lijk(nMesh, mBlock)                        ! è®¡ç®—è°±åŠå¾„  (Blazek's book, p189-190), æ®‹å·®å…‰é¡ºï¼Œå±€éƒ¨æ—¶é—´æ­¥é•¿åŠLU-SGSä¸­å‡ä½¿ç”¨è¯¥å€¼
+    if (If_Residual_smoothing .eq. 1) then
+      call Residual_smoothing(nMesh, mBlock)             ! æ®‹å·®å…‰é¡º
+    end if
+    call comput_dt(nMesh, mBlock)                          ! è®¡ç®—(å½“åœ°) æ—¶é—´æ­¥é•¿
 
+    if (Time_Method .eq. Time_LU_SGS .or. Time_Method .eq. Time_Dual_LU_SGS) then
+      call du_LU_SGS(nMesh, mBlock, Sfac1)                      ! é‡‡ç”¨LU_SGSæ–¹æ³•è®¡ç®—DU=U(n+1)-U(n)
+    end if
 
-     call comput_Lijk(nMesh,mBlock)                        ! ¼ÆËãÆ×°ë¾¶  (Blazek's book, p189-190), ²Ğ²î¹âË³£¬¾Ö²¿Ê±¼ä²½³¤¼°LU-SGSÖĞ¾ùÊ¹ÓÃ¸ÃÖµ
-	 if(If_Residual_smoothing .eq. 1 ) then
-	     call Residual_smoothing(nMesh,mBlock)             ! ²Ğ²î¹âË³
-	 endif
-	 call comput_dt(nMesh,mBlock)                          ! ¼ÆËã(µ±µØ) Ê±¼ä²½³¤
+    deallocate (d, uu, v, w, T, cc, p, Flux)
+    deallocate (Lci, Lcj, Lck, Lvi, Lvj, Lvk)
 
-     if(Time_Method .eq. Time_LU_SGS .or. Time_Method .eq. Time_Dual_LU_SGS) then
-        call du_LU_SGS(nMesh,mBlock,Sfac1)                      ! ²ÉÓÃLU_SGS·½·¨¼ÆËãDU=U(n+1)-U(n)
-     endif
+  end do
 
-	 deallocate(d,uu,v,w,T,cc,p,Flux)
-     deallocate(Lci,Lcj,Lck,Lvi,Lvj,Lvk)
-
-
-   enddo    
-   
-
-  end Subroutine Comput_Residual_one_mesh
-
+end Subroutine Comput_Residual_one_mesh
 
 !------------------------------------------------------------------------------
-! ¼ÆËã²Ğ²î (²Ğ²î=ÓÒ¶ËÏî=¾»Á÷Á¿); ÊÇÇó½âN-S·½³ÌµÄºËĞÄÄ£¿é; 
+! è®¡ç®—æ®‹å·® (æ®‹å·®=å³ç«¯é¡¹=å‡€æµé‡); æ˜¯æ±‚è§£N-Sæ–¹ç¨‹çš„æ ¸å¿ƒæ¨¡å—;
 ! Flux (= inviscous flux + viscous flux )
 
-    subroutine Residual(nMesh,mBlock)
-     Use Global_Var
-     Use Flow_Var
-     implicit none
-     integer:: nx,ny,nz,i,j,k,m,nMesh,mBlock !,Scheme,IFlux,Reconstruction
-     Type (Block_TYPE),pointer:: B
-     TYPE (Mesh_TYPE),pointer:: MP
-     MP=> Mesh(nMesh)
-     B => MP%Block(mBlock)
-     
-     if(If_viscous .eq. 1 ) then
-      call get_viscous(nMesh,mBlock)                   ! ¼ÆËã²ãÁ÷Õ³ĞÔÏµÊı  
-!  ÍÄÁ÷Ä£ĞÍ
-     if(MP%Iflag_turbulence_model .eq. Turbulence_BL) then
-       call  turbulence_model_BL(nMesh,mBlock)               !  BLÄ£ĞÍ
-     else if(MP%Iflag_turbulence_model .eq. Turbulence_SA) then
-       call Turbulence_model_SA(nMesh,mBlock)                  ! SAÄ£ĞÍ
-     else if(MP%Iflag_turbulence_model .eq. Turbulence_NewSA) then
-       call Turbulence_model_NewSA(nMesh,mBlock)                  ! New SAÄ£ĞÍ (By Li XL, He ZW and Li L)
-   
-     else if(MP%Iflag_turbulence_model .eq. Turbulence_SST) then
-	   call  Turbulence_model_SST(nMesh,mBlock)
+subroutine Residual(nMesh, mBlock)
+  Use Global_Var
+  Use Flow_Var
+  implicit none
+  integer:: nx, ny, nz, i, j, k, m, nMesh, mBlock !,Scheme,IFlux,Reconstruction
+  Type(Block_TYPE), pointer:: B
+  TYPE(Mesh_TYPE), pointer:: MP
+  MP => Mesh(nMesh)
+  B => MP%Block(mBlock)
 
-     else
-       B%mu_t(:,:,:)=0.d0                                ! ²ãÁ÷
-     endif 
+  if (If_viscous .eq. 1) then
+    call get_viscous(nMesh, mBlock)                   ! è®¡ç®—å±‚æµç²˜æ€§ç³»æ•°
+!  æ¹æµæ¨¡å‹
+    if (MP%Iflag_turbulence_model .eq. Turbulence_BL) then
+      call turbulence_model_BL(nMesh, mBlock)               !  BLæ¨¡å‹
+    else if (MP%Iflag_turbulence_model .eq. Turbulence_SA) then
+      call Turbulence_model_SA(nMesh, mBlock)                  ! SAæ¨¡å‹
+    else if (MP%Iflag_turbulence_model .eq. Turbulence_NewSA) then
+      call Turbulence_model_NewSA(nMesh, mBlock)                  ! New SAæ¨¡å‹ (By Li XL, He ZW and Li L)
 
-!    ¶ÔÍÄÁ÷Õ³ĞÔÏµÊı½øĞĞÏŞÖÆ	 
- 	 call limit_mut(nMesh,mBlock)
+    else if (MP%Iflag_turbulence_model .eq. Turbulence_SST) then
+      call Turbulence_model_SST(nMesh, mBlock)
 
-     endif
-     
-!-----------------ÎŞÕ³Ïî-------------------------------------
-     call flux_inviscous_i(nMesh,mBlock)
-     call flux_inviscous_j(nMesh,mBlock)
-     call flux_inviscous_k(nMesh,mBlock)
-    
-! Èı¸ö·½ÏòµÄÕ³ĞÔÍ¨Á¿
-    if(If_viscous .eq. 1) then
-     call flux_viscous_i(nMesh,mBlock)
-     call flux_viscous_j(nMesh,mBlock)
-     call flux_viscous_k(nMesh,mBlock)
-    endif
- 
-    end  
+    else
+      B%mu_t(:, :, :) = 0.d0                                ! å±‚æµ
+    end if
+
+!    å¯¹æ¹æµç²˜æ€§ç³»æ•°è¿›è¡Œé™åˆ¶
+    call limit_mut(nMesh, mBlock)
+
+  end if
+
+!-----------------æ— ç²˜é¡¹-------------------------------------
+  call flux_inviscous_i(nMesh, mBlock)
+  call flux_inviscous_j(nMesh, mBlock)
+  call flux_inviscous_k(nMesh, mBlock)
+
+! ä¸‰ä¸ªæ–¹å‘çš„ç²˜æ€§é€šé‡
+  if (If_viscous .eq. 1) then
+    call flux_viscous_i(nMesh, mBlock)
+    call flux_viscous_j(nMesh, mBlock)
+    call flux_viscous_k(nMesh, mBlock)
+  end if
+
+end
 !---------------------------------------------------------------------------------------------------------
-!  i·½ÏòµÄÎŞÕ³Í¨Á¿, ¼´´©¹ıÒÔ(i,j+1/2,k+1/2) (¼´(I-1/2,J,K)) ÎªÖĞĞÄ²àÃæµÄÍ¨Á¿ 
-!  Ö§³ÖOpenMP, since ver0.71 
-   subroutine flux_inviscous_i(nMesh,mBlock)
-    Use Global_Var
-    Use Flow_Var
-    implicit none
-    real(PRE_EC),dimension(5):: UL,UR,QL,QR,Flux0
-    real(PRE_EC):: U0(1-LAP:LAP,5)
-    integer:: mBlock,NVAR1,i,j,k,m,nx1,ny1,nz1,ksub,nMesh
-    integer:: Scheme,IFlux,Reconstruction
-    real(PRE_EC):: s1x,s1y,s1z,s2x,s2y,s2z,s3x,s3y,s3z,s0,t10,t1x,t1y,t1z  ! ·¨·½Ïò(s1)¼°ÇĞ·½Ïò(s2,s3)
-    real(PRE_EC):: d0,uu0,v0,w0,p0,E0,un
-    Type (Block_TYPE),pointer:: B
-    TYPE (Mesh_TYPE),pointer:: MP
-    Type (BC_MSG_TYPE),pointer:: Bc
-    
-    MP=> Mesh(nMesh)
-    B => MP%Block(mBlock)
-    NVAR1=MP%NVAR
-	
-!	Scheme=MP%Iflag_Scheme         ! ÊıÖµ¸ñÊ½ £¨²»Í¬Íø¸ñÉÏ²ÉÓÃ²»Í¬¸ñÊ½£©
-    
-	IFlux=MP%Iflag_Flux            ! Í¨Á¿¼¼Êõ
-    Reconstruction=MP%IFlag_Reconstruction  ! ÖØ¹¹·½Ê½
-    nx1=B%nx ; ny1=B%ny ; nz1=B%nz
+!  iæ–¹å‘çš„æ— ç²˜é€šé‡, å³ç©¿è¿‡ä»¥(i,j+1/2,k+1/2) (å³(I-1/2,J,K)) ä¸ºä¸­å¿ƒä¾§é¢çš„é€šé‡
+!  æ”¯æŒOpenMP, since ver0.71
+subroutine flux_inviscous_i(nMesh, mBlock)
+  Use Global_Var
+  Use Flow_Var
+  implicit none
+  real(PRE_EC), dimension(5):: UL, UR, QL, QR, Flux0
+  real(PRE_EC):: U0(1-LAP:LAP, 5)
+  integer:: mBlock, NVAR1, i, j, k, m, nx1, ny1, nz1, ksub, nMesh
+  integer:: Scheme, IFlux, Reconstruction
+  real(PRE_EC):: s1x, s1y, s1z, s2x, s2y, s2z, s3x, s3y, s3z, s0, t10, t1x, t1y, t1z  ! æ³•æ–¹å‘(s1)åŠåˆ‡æ–¹å‘(s2,s3)
+  real(PRE_EC):: d0, uu0, v0, w0, p0, E0, un
+  Type(Block_TYPE), pointer:: B
+  TYPE(Mesh_TYPE), pointer:: MP
+  Type(BC_MSG_TYPE), pointer:: Bc
 
+  MP => Mesh(nMesh)
+  B => MP%Block(mBlock)
+  NVAR1 = MP%NVAR
 
-! OpenMPµÄ±àÒëÖ¸Ê¾·û£¨²»ÊÇ×¢ÊÍ£©£¬ Ö¸¶¨Do Ñ­»·²¢ĞĞÖ´ĞĞ£» Ö¸¶¨Ò»Ğ©¸÷½ø³ÌË½ÓĞµÄ±äÁ¿
+!        Scheme=MP%Iflag_Scheme         ! æ•°å€¼æ ¼å¼ ï¼ˆä¸åŒç½‘æ ¼ä¸Šé‡‡ç”¨ä¸åŒæ ¼å¼ï¼‰
+
+  IFlux = MP%Iflag_Flux            ! é€šé‡æŠ€æœ¯
+  Reconstruction = MP%IFlag_Reconstruction  ! é‡æ„æ–¹å¼
+  nx1 = B%nx; ny1 = B%ny; nz1 = B%nz
+
+! OpenMPçš„ç¼–è¯‘æŒ‡ç¤ºç¬¦ï¼ˆä¸æ˜¯æ³¨é‡Šï¼‰ï¼Œ æŒ‡å®šDo å¾ªç¯å¹¶è¡Œæ‰§è¡Œï¼› æŒ‡å®šä¸€äº›å„è¿›ç¨‹ç§æœ‰çš„å˜é‡
 !$OMP PARALLEL DEFAULT(FIRSTPRIVATE) SHARED (MP,B,NVAR1,IFlux,Reconstruction,nx1,ny1,nz1,gamma,Flux,d,uu,v,w,p)
-!$OMP DO   
-	do k=1,nz1
-      do j=1,ny1
-        do i=1,nx1
-          do m=1,NVAR1
-            Flux(m,i,j,k)=0.d0            ! ³õÊ¼»¯
-          enddo
-        enddo
-      enddo
-    enddo
+!$OMP DO
+  do k = 1, nz1
+  do j = 1, ny1
+  do i = 1, nx1
+  do m = 1, NVAR1
+    Flux(m, i, j, k) = 0.d0            ! åˆå§‹åŒ–
+  end do
+  end do
+  end do
+  end do
 !$OMP END DO
- 
-!$OMP DO   
-	do k=1,nz1-1 
-      do j=1,ny1-1
-        do i=1,nx1
 
-!      Éè¶¨±ß½ç¸ñÊ½ (Çø·ÖÄÚµã¸ñÊ½¼°±ß½çµã¸ñÊ½)
-		    Scheme=MP%Iflag_Scheme
-		   
-		   if(B%BcI(j,k,1)==1) then            ! ÊÇ·ñÎªÎïÀí±ß½ç
-		     if(i .eq. 1) then
-			   Scheme=Scheme_CD2    ! µÚ1¸ö½çÃæ²ÉÓÃ2½×ÖĞĞÄ¸ñÊ½ £¨ÀûÓÃĞéÍø¸ñ£¬±£³ÖÍ¨Á¿ÊØºã£©  
-             else if (i < LAP) then
-		       Scheme=MP%Bound_Scheme            ! ±ß½ç¸ñÊ½
-             endif
-           endif
-		 
-		   if(B%BcI(j,k,2)==1) then      ! ÊÇ·ñÎªÎïÀí±ß½ç
-			if(i .eq. nx1 ) then
-			 Scheme=Scheme_CD2        ! ×îÓÒ±ß½ç£¬²ÉÓÃ2½×ÖĞĞÄ
-			else if (i > nx1-LAP+1) then
-		     Scheme=MP%Bound_Scheme   ! ±ß½ç¸ñÊ½
-            endif
-           endif
+!$OMP DO
+  do k = 1, nz1-1
+  do j = 1, ny1-1
+  do i = 1, nx1
 
-          if(B%IF_OverLimit == 1)  Scheme=Scheme_UD1            ! ÎïÀíÁ¿³¬ÏŞ£¨Èç³öÏÖ¸ºÎÂ¶È£©£¬ ¸Ã¿é²ÉÓÃ1½×Ó­·ç
-		 		 
+!      è®¾å®šè¾¹ç•Œæ ¼å¼ (åŒºåˆ†å†…ç‚¹æ ¼å¼åŠè¾¹ç•Œç‚¹æ ¼å¼)
+    Scheme = MP%Iflag_Scheme
 
-!-----²àÃæµÄ·¨·½ÏòºÍÁ½¸öÇĞ·½Ïò-----------------------------------------------------------------------------
-!  ÎªÁË½ÚÊ¡ÄÚ´æ£¬±¾³ÌĞò²»´æ´¢½çÃæµÄ·¨·½Ïò¼°ÇĞ·½Ïò£¬ÔÚÊ¹ÓÃÊ±¼ÆËã (»áÔö¼ÓĞ©¼ÆËãÁ¿)
-          s1x=B%ni1(i,j,k); s1y=B%ni2(i,j,k) ; s1z= B%ni3(i,j,k)            ! ¹éÒ»»¯µÄ·¨·½Ïò
-          t1x=B%x(i,j+1,k)-B%x(i,j,k+1); t1y=B%y(i,j+1,k)-B%y(i,j,k+1); t1z=B%z(i,j+1,k)-B%z(i,j,k+1)   ! ¶Ô½ÇÏß1
-          t10=1.d0/(sqrt(t1x*t1x+t1y*t1y+t1z*t1z))  
-          s2x=t1x*t10; s2y=t1y*t10; s2z=t1z*t10                             ! ¹éÒ»»¯µÄÇĞ·½Ïò1 £¨¶Ô½ÇÏß1£©
-          s3x=s1y*s2z-s1z*s2y; s3y=s1z*s2x-s1x*s2z ; s3z= s1x*s2y-s1y*s2x   ! ÇĞ·½Ïò2 £¨·¨·½Ïò²æ³ËÇĞ·½Ïò1£©
+    if (B%BcI(j, k, 1) == 1) then            ! æ˜¯å¦ä¸ºç‰©ç†è¾¹ç•Œ
+    if (i .eq. 1) then
+      Scheme = Scheme_CD2    ! ç¬¬1ä¸ªç•Œé¢é‡‡ç”¨2é˜¶ä¸­å¿ƒæ ¼å¼ ï¼ˆåˆ©ç”¨è™šç½‘æ ¼ï¼Œä¿æŒé€šé‡å®ˆæ’ï¼‰
+    else if (i < LAP) then
+      Scheme = MP%Bound_Scheme            ! è¾¹ç•Œæ ¼å¼
+    end if
+    end if
+
+    if (B%BcI(j, k, 2) == 1) then      ! æ˜¯å¦ä¸ºç‰©ç†è¾¹ç•Œ
+    if (i .eq. nx1) then
+      Scheme = Scheme_CD2        ! æœ€å³è¾¹ç•Œï¼Œé‡‡ç”¨2é˜¶ä¸­å¿ƒ
+    else if (i > nx1-LAP+1) then
+      Scheme = MP%Bound_Scheme   ! è¾¹ç•Œæ ¼å¼
+    end if
+    end if
+
+    if (B%IF_OverLimit == 1) Scheme = Scheme_UD1            ! ç‰©ç†é‡è¶…é™ï¼ˆå¦‚å‡ºç°è´Ÿæ¸©åº¦ï¼‰ï¼Œ è¯¥å—é‡‡ç”¨1é˜¶è¿é£
+
+!-----ä¾§é¢çš„æ³•æ–¹å‘å’Œä¸¤ä¸ªåˆ‡æ–¹å‘-----------------------------------------------------------------------------
+!  ä¸ºäº†èŠ‚çœå†…å­˜ï¼Œæœ¬ç¨‹åºä¸å­˜å‚¨ç•Œé¢çš„æ³•æ–¹å‘åŠåˆ‡æ–¹å‘ï¼Œåœ¨ä½¿ç”¨æ—¶è®¡ç®— (ä¼šå¢åŠ äº›è®¡ç®—é‡)
+    s1x = B%ni1(i, j, k); s1y = B%ni2(i, j, k); s1z = B%ni3(i, j, k)            ! å½’ä¸€åŒ–çš„æ³•æ–¹å‘
+    t1x = B%x(i, j+1, k)-B%x(i, j, k+1); t1y = B%y(i, j+1, k)-B%y(i, j, k+1); t1z = B%z(i, j+1, k)-B%z(i, j, k+1)   ! å¯¹è§’çº¿1
+    t10 = 1.d0/(sqrt(t1x*t1x+t1y*t1y+t1z*t1z))
+    s2x = t1x*t10; s2y = t1y*t10; s2z = t1z*t10                             ! å½’ä¸€åŒ–çš„åˆ‡æ–¹å‘1 ï¼ˆå¯¹è§’çº¿1ï¼‰
+    s3x = s1y*s2z-s1z*s2y; s3y = s1z*s2x-s1x*s2z; s3z = s1x*s2y-s1y*s2x   ! åˆ‡æ–¹å‘2 ï¼ˆæ³•æ–¹å‘å‰ä¹˜åˆ‡æ–¹å‘1ï¼‰
 !--------------------------------------------------------------------------------------------
-! ÄÚµã£¬²ÉÓÃ2,3½×¸ñÊ½ÖØ¹¹  (I-1/2,J,K) µãµÄÖµ£»
-! ÀíÂÛÊÖ²á¼°½Ì¿ÆÊéÖĞ£¬Í¨³£Ğ´ÖØ¹¹³ö(I+1/2,J,K)µãµÄÖµ¡£ ±¾³ÌĞòÖĞÖØ¹¹(I-1/2,J,K)µãµÄÖµÎªÁË·½±ã 
-! ĞèÒªÊ¹ÓÃ4¸öµãµÄÖµ£º I-2, I-1, I, I+1; ÆäÖĞ×óÖµ(UL)Ê¹ÓÃI-2,I-1,IµãµÄÖµÖØ¹¹£» ÓÒÖµ(UR)Ê¹ÓÃI-1,I,I+1µãµÄÖµÖØ¹¹  
-          if(Reconstruction .eq. Reconst_Original) then
-! Ê¹ÓÃÔ­Ê¼±äÁ¿ÖØ¹¹ U0(:,:) ´æ´¢µÄÊÇ4¸öµãÉÏµÄÃÜ¶È¡¢ËÙ¶È¡¢Ñ¹Á¦
-                U0(:,1)=d(i-LAP:i+LAP-1,j,k) 
-			    U0(:,2)=uu(i-LAP:i+LAP-1,j,k) 
-			    U0(:,3)=v(i-LAP:i+LAP-1,j,k)
-			    U0(:,4)=w(i-LAP:i+LAP-1,j,k)
-			    U0(:,5)=p(i-LAP:i+LAP-1,j,k)
-            call Reconstuction_original(U0,UL,UR,gamma,Scheme)          ! ÊıÖµ¸ñÊ½
-          else if (Reconstruction .eq. Reconst_Conservative) then
-! Ê¹ÓÃÊØºã±äÁ¿ÖØ¹¹ U0(:,:) ´æ´¢µÄÊÇ4¸öµãÉÏµÄÊØºã±äÁ¿£¨ÖÊÁ¿ÃÜ¶È¡¢¶¯Á¿ÃÜ¶ÈºÍÄÜÁ¿ÃÜ¶È£©
-            do m=1,5
-               U0(:,m)=B%U(m,i-LAP:i+LAP-1,j,k)
-            enddo
-            call Reconstuction_conservative(U0,UL,UR,gamma,Scheme)
-          else
-! ²ÉÓÃÌØÕ÷±äÁ¿ÖØ¹¹
-            do m=1,5
-              U0(:,m)=B%U(m,i-LAP:i+LAP-1,j,k)
-            enddo
-            call Reconstuction_Characteristic(U0,UL,UR,gamma,Scheme)
-          endif   
-!-------ÖØ¹¹½áÊø£¬µÃµ½(I-1/2,J,K)µãÉÏµÄ×ó¡¢ÓÒÖµUL,UR  (³ÌĞòÖĞÎªÔ­Ê¼±äÁ¿)------------
-!----¼ì²é UL, UR ÖĞµÄÃÜ¶È¡¢Ñ¹Á¦ÊÇ·ñÎª¸º -------------------------
-! Èç¹ûÎª¸º£¬ÔòÊ¹ÓÃ1½×Ó­·ç        
-	  if(IF_Scheme_Positivity == 1) then
-		if(UL(1) .le. Lim_Zero  .or. UL(5) .le. Lim_Zero) then      ! Lim_Zero=1.d-20 
-          UL(1)=d(i-1,j,k)            ! 1½×Ó­·ç
-		  UL(2)=uu(i-1,j,k)
-		  UL(3)=v(i-1,j,k)
-		  UL(4)=w(i-1,j,k)
-		  UL(5)=p(i-1,j,k)
-		endif
+! å†…ç‚¹ï¼Œé‡‡ç”¨2,3é˜¶æ ¼å¼é‡æ„  (I-1/2,J,K) ç‚¹çš„å€¼ï¼›
+! ç†è®ºæ‰‹å†ŒåŠæ•™ç§‘ä¹¦ä¸­ï¼Œé€šå¸¸å†™é‡æ„å‡º(I+1/2,J,K)ç‚¹çš„å€¼ã€‚ æœ¬ç¨‹åºä¸­é‡æ„(I-1/2,J,K)ç‚¹çš„å€¼ä¸ºäº†æ–¹ä¾¿
+! éœ€è¦ä½¿ç”¨4ä¸ªç‚¹çš„å€¼ï¼š I-2, I-1, I, I+1; å…¶ä¸­å·¦å€¼(UL)ä½¿ç”¨I-2,I-1,Iç‚¹çš„å€¼é‡æ„ï¼› å³å€¼(UR)ä½¿ç”¨I-1,I,I+1ç‚¹çš„å€¼é‡æ„
+    if (Reconstruction .eq. Reconst_Original) then
+! ä½¿ç”¨åŸå§‹å˜é‡é‡æ„ U0(:,:) å­˜å‚¨çš„æ˜¯4ä¸ªç‚¹ä¸Šçš„å¯†åº¦ã€é€Ÿåº¦ã€å‹åŠ›
+      U0(:, 1) = d(i-LAP:i+LAP-1, j, k)
+      U0(:, 2) = uu(i-LAP:i+LAP-1, j, k)
+      U0(:, 3) = v(i-LAP:i+LAP-1, j, k)
+      U0(:, 4) = w(i-LAP:i+LAP-1, j, k)
+      U0(:, 5) = p(i-LAP:i+LAP-1, j, k)
+      call Reconstuction_original(U0, UL, UR, gamma, Scheme)          ! æ•°å€¼æ ¼å¼
+    else if (Reconstruction .eq. Reconst_Conservative) then
+! ä½¿ç”¨å®ˆæ’å˜é‡é‡æ„ U0(:,:) å­˜å‚¨çš„æ˜¯4ä¸ªç‚¹ä¸Šçš„å®ˆæ’å˜é‡ï¼ˆè´¨é‡å¯†åº¦ã€åŠ¨é‡å¯†åº¦å’Œèƒ½é‡å¯†åº¦ï¼‰
+      do m = 1, 5
+        U0(:, m) = B%U(m, i-LAP:i+LAP-1, j, k)
+      end do
+      call Reconstuction_conservative(U0, UL, UR, gamma, Scheme)
+    else
+! é‡‡ç”¨ç‰¹å¾å˜é‡é‡æ„
+      do m = 1, 5
+        U0(:, m) = B%U(m, i-LAP:i+LAP-1, j, k)
+      end do
+      call Reconstuction_Characteristic(U0, UL, UR, gamma, Scheme)
+    end if
+!-------é‡æ„ç»“æŸï¼Œå¾—åˆ°(I-1/2,J,K)ç‚¹ä¸Šçš„å·¦ã€å³å€¼UL,UR  (ç¨‹åºä¸­ä¸ºåŸå§‹å˜é‡)------------
+!----æ£€æŸ¥ UL, UR ä¸­çš„å¯†åº¦ã€å‹åŠ›æ˜¯å¦ä¸ºè´Ÿ -------------------------
+! å¦‚æœä¸ºè´Ÿï¼Œåˆ™ä½¿ç”¨1é˜¶è¿é£
+    if (IF_Scheme_Positivity == 1) then
+    if (UL(1) .le. Lim_Zero .or. UL(5) .le. Lim_Zero) then      ! Lim_Zero=1.d-20
+      UL(1) = d(i-1, j, k)            ! 1é˜¶è¿é£
+      UL(2) = uu(i-1, j, k)
+      UL(3) = v(i-1, j, k)
+      UL(4) = w(i-1, j, k)
+      UL(5) = p(i-1, j, k)
+    end if
 
-       if(UR(1) .le. Lim_Zero .or. UR(5) .le. Lim_Zero) then
-          UR(1)=d(i,j,k)         ! 1½×Ó­·ç
-		  UR(2)=uu(i,j,k)
-		  UR(3)=v(i,j,k)
-		  UR(4)=w(i,j,k)
-		  UR(5)=p(i,j,k)
-       endif
-     endif
-
-
-
+    if (UR(1) .le. Lim_Zero .or. UR(5) .le. Lim_Zero) then
+      UR(1) = d(i, j, k)         ! 1é˜¶è¿é£
+      UR(2) = uu(i, j, k)
+      UR(3) = v(i, j, k)
+      UR(4) = w(i, j, k)
+      UR(5) = p(i, j, k)
+    end if
+    end if
 
 !----------------------------------------------------------------
-!-----½«UL,UR½øĞĞ×ø±êĞı×ª±ä»»£¬µÃµ½×ø±êÏµ(s1,s2,s3) (·¨·½Ïò£¬ÇĞ·½Ïò1£¬ÇĞ·½Ïò2) ÖĞµÄÊØºã±äÁ¿QL,QR
-!  ±êÁ¿£¨ÃÜ¶È¡¢Ñ¹Á¦£©±£³Ö²»±ä£» ÏòÁ¿£¨ËÙ¶È£©Í¶Ó°µ½ĞÂµÄ×ø±êÖá·½Ïò
-!  ×óÖµ
-          QL(1)=UL(1)                           ! ÃÜ¶È£¨±êÁ¿£¬×ø±êĞı×ª±£³Ö²»±ä£©
-          QL(2)=UL(2)*s1x+UL(3)*s1y+UL(4)*s1z   ! ·¨ÏòËÙ¶È
-          QL(3)=UL(2)*s2x+UL(3)*s2y+UL(4)*s2z   ! ÇĞ·½Ïò1µÄËÙ¶È·ÖÁ¿
-          QL(4)=UL(2)*s3x+UL(3)*s3y+UL(4)*s3z   ! ÇĞ·½Ïò2µÄËÙ¶È·ÖÁ¿
-          QL(5)=UL(5)                           ! Ñ¹Á¦£¨±êÁ¿£© 
-! ÓÒÖµ £¨±äÁ¿º¬ÒåÓë×óÖµÏàÍ¬£©
-          QR(1)=UR(1)                            
-          QR(2)=UR(2)*s1x+UR(3)*s1y+UR(4)*s1z    
-          QR(3)=UR(2)*s2x+UR(3)*s2y+UR(4)*s2z    
-          QR(4)=UR(2)*s3x+UR(3)*s3y+UR(4)*s3z    
-          QR(5)=UR(5)                             
-!---------Í¨Á¿·ÖÁÑ (FVS»òFDS), ¸ù¾İ×ó¡¢ÓÒÖµ¼ÆËã´©¹ı½çÃæµÄÍ¨Á¿(À©Õ¹1Î¬ÎÊÌâ£©-------------
-          if(IFlux .eq. Flux_Steger_Warming ) then
-            call Flux_steger_warming_1Da(QL,QR,Flux0,gamma)     ! Steger-Warming FVS·½·¨ 
-          else  if(IFlux .eq. Flux_Roe ) then
-            call Flux_Roe_1D(QL,QR,Flux0,gamma)                 ! Roe FDS·½·¨
-          else  if(IFlux .eq. Flux_Van_Leer ) then
-            call Flux_Van_Leer_1Da(QL,QR,Flux0,gamma)           ! Van Leer FVS·½·¨
-          else  if(IFlux .eq. Flux_Ausm ) then          
-            call Flux_Ausmpw_1Da(QL,QR,Flux0,gamma)             ! AUSM + ·½·¨
-          else
-            call Flux_HLL_HLLC_1D(QL,QR,Flux0,gamma,IFlux)      !HLL/HLLC FDS·½·¨£¨½üËÆRiemann½â£©
-          endif
-! ---½«(s1,s2,s3)×ø±êÏµÏÂµÄÍ¨Á¿Flux0 ½øĞĞ±ä»»£¬µÃµ½(x,y,z)×ø±êÏµÏÂµÄÍ¨Á¿£» ±êÁ¿±£³Ö²»±ä£¬ÏòÁ¿½øĞĞÍ¶Ó°
-! ---±ä»»ºó£¬³ËÒÔÃæ»ı£¬¾ÍµÃµ½´©¹ı(I-1/2,J,K)µã £¨¼´ (i,j+1/2,k+1/2)µã£©ËùÔÚ²àÃæµÄÍ¨Á¿	  
-          Flux(1,i,j,k)=-Flux0(1)*B%Si(i,j,k)                        ! ÖÊÁ¿Í¨Á¿ £¨±êÁ¿£¬²»Ëæ×ø±êĞı×ª¶ø±ä»¯£©
-          Flux(2,i,j,k)=-(Flux0(2)*s1x+Flux0(3)*s2x+Flux0(4)*s3x)*B%Si(i,j,k)  ! x·½ÏòµÄ¶¯Á¿Í¨Á¿  £¨Í¶Ó°µ½x·½Ïò£©
-          Flux(3,i,j,k)=-(Flux0(2)*s1y+Flux0(3)*s2y+Flux0(4)*s3y)*B%Si(i,j,k)  ! y·½ÏòµÄ¶¯Á¿Í¨Á¿
-          Flux(4,i,j,k)=-(Flux0(2)*s1z+Flux0(3)*s2z+Flux0(4)*s3z)*B%Si(i,j,k)  ! z·½ÏòµÄ¶¯Á¿Í¨Á¿
-          Flux(5,i,j,k)=-Flux0(5)*B%Si(i,j,k)                        ! ÄÜÁ¿Í¨Á¿ £¨±êÁ¿£©
-        enddo
-      enddo
-    enddo
+!-----å°†UL,URè¿›è¡Œåæ ‡æ—‹è½¬å˜æ¢ï¼Œå¾—åˆ°åæ ‡ç³»(s1,s2,s3) (æ³•æ–¹å‘ï¼Œåˆ‡æ–¹å‘1ï¼Œåˆ‡æ–¹å‘2) ä¸­çš„å®ˆæ’å˜é‡QL,QR
+!  æ ‡é‡ï¼ˆå¯†åº¦ã€å‹åŠ›ï¼‰ä¿æŒä¸å˜ï¼› å‘é‡ï¼ˆé€Ÿåº¦ï¼‰æŠ•å½±åˆ°æ–°çš„åæ ‡è½´æ–¹å‘
+!  å·¦å€¼
+    QL(1) = UL(1)                           ! å¯†åº¦ï¼ˆæ ‡é‡ï¼Œåæ ‡æ—‹è½¬ä¿æŒä¸å˜ï¼‰
+    QL(2) = UL(2)*s1x+UL(3)*s1y+UL(4)*s1z   ! æ³•å‘é€Ÿåº¦
+    QL(3) = UL(2)*s2x+UL(3)*s2y+UL(4)*s2z   ! åˆ‡æ–¹å‘1çš„é€Ÿåº¦åˆ†é‡
+    QL(4) = UL(2)*s3x+UL(3)*s3y+UL(4)*s3z   ! åˆ‡æ–¹å‘2çš„é€Ÿåº¦åˆ†é‡
+    QL(5) = UL(5)                           ! å‹åŠ›ï¼ˆæ ‡é‡ï¼‰
+! å³å€¼ ï¼ˆå˜é‡å«ä¹‰ä¸å·¦å€¼ç›¸åŒï¼‰
+    QR(1) = UR(1)
+    QR(2) = UR(2)*s1x+UR(3)*s1y+UR(4)*s1z
+    QR(3) = UR(2)*s2x+UR(3)*s2y+UR(4)*s2z
+    QR(4) = UR(2)*s3x+UR(3)*s3y+UR(4)*s3z
+    QR(5) = UR(5)
+!---------é€šé‡åˆ†è£‚ (FVSæˆ–FDS), æ ¹æ®å·¦ã€å³å€¼è®¡ç®—ç©¿è¿‡ç•Œé¢çš„é€šé‡(æ‰©å±•1ç»´é—®é¢˜ï¼‰-------------
+    if (IFlux .eq. Flux_Steger_Warming) then
+      call Flux_steger_warming_1Da(QL, QR, Flux0, gamma)     ! Steger-Warming FVSæ–¹æ³•
+    else if (IFlux .eq. Flux_Roe) then
+      call Flux_Roe_1D(QL, QR, Flux0, gamma)                 ! Roe FDSæ–¹æ³•
+    else if (IFlux .eq. Flux_Van_Leer) then
+      call Flux_Van_Leer_1Da(QL, QR, Flux0, gamma)           ! Van Leer FVSæ–¹æ³•
+    else if (IFlux .eq. Flux_Ausm) then
+      call Flux_Ausmpw_1Da(QL, QR, Flux0, gamma)             ! AUSM + æ–¹æ³•
+    else
+      call Flux_HLL_HLLC_1D(QL, QR, Flux0, gamma, IFlux)      !HLL/HLLC FDSæ–¹æ³•ï¼ˆè¿‘ä¼¼Riemannè§£ï¼‰
+    end if
+! ---å°†(s1,s2,s3)åæ ‡ç³»ä¸‹çš„é€šé‡Flux0 è¿›è¡Œå˜æ¢ï¼Œå¾—åˆ°(x,y,z)åæ ‡ç³»ä¸‹çš„é€šé‡ï¼› æ ‡é‡ä¿æŒä¸å˜ï¼Œå‘é‡è¿›è¡ŒæŠ•å½±
+! ---å˜æ¢åï¼Œä¹˜ä»¥é¢ç§¯ï¼Œå°±å¾—åˆ°ç©¿è¿‡(I-1/2,J,K)ç‚¹ ï¼ˆå³ (i,j+1/2,k+1/2)ç‚¹ï¼‰æ‰€åœ¨ä¾§é¢çš„é€šé‡
+    Flux(1, i, j, k) = -Flux0(1)*B%Si(i, j, k)                        ! è´¨é‡é€šé‡ ï¼ˆæ ‡é‡ï¼Œä¸éšåæ ‡æ—‹è½¬è€Œå˜åŒ–ï¼‰
+    Flux(2, i, j, k) = -(Flux0(2)*s1x+Flux0(3)*s2x+Flux0(4)*s3x)*B%Si(i, j, k)  ! xæ–¹å‘çš„åŠ¨é‡é€šé‡  ï¼ˆæŠ•å½±åˆ°xæ–¹å‘ï¼‰
+    Flux(3, i, j, k) = -(Flux0(2)*s1y+Flux0(3)*s2y+Flux0(4)*s3y)*B%Si(i, j, k)  ! yæ–¹å‘çš„åŠ¨é‡é€šé‡
+    Flux(4, i, j, k) = -(Flux0(2)*s1z+Flux0(3)*s2z+Flux0(4)*s3z)*B%Si(i, j, k)  ! zæ–¹å‘çš„åŠ¨é‡é€šé‡
+    Flux(5, i, j, k) = -Flux0(5)*B%Si(i, j, k)                        ! èƒ½é‡é€šé‡ ï¼ˆæ ‡é‡ï¼‰
+  end do
+  end do
+  end do
 !$OMP END DO
 
-    
 !----------------Residual -------------------------------
-!$OMP DO   
-	do k=1,nz1-1
-      do j=1,ny1-1
-        do i=1,nx1-1
-          do m=1,5
-            B%Res(m,i,j,k)=Flux(m,i+1,j,k)-Flux(m,i,j,k)        
-          enddo
-        enddo
-      enddo
-    enddo
+!$OMP DO
+  do k = 1, nz1-1
+  do j = 1, ny1-1
+  do i = 1, nx1-1
+  do m = 1, 5
+    B%Res(m, i, j, k) = Flux(m, i+1, j, k)-Flux(m, i, j, k)
+  end do
+  end do
+  end do
+  end do
 !$OMP END DO
 
 !$OMP END PARALLEL
 
-   end subroutine flux_inviscous_i
+end subroutine flux_inviscous_i
 !--------------------------------------------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------------------------------------------
-! ´©¹ıj·½Ïò½çÃæ((I,J-1/2,K)µãËùÔÚ½çÃæ)µÄÎŞÕ³Í¨Á¿ 
-   subroutine flux_inviscous_j(nMesh,mBlock)
-    Use Global_Var
-    Use Flow_Var
-    implicit none
-    real(PRE_EC),dimension(5):: UL,UR,QL,QR,Flux0
-    real(PRE_EC):: U0(1-LAP:LAP,5)
-    integer:: mBlock,i,j,k,m,nx1,ny1,nz1,ksub,nMesh
-    integer:: Scheme,IFlux,Reconstruction
-    real(PRE_EC):: s1x,s1y,s1z,s2x,s2y,s2z,s3x,s3y,s3z,s0,t10,t1x,t1y,t1z  ! ·¨·½Ïò(s1)¼°ÇĞ·½Ïò(s2,s3)
-    real(PRE_EC):: d0,uu0,v0,w0,p0,E0,un
-    Type (Block_TYPE),pointer:: B
-    TYPE (Mesh_TYPE),pointer:: MP
-    Type (BC_MSG_TYPE),pointer:: Bc
-    MP=> Mesh(nMesh)
-    B => MP%Block(mBlock)
-    Scheme=MP%Iflag_Scheme                  ! ÊıÖµ¸ñÊ½ £¨²»Í¬Íø¸ñÉÏ²ÉÓÃ²»Í¬¸ñÊ½£©
-    IFlux=MP%Iflag_Flux                     ! Í¨Á¿¼¼Êõ
-    Reconstruction=MP%IFlag_Reconstruction  ! ÖØ¹¹·½Ê½
-    nx1=B%nx ; ny1=B%ny ; nz1=B%nz
-    Flux=0.d0                               ! ³õÊ¼»¯
-   
+! ç©¿è¿‡jæ–¹å‘ç•Œé¢((I,J-1/2,K)ç‚¹æ‰€åœ¨ç•Œé¢)çš„æ— ç²˜é€šé‡
+subroutine flux_inviscous_j(nMesh, mBlock)
+  Use Global_Var
+  Use Flow_Var
+  implicit none
+  real(PRE_EC), dimension(5):: UL, UR, QL, QR, Flux0
+  real(PRE_EC):: U0(1-LAP:LAP, 5)
+  integer:: mBlock, i, j, k, m, nx1, ny1, nz1, ksub, nMesh
+  integer:: Scheme, IFlux, Reconstruction
+  real(PRE_EC):: s1x, s1y, s1z, s2x, s2y, s2z, s3x, s3y, s3z, s0, t10, t1x, t1y, t1z  ! æ³•æ–¹å‘(s1)åŠåˆ‡æ–¹å‘(s2,s3)
+  real(PRE_EC):: d0, uu0, v0, w0, p0, E0, un
+  Type(Block_TYPE), pointer:: B
+  TYPE(Mesh_TYPE), pointer:: MP
+  Type(BC_MSG_TYPE), pointer:: Bc
+  MP => Mesh(nMesh)
+  B => MP%Block(mBlock)
+  Scheme = MP%Iflag_Scheme                  ! æ•°å€¼æ ¼å¼ ï¼ˆä¸åŒç½‘æ ¼ä¸Šé‡‡ç”¨ä¸åŒæ ¼å¼ï¼‰
+  IFlux = MP%Iflag_Flux                     ! é€šé‡æŠ€æœ¯
+  Reconstruction = MP%IFlag_Reconstruction  ! é‡æ„æ–¹å¼
+  nx1 = B%nx; ny1 = B%ny; nz1 = B%nz
+  Flux = 0.d0                               ! åˆå§‹åŒ–
+
 !$OMP PARALLEL DEFAULT(FIRSTPRIVATE) SHARED(MP,B,IFlux,Reconstruction,nx1,ny1,nz1,gamma,Flux,d,uu,v,w,p)
 
-!$OMP DO   
-    do k=1,nz1-1 
-      do j=1,ny1
-		do i=1,nx1-1   
-  
-  
-  !      Éè¶¨±ß½ç¸ñÊ½ (Çø·ÖÄÚµã¸ñÊ½¼°±ß½çµã¸ñÊ½)
+!$OMP DO
+  do k = 1, nz1-1
+  do j = 1, ny1
+  do i = 1, nx1-1
 
-		   Scheme=MP%Iflag_Scheme
-		    if(B%BcJ(i,k,1)==1) then            ! ÊÇ·ñÎªÎïÀí±ß½ç
-             if(j .eq. 1) then
-			   Scheme=Scheme_CD2    ! µÚ1¸ö½çÃæ²ÉÓÃ2½×ÖĞĞÄ¸ñÊ½ £¨ÀûÓÃĞéÍø¸ñ£¬±£³ÖÍ¨Á¿ÊØºã£©  
-			 else if( j < LAP ) then                  ! ¿¿½ü×ó±ß½ç
-               Scheme=MP%Bound_Scheme            ! ±ß½ç¸ñÊ½
-			 endif
-            endif
-		  
-		    if(B%BcJ(i,k,2)==1) then
-             if(j .eq. ny1) then
-			   Scheme=Scheme_CD2    ! µÚ1¸ö½çÃæ²ÉÓÃ2½×ÖĞĞÄ¸ñÊ½ £¨ÀûÓÃĞéÍø¸ñ£¬±£³ÖÍ¨Á¿ÊØºã£©  
-		     else if( j > ny1-LAP+1 ) then      ! ¿¿½üÓÒ±ß½ç
-               Scheme=MP%Bound_Scheme            ! ±ß½ç¸ñÊ½
-			 endif
-            endif
+!      è®¾å®šè¾¹ç•Œæ ¼å¼ (åŒºåˆ†å†…ç‚¹æ ¼å¼åŠè¾¹ç•Œç‚¹æ ¼å¼)
 
-           if(B%IF_OverLimit == 1)  Scheme=Scheme_UD1            ! ÎïÀíÁ¿³¬ÏŞ£¨Èç³öÏÖ¸ºÎÂ¶È£©£¬ ¸Ã¿é²ÉÓÃ1½×Ó­·ç
+    Scheme = MP%Iflag_Scheme
+    if (B%BcJ(i, k, 1) == 1) then            ! æ˜¯å¦ä¸ºç‰©ç†è¾¹ç•Œ
+    if (j .eq. 1) then
+      Scheme = Scheme_CD2    ! ç¬¬1ä¸ªç•Œé¢é‡‡ç”¨2é˜¶ä¸­å¿ƒæ ¼å¼ ï¼ˆåˆ©ç”¨è™šç½‘æ ¼ï¼Œä¿æŒé€šé‡å®ˆæ’ï¼‰
+    else if (j < LAP) then                  ! é è¿‘å·¦è¾¹ç•Œ
+      Scheme = MP%Bound_Scheme            ! è¾¹ç•Œæ ¼å¼
+    end if
+    end if
 
+    if (B%BcJ(i, k, 2) == 1) then
+    if (j .eq. ny1) then
+      Scheme = Scheme_CD2    ! ç¬¬1ä¸ªç•Œé¢é‡‡ç”¨2é˜¶ä¸­å¿ƒæ ¼å¼ ï¼ˆåˆ©ç”¨è™šç½‘æ ¼ï¼Œä¿æŒé€šé‡å®ˆæ’ï¼‰
+    else if (j > ny1-LAP+1) then      ! é è¿‘å³è¾¹ç•Œ
+      Scheme = MP%Bound_Scheme            ! è¾¹ç•Œæ ¼å¼
+    end if
+    end if
 
+    if (B%IF_OverLimit == 1) Scheme = Scheme_UD1            ! ç‰©ç†é‡è¶…é™ï¼ˆå¦‚å‡ºç°è´Ÿæ¸©åº¦ï¼‰ï¼Œ è¯¥å—é‡‡ç”¨1é˜¶è¿é£
 
-          s1x=B%nj1(i,j,k); s1y=B%nj2(i,j,k) ; s1z= B%nj3(i,j,k)  ! ¹éÒ»»¯µÄ·¨·½Ïò
-          t1x=B%x(i+1,j,k+1)-B%x(i,j,k); t1y=B%y(i+1,j,k+1)-B%y(i,j,k) ; t1z=B%z(i+1,j,k+1)-B%z(i,j,k)  ! ¶Ô½ÇÏß1
-          t10=1.d0/(sqrt(t1x*t1x+t1y*t1y+t1z*t1z))  
-          s2x=t1x*t10; s2y=t1y*t10; s2z=t1z*t10     ! ¹éÒ»»¯µÄÇĞ·½Ïò1 £¨¶Ô½ÇÏß1£©
-          s3x=s1y*s2z-s1z*s2y; s3y=s1z*s2x-s1x*s2z ; s3z= s1x*s2y-s1y*s2x   ! ÇĞ·½Ïò2 £¨·¨·½Ïò²æ³ËÇĞ·½Ïò1: s1*s2£©
+    s1x = B%nj1(i, j, k); s1y = B%nj2(i, j, k); s1z = B%nj3(i, j, k)  ! å½’ä¸€åŒ–çš„æ³•æ–¹å‘
+    t1x = B%x(i+1, j, k+1)-B%x(i, j, k); t1y = B%y(i+1, j, k+1)-B%y(i, j, k); t1z = B%z(i+1, j, k+1)-B%z(i, j, k)  ! å¯¹è§’çº¿1
+    t10 = 1.d0/(sqrt(t1x*t1x+t1y*t1y+t1z*t1z))
+    s2x = t1x*t10; s2y = t1y*t10; s2z = t1z*t10     ! å½’ä¸€åŒ–çš„åˆ‡æ–¹å‘1 ï¼ˆå¯¹è§’çº¿1ï¼‰
+    s3x = s1y*s2z-s1z*s2y; s3y = s1z*s2x-s1x*s2z; s3z = s1x*s2y-s1y*s2x   ! åˆ‡æ–¹å‘2 ï¼ˆæ³•æ–¹å‘å‰ä¹˜åˆ‡æ–¹å‘1: s1*s2ï¼‰
 !--------------------------------------------------------------------------------------------
-! ÄÚµã£¬²ÉÓÃ2,3½×¸ñÊ½ÖØ¹¹  (I,J-1/2,K) µãµÄÖµ£»
-          if(Reconstruction .eq. Reconst_Original) then
-! Ê¹ÓÃÔ­Ê¼±äÁ¿ÖØ¹¹ U0(:,:) ´æ´¢µÄÊÇ4¸öµãÉÏµÄÃÜ¶È¡¢ËÙ¶È¡¢Ñ¹Á¦
-             U0(:,1)=d(i,j-LAP:j+LAP-1,k)
-			 U0(:,2)=uu(i,j-LAP:j+LAP-1,k) 
-			 U0(:,3)=v(i,j-LAP:j+LAP-1,k)
-			 U0(:,4)=w(i,j-LAP:j+LAP-1,k)
-			 U0(:,5)=p(i,j-LAP:j+LAP-1,k)
-            call Reconstuction_original(U0,UL,UR,gamma,Scheme)          ! ÊıÖµ¸ñÊ½
-          else if (Reconstruction .eq. Reconst_Conservative) then
-! Ê¹ÓÃÊØºã±äÁ¿ÖØ¹¹ U0(:,:) ´æ´¢µÄÊÇ4¸öµãÉÏµÄÊØºã±äÁ¿£¨ÖÊÁ¿ÃÜ¶È¡¢¶¯Á¿ÃÜ¶ÈºÍÄÜÁ¿ÃÜ¶È£©
-            do m=1,5
-              U0(:,m)=B%U(m,i,j-LAP:j+LAP-1,k)
-            enddo
-            call Reconstuction_conservative(U0,UL,UR,gamma,Scheme)
-          else
-! ²ÉÓÃÌØÕ÷±äÁ¿ÖØ¹¹
-            do m=1,5
-              U0(:,m)=B%U(m,i,j-LAP:j+LAP-1,k)
-            enddo
-            call Reconstuction_Characteristic(U0,UL,UR,gamma,Scheme)
-          endif
-!-------ÖØ¹¹½áÊø£¬µÃµ½(I,J-1/2,K)µãÉÏµÄ×ó¡¢ÓÒÖµUL,UR  £¨Ô­Ê¼±äÁ¿£ºÃÜ¶È¡¢ËÙ¶È¡¢Ñ¹Á¦£©------------
+! å†…ç‚¹ï¼Œé‡‡ç”¨2,3é˜¶æ ¼å¼é‡æ„  (I,J-1/2,K) ç‚¹çš„å€¼ï¼›
+    if (Reconstruction .eq. Reconst_Original) then
+! ä½¿ç”¨åŸå§‹å˜é‡é‡æ„ U0(:,:) å­˜å‚¨çš„æ˜¯4ä¸ªç‚¹ä¸Šçš„å¯†åº¦ã€é€Ÿåº¦ã€å‹åŠ›
+      U0(:, 1) = d(i, j-LAP:j+LAP-1, k)
+      U0(:, 2) = uu(i, j-LAP:j+LAP-1, k)
+      U0(:, 3) = v(i, j-LAP:j+LAP-1, k)
+      U0(:, 4) = w(i, j-LAP:j+LAP-1, k)
+      U0(:, 5) = p(i, j-LAP:j+LAP-1, k)
+      call Reconstuction_original(U0, UL, UR, gamma, Scheme)          ! æ•°å€¼æ ¼å¼
+    else if (Reconstruction .eq. Reconst_Conservative) then
+! ä½¿ç”¨å®ˆæ’å˜é‡é‡æ„ U0(:,:) å­˜å‚¨çš„æ˜¯4ä¸ªç‚¹ä¸Šçš„å®ˆæ’å˜é‡ï¼ˆè´¨é‡å¯†åº¦ã€åŠ¨é‡å¯†åº¦å’Œèƒ½é‡å¯†åº¦ï¼‰
+      do m = 1, 5
+        U0(:, m) = B%U(m, i, j-LAP:j+LAP-1, k)
+      end do
+      call Reconstuction_conservative(U0, UL, UR, gamma, Scheme)
+    else
+! é‡‡ç”¨ç‰¹å¾å˜é‡é‡æ„
+      do m = 1, 5
+        U0(:, m) = B%U(m, i, j-LAP:j+LAP-1, k)
+      end do
+      call Reconstuction_Characteristic(U0, UL, UR, gamma, Scheme)
+    end if
+!-------é‡æ„ç»“æŸï¼Œå¾—åˆ°(I,J-1/2,K)ç‚¹ä¸Šçš„å·¦ã€å³å€¼UL,UR  ï¼ˆåŸå§‹å˜é‡ï¼šå¯†åº¦ã€é€Ÿåº¦ã€å‹åŠ›ï¼‰------------
 
-!----¼ì²é UL, UR ÖĞµÄÃÜ¶È¡¢Ñ¹Á¦ÊÇ·ñÎª¸º -------------------------
-! Èç¹ûÎª¸º£¬ÔòÊ¹ÓÃ1½×Ó­·ç        
-	  if(IF_Scheme_Positivity == 1) then
-		if(UL(1) .le. Lim_Zero  .or. UL(5) .le. Lim_Zero) then      ! Lim_Zero=1.d-20 
-          UL(1)=d(i,j-1,k)            ! 1½×Ó­·ç
-		  UL(2)=uu(i,j-1,k)
-		  UL(3)=v(i,j-1,k)
-		  UL(4)=w(i,j-1,k)
-		  UL(5)=p(i,j-1,k)
-		endif
+!----æ£€æŸ¥ UL, UR ä¸­çš„å¯†åº¦ã€å‹åŠ›æ˜¯å¦ä¸ºè´Ÿ -------------------------
+! å¦‚æœä¸ºè´Ÿï¼Œåˆ™ä½¿ç”¨1é˜¶è¿é£
+    if (IF_Scheme_Positivity == 1) then
+    if (UL(1) .le. Lim_Zero .or. UL(5) .le. Lim_Zero) then      ! Lim_Zero=1.d-20
+      UL(1) = d(i, j-1, k)            ! 1é˜¶è¿é£
+      UL(2) = uu(i, j-1, k)
+      UL(3) = v(i, j-1, k)
+      UL(4) = w(i, j-1, k)
+      UL(5) = p(i, j-1, k)
+    end if
 
-       if(UR(1) .le. Lim_Zero .or. UR(5) .le. Lim_Zero) then
-          UR(1)=d(i,j,k)         ! 1½×Ó­·ç
-		  UR(2)=uu(i,j,k)
-		  UR(3)=v(i,j,k)
-		  UR(4)=w(i,j,k)
-		  UR(5)=p(i,j,k)
-       endif
-     endif
+    if (UR(1) .le. Lim_Zero .or. UR(5) .le. Lim_Zero) then
+      UR(1) = d(i, j, k)         ! 1é˜¶è¿é£
+      UR(2) = uu(i, j, k)
+      UR(3) = v(i, j, k)
+      UR(4) = w(i, j, k)
+      UR(5) = p(i, j, k)
+    end if
+    end if
 
-
-
-
-
-
-!-----½«UL,UR½øĞĞ×ø±êĞı×ª±ä»»£¬µÃµ½×ø±êÏµ(s1,s2,s3) (·¨·½Ïò£¬ÇĞ·½Ïò1£¬ÇĞ·½Ïò2) ÖĞµÄÊØºã±äÁ¿QL,QR
-!  ×óÖµ
-          QL(1)=UL(1)                           ! ÃÜ¶È£¨±êÁ¿£¬×ø±êĞı×ª±£³Ö²»±ä£©
-          QL(2)=UL(2)*s1x+UL(3)*s1y+UL(4)*s1z   ! ·¨·½ÏòµÄËÙ¶È·ÖÁ¿  £¨Í¶Ó°µ½·¨·½Ïò£©
-          QL(3)=UL(2)*s2x+UL(3)*s2y+UL(4)*s2z   ! ÇĞ·½Ïò1µÄËÙ¶È·ÖÁ¿
-          QL(4)=UL(2)*s3x+UL(3)*s3y+UL(4)*s3z   ! ÇĞ·½Ïò2µÄËÙ¶È·ÖÁ¿
-          QL(5)=UL(5)                           ! Ñ¹Á¦£¨±êÁ¿£© 
-! ÓÒÖµ £¨¸÷±äÁ¿º¬ÒåÍ¬ÉÏ£©
-          QR(1)=UR(1)                           
-          QR(2)=UR(2)*s1x+UR(3)*s1y+UR(4)*s1z   
-          QR(3)=UR(2)*s2x+UR(3)*s2y+UR(4)*s2z   
-          QR(4)=UR(2)*s3x+UR(3)*s3y+UR(4)*s3z   
-          QR(5)=UR(5)                          
-!---------Í¨Á¿·ÖÁÑ (FVS»òFDS), ¸ù¾İ×ó¡¢ÓÒÖµ¼ÆËã´©¹ı½çÃæµÄÍ¨Á¿(À©Õ¹1Î¬ÎÊÌâ£©-------------
-          if(IFlux .eq. Flux_Steger_Warming ) then
-            call Flux_steger_warming_1Da(QL,QR,Flux0,gamma)     ! Steger-Warming FVS·½·¨ 
-          else  if(IFlux .eq. Flux_Roe ) then
-            call Flux_Roe_1D(QL,QR,Flux0,gamma)                 ! Roe FDS·½·¨
-          else  if(IFlux .eq. Flux_Van_Leer ) then
-            call Flux_Van_Leer_1Da(QL,QR,Flux0,gamma)           ! Van Leer FVS·½·¨
-          else  if(IFlux .eq. Flux_Ausm ) then
-            call Flux_Ausmpw_1Da(QL,QR,Flux0,gamma)   
-          else 
-            call Flux_HLL_HLLC_1D(QL,QR,Flux0,gamma,IFlux)      !HLL/HLLC FDS·½·¨£¨½üËÆRiemann½â£©
-          endif
-! ---½«(s1,s2,s3)×ø±êÏµÏÂµÄÍ¨Á¿Flux0 ½øĞĞ±ä»»£¬µÃµ½(x,y,z)×ø±êÏµÏÂµÄÍ¨Á¿£» ±êÁ¿±£³Ö²»±ä£¬ÏòÁ¿½øĞĞÍ¶Ó°	  
-          Flux(1,i,j,k)=-Flux0(1)*B%Sj(i,j,k)                                  ! ÖÊÁ¿Í¨Á¿ £¨±êÁ¿£¬²»Ëæ×ø±êĞı×ª¶ø±ä»¯£©
-          Flux(2,i,j,k)=-(Flux0(2)*s1x+Flux0(3)*s2x+Flux0(4)*s3x)*B%Sj(i,j,k)  ! x·½ÏòµÄ¶¯Á¿Í¨Á¿  £¨Í¶Ó°µ½x·½Ïò£©
-          Flux(3,i,j,k)=-(Flux0(2)*s1y+Flux0(3)*s2y+Flux0(4)*s3y)*B%Sj(i,j,k)  ! y·½ÏòµÄ¶¯Á¿Í¨Á¿
-          Flux(4,i,j,k)=-(Flux0(2)*s1z+Flux0(3)*s2z+Flux0(4)*s3z)*B%Sj(i,j,k)  ! z·½ÏòµÄ¶¯Á¿Í¨Á¿
-          Flux(5,i,j,k)=-Flux0(5)*B%Sj(i,j,k)                                  ! ÄÜÁ¿Í¨Á¿ £¨±êÁ¿£© 
-        enddo
-      enddo
-    enddo
-!$OMP END DO   
+!-----å°†UL,URè¿›è¡Œåæ ‡æ—‹è½¬å˜æ¢ï¼Œå¾—åˆ°åæ ‡ç³»(s1,s2,s3) (æ³•æ–¹å‘ï¼Œåˆ‡æ–¹å‘1ï¼Œåˆ‡æ–¹å‘2) ä¸­çš„å®ˆæ’å˜é‡QL,QR
+!  å·¦å€¼
+    QL(1) = UL(1)                           ! å¯†åº¦ï¼ˆæ ‡é‡ï¼Œåæ ‡æ—‹è½¬ä¿æŒä¸å˜ï¼‰
+    QL(2) = UL(2)*s1x+UL(3)*s1y+UL(4)*s1z   ! æ³•æ–¹å‘çš„é€Ÿåº¦åˆ†é‡  ï¼ˆæŠ•å½±åˆ°æ³•æ–¹å‘ï¼‰
+    QL(3) = UL(2)*s2x+UL(3)*s2y+UL(4)*s2z   ! åˆ‡æ–¹å‘1çš„é€Ÿåº¦åˆ†é‡
+    QL(4) = UL(2)*s3x+UL(3)*s3y+UL(4)*s3z   ! åˆ‡æ–¹å‘2çš„é€Ÿåº¦åˆ†é‡
+    QL(5) = UL(5)                           ! å‹åŠ›ï¼ˆæ ‡é‡ï¼‰
+! å³å€¼ ï¼ˆå„å˜é‡å«ä¹‰åŒä¸Šï¼‰
+    QR(1) = UR(1)
+    QR(2) = UR(2)*s1x+UR(3)*s1y+UR(4)*s1z
+    QR(3) = UR(2)*s2x+UR(3)*s2y+UR(4)*s2z
+    QR(4) = UR(2)*s3x+UR(3)*s3y+UR(4)*s3z
+    QR(5) = UR(5)
+!---------é€šé‡åˆ†è£‚ (FVSæˆ–FDS), æ ¹æ®å·¦ã€å³å€¼è®¡ç®—ç©¿è¿‡ç•Œé¢çš„é€šé‡(æ‰©å±•1ç»´é—®é¢˜ï¼‰-------------
+    if (IFlux .eq. Flux_Steger_Warming) then
+      call Flux_steger_warming_1Da(QL, QR, Flux0, gamma)     ! Steger-Warming FVSæ–¹æ³•
+    else if (IFlux .eq. Flux_Roe) then
+      call Flux_Roe_1D(QL, QR, Flux0, gamma)                 ! Roe FDSæ–¹æ³•
+    else if (IFlux .eq. Flux_Van_Leer) then
+      call Flux_Van_Leer_1Da(QL, QR, Flux0, gamma)           ! Van Leer FVSæ–¹æ³•
+    else if (IFlux .eq. Flux_Ausm) then
+      call Flux_Ausmpw_1Da(QL, QR, Flux0, gamma)
+    else
+      call Flux_HLL_HLLC_1D(QL, QR, Flux0, gamma, IFlux)      !HLL/HLLC FDSæ–¹æ³•ï¼ˆè¿‘ä¼¼Riemannè§£ï¼‰
+    end if
+! ---å°†(s1,s2,s3)åæ ‡ç³»ä¸‹çš„é€šé‡Flux0 è¿›è¡Œå˜æ¢ï¼Œå¾—åˆ°(x,y,z)åæ ‡ç³»ä¸‹çš„é€šé‡ï¼› æ ‡é‡ä¿æŒä¸å˜ï¼Œå‘é‡è¿›è¡ŒæŠ•å½±
+    Flux(1, i, j, k) = -Flux0(1)*B%Sj(i, j, k)                                  ! è´¨é‡é€šé‡ ï¼ˆæ ‡é‡ï¼Œä¸éšåæ ‡æ—‹è½¬è€Œå˜åŒ–ï¼‰
+    Flux(2, i, j, k) = -(Flux0(2)*s1x+Flux0(3)*s2x+Flux0(4)*s3x)*B%Sj(i, j, k)  ! xæ–¹å‘çš„åŠ¨é‡é€šé‡  ï¼ˆæŠ•å½±åˆ°xæ–¹å‘ï¼‰
+    Flux(3, i, j, k) = -(Flux0(2)*s1y+Flux0(3)*s2y+Flux0(4)*s3y)*B%Sj(i, j, k)  ! yæ–¹å‘çš„åŠ¨é‡é€šé‡
+    Flux(4, i, j, k) = -(Flux0(2)*s1z+Flux0(3)*s2z+Flux0(4)*s3z)*B%Sj(i, j, k)  ! zæ–¹å‘çš„åŠ¨é‡é€šé‡
+    Flux(5, i, j, k) = -Flux0(5)*B%Sj(i, j, k)                                  ! èƒ½é‡é€šé‡ ï¼ˆæ ‡é‡ï¼‰
+  end do
+  end do
+  end do
+!$OMP END DO
 
 !----------------Residual -------------------------------
-!$OMP DO   
-    do k=1,nz1-1
-      do j=1,ny1-1
-        do i=1,nx1-1
-          do m=1,5
-            B%Res(m,i,j,k)=B%Res(m,i,j,k)+Flux(m,i,j+1,k)-Flux(m,i,j,k)           
-          enddo
-        enddo
-      enddo
-    enddo
-!$OMP END DO  
+!$OMP DO
+  do k = 1, nz1-1
+  do j = 1, ny1-1
+  do i = 1, nx1-1
+  do m = 1, 5
+    B%Res(m, i, j, k) = B%Res(m, i, j, k)+Flux(m, i, j+1, k)-Flux(m, i, j, k)
+  end do
+  end do
+  end do
+  end do
+!$OMP END DO
 !$OMP END PARALLEL
- 
-   end subroutine flux_inviscous_j
+
+end subroutine flux_inviscous_j
 !--------------------------------------------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------------------------------------------
-! ´©¹ık·½Ïò½çÃæ((I,J,K-1/2)µãËùÔÚ½çÃæ)µÄÎŞÕ³Í¨Á¿ 
-   subroutine flux_inviscous_k(nMesh,mBlock)
-    Use Global_Var
-    Use Flow_Var
-    implicit none
-    real(PRE_EC),dimension(5):: UL,UR,QL,QR,Flux0
-    real(PRE_EC):: U0(1-LAP:LAP,5)
-    integer:: mBlock,i,j,k,m,nx1,ny1,nz1,ksub,nMesh
-    integer:: Scheme,IFlux,Reconstruction
-    real(PRE_EC):: s1x,s1y,s1z,s2x,s2y,s2z,s3x,s3y,s3z,s0,t10,t1x,t1y,t1z  ! ·¨·½Ïò(s1)¼°ÇĞ·½Ïò(s2,s3)
-    real(PRE_EC):: d0,uu0,v0,w0,p0,E0,un
-    Type (Block_TYPE),pointer:: B
-    TYPE (Mesh_TYPE),pointer:: MP
-    Type (BC_MSG_TYPE),pointer:: Bc
-    MP=> Mesh(nMesh)
-    B => MP%Block(mBlock)
-    Scheme=MP%Iflag_Scheme                  ! ÊıÖµ¸ñÊ½ £¨²»Í¬Íø¸ñÉÏ²ÉÓÃ²»Í¬¸ñÊ½£©
-    IFlux=MP%Iflag_Flux                     ! Í¨Á¿¼¼Êõ
-    Reconstruction=MP%IFlag_Reconstruction  ! ÖØ¹¹·½Ê½
-    nx1=B%nx ; ny1=B%ny ; nz1=B%nz
-    
-	Flux=0.d0                               ! ³õÊ¼»¯
+! ç©¿è¿‡kæ–¹å‘ç•Œé¢((I,J,K-1/2)ç‚¹æ‰€åœ¨ç•Œé¢)çš„æ— ç²˜é€šé‡
+subroutine flux_inviscous_k(nMesh, mBlock)
+  Use Global_Var
+  Use Flow_Var
+  implicit none
+  real(PRE_EC), dimension(5):: UL, UR, QL, QR, Flux0
+  real(PRE_EC):: U0(1-LAP:LAP, 5)
+  integer:: mBlock, i, j, k, m, nx1, ny1, nz1, ksub, nMesh
+  integer:: Scheme, IFlux, Reconstruction
+  real(PRE_EC):: s1x, s1y, s1z, s2x, s2y, s2z, s3x, s3y, s3z, s0, t10, t1x, t1y, t1z  ! æ³•æ–¹å‘(s1)åŠåˆ‡æ–¹å‘(s2,s3)
+  real(PRE_EC):: d0, uu0, v0, w0, p0, E0, un
+  Type(Block_TYPE), pointer:: B
+  TYPE(Mesh_TYPE), pointer:: MP
+  Type(BC_MSG_TYPE), pointer:: Bc
+  MP => Mesh(nMesh)
+  B => MP%Block(mBlock)
+  Scheme = MP%Iflag_Scheme                  ! æ•°å€¼æ ¼å¼ ï¼ˆä¸åŒç½‘æ ¼ä¸Šé‡‡ç”¨ä¸åŒæ ¼å¼ï¼‰
+  IFlux = MP%Iflag_Flux                     ! é€šé‡æŠ€æœ¯
+  Reconstruction = MP%IFlag_Reconstruction  ! é‡æ„æ–¹å¼
+  nx1 = B%nx; ny1 = B%ny; nz1 = B%nz
+
+  Flux = 0.d0                               ! åˆå§‹åŒ–
 
 !$OMP PARALLEL DEFAULT(FIRSTPRIVATE) SHARED(MP,B,IFlux,Reconstruction,nx1,ny1,nz1,gamma,Flux,d,uu,v,w,p)
 
-!$OMP  DO  
-    do k=1,nz1 
-      do j=1,ny1-1
-        do i=1,nx1-1
+!$OMP  DO
+  do k = 1, nz1
+  do j = 1, ny1-1
+  do i = 1, nx1-1
 
- !      Éè¶¨±ß½ç¸ñÊ½ (Çø·ÖÄÚµã¸ñÊ½¼°±ß½çµã¸ñÊ½)
+!      è®¾å®šè¾¹ç•Œæ ¼å¼ (åŒºåˆ†å†…ç‚¹æ ¼å¼åŠè¾¹ç•Œç‚¹æ ¼å¼)
 
-		   Scheme=MP%Iflag_Scheme
-		   if(B%BcK(i,j,1)==1) then            ! ÊÇ·ñÎªÎïÀí±ß½ç
-              if(k .eq. 1) then
- 			   Scheme=Scheme_CD2    ! µÚ1¸ö½çÃæ²ÉÓÃ2½×ÖĞĞÄ¸ñÊ½ £¨ÀûÓÃĞéÍø¸ñ£¬±£³ÖÍ¨Á¿ÊØºã£©  
-			  else if( k < LAP ) then                  ! ¿¿½ü×ó±ß½ç
-               Scheme=MP%Bound_Scheme            ! ±ß½ç¸ñÊ½
-			  endif
-           endif
-	
-		   if(B%BcK(i,j,2)==1) then
-             if(k .eq. nz1) then
-			   Scheme=Scheme_CD2    ! µÚ1¸ö½çÃæ²ÉÓÃ2½×ÖĞĞÄ¸ñÊ½ £¨ÀûÓÃĞéÍø¸ñ£¬±£³ÖÍ¨Á¿ÊØºã£©  
-		     else if( k > nz1-LAP+1 ) then      ! ¿¿½üÓÒ±ß½ç
-               Scheme=MP%Bound_Scheme            ! ±ß½ç¸ñÊ½
-			 endif
-           endif
-           
-		   if(B%IF_OverLimit == 1)  Scheme=Scheme_UD1            ! ÎïÀíÁ¿³¬ÏŞ£¨Èç³öÏÖ¸ºÎÂ¶È£©£¬ ¸Ã¿é²ÉÓÃ1½×Ó­·ç
+    Scheme = MP%Iflag_Scheme
+    if (B%BcK(i, j, 1) == 1) then            ! æ˜¯å¦ä¸ºç‰©ç†è¾¹ç•Œ
+    if (k .eq. 1) then
+      Scheme = Scheme_CD2    ! ç¬¬1ä¸ªç•Œé¢é‡‡ç”¨2é˜¶ä¸­å¿ƒæ ¼å¼ ï¼ˆåˆ©ç”¨è™šç½‘æ ¼ï¼Œä¿æŒé€šé‡å®ˆæ’ï¼‰
+    else if (k < LAP) then                  ! é è¿‘å·¦è¾¹ç•Œ
+      Scheme = MP%Bound_Scheme            ! è¾¹ç•Œæ ¼å¼
+    end if
+    end if
 
+    if (B%BcK(i, j, 2) == 1) then
+    if (k .eq. nz1) then
+      Scheme = Scheme_CD2    ! ç¬¬1ä¸ªç•Œé¢é‡‡ç”¨2é˜¶ä¸­å¿ƒæ ¼å¼ ï¼ˆåˆ©ç”¨è™šç½‘æ ¼ï¼Œä¿æŒé€šé‡å®ˆæ’ï¼‰
+    else if (k > nz1-LAP+1) then      ! é è¿‘å³è¾¹ç•Œ
+      Scheme = MP%Bound_Scheme            ! è¾¹ç•Œæ ¼å¼
+    end if
+    end if
 
-          s1x=B%nk1(i,j,k); s1y=B%nk2(i,j,k) ; s1z= B%nk3(i,j,k)  ! ¹éÒ»»¯µÄ·¨·½Ïò
-          t1x=B%x(i+1,j+1,k)-B%x(i,j,k); t1y=B%y(i+1,j+1,k)-B%y(i,j,k) ; t1z=B%z(i+1,j+1,k)-B%z(i,j,k)  ! ¶Ô½ÇÏß1
-          t10=1.d0/(sqrt(t1x*t1x+t1y*t1y+t1z*t1z))  
-          s2x=t1x*t10; s2y=t1y*t10; s2z=t1z*t10     ! ¹éÒ»»¯µÄÇĞ·½Ïò1 £¨¶Ô½ÇÏß1£©
-          s3x=s1y*s2z-s1z*s2y; s3y=s1z*s2x-s1x*s2z ; s3z= s1x*s2y-s1y*s2x   ! ÇĞ·½Ïò2 £¨·¨·½Ïò²æ³ËÇĞ·½Ïò1: s1*s2£©
+    if (B%IF_OverLimit == 1) Scheme = Scheme_UD1            ! ç‰©ç†é‡è¶…é™ï¼ˆå¦‚å‡ºç°è´Ÿæ¸©åº¦ï¼‰ï¼Œ è¯¥å—é‡‡ç”¨1é˜¶è¿é£
+
+    s1x = B%nk1(i, j, k); s1y = B%nk2(i, j, k); s1z = B%nk3(i, j, k)  ! å½’ä¸€åŒ–çš„æ³•æ–¹å‘
+    t1x = B%x(i+1, j+1, k)-B%x(i, j, k); t1y = B%y(i+1, j+1, k)-B%y(i, j, k); t1z = B%z(i+1, j+1, k)-B%z(i, j, k)  ! å¯¹è§’çº¿1
+    t10 = 1.d0/(sqrt(t1x*t1x+t1y*t1y+t1z*t1z))
+    s2x = t1x*t10; s2y = t1y*t10; s2z = t1z*t10     ! å½’ä¸€åŒ–çš„åˆ‡æ–¹å‘1 ï¼ˆå¯¹è§’çº¿1ï¼‰
+    s3x = s1y*s2z-s1z*s2y; s3y = s1z*s2x-s1x*s2z; s3z = s1x*s2y-s1y*s2x   ! åˆ‡æ–¹å‘2 ï¼ˆæ³•æ–¹å‘å‰ä¹˜åˆ‡æ–¹å‘1: s1*s2ï¼‰
 !--------------------------------------------------------------------------------------------
-! ÄÚµã£¬²ÉÓÃ2,3½×¸ñÊ½ÖØ¹¹  (I,J-1/2,K) µãµÄÖµ£»
-          if(Reconstruction .eq. Reconst_Original) then
-! Ê¹ÓÃÔ­Ê¼±äÁ¿ÖØ¹¹ U0(:,:) ´æ´¢µÄÊÇ4¸öµãÉÏµÄÃÜ¶È¡¢ËÙ¶È¡¢Ñ¹Á¦
-              U0(:,1)=d(i,j,k-LAP:k+LAP-1) 
-			  U0(:,2)=uu(i,j,k-LAP:k+LAP-1) 
-			  U0(:,3)=v(i,j,k-LAP:k+LAP-1)
-			  U0(:,4)=w(i,j,k-LAP:k+LAP-1)
-			  U0(:,5)=p(i,j,k-LAP:k+LAP-1)
-            call Reconstuction_original(U0,UL,UR,gamma,Scheme)          ! ÊıÖµ¸ñÊ½
-          else if (Reconstruction .eq. Reconst_Conservative) then
-! Ê¹ÓÃÊØºã±äÁ¿ÖØ¹¹ U0(:,:) ´æ´¢µÄÊÇ4¸öµãÉÏµÄÊØºã±äÁ¿£¨ÖÊÁ¿ÃÜ¶È¡¢¶¯Á¿ÃÜ¶ÈºÍÄÜÁ¿ÃÜ¶È£©
-            do m=1,5
-              U0(:,m)=B%U(m,i,j,k-LAP:k+LAP-1)
-            enddo
-            call Reconstuction_conservative(U0,UL,UR,gamma,Scheme)
-          else
-! ²ÉÓÃÌØÕ÷±äÁ¿ÖØ¹¹
-            do m=1,5
-              U0(:,m)=B%U(m,i,j,k-LAP:k+LAP-1)
-            enddo
-            call Reconstuction_Characteristic(U0,UL,UR,gamma,Scheme)
-          endif  
-!-------ÖØ¹¹½áÊø£¬µÃµ½(I,J-1/2,K)µãÉÏµÄ×ó¡¢ÓÒÖµUL,UR  £¨Ô­Ê¼±äÁ¿£ºÃÜ¶È¡¢ËÙ¶È¡¢Ñ¹Á¦£©------------
+! å†…ç‚¹ï¼Œé‡‡ç”¨2,3é˜¶æ ¼å¼é‡æ„  (I,J-1/2,K) ç‚¹çš„å€¼ï¼›
+    if (Reconstruction .eq. Reconst_Original) then
+! ä½¿ç”¨åŸå§‹å˜é‡é‡æ„ U0(:,:) å­˜å‚¨çš„æ˜¯4ä¸ªç‚¹ä¸Šçš„å¯†åº¦ã€é€Ÿåº¦ã€å‹åŠ›
+      U0(:, 1) = d(i, j, k-LAP:k+LAP-1)
+      U0(:, 2) = uu(i, j, k-LAP:k+LAP-1)
+      U0(:, 3) = v(i, j, k-LAP:k+LAP-1)
+      U0(:, 4) = w(i, j, k-LAP:k+LAP-1)
+      U0(:, 5) = p(i, j, k-LAP:k+LAP-1)
+      call Reconstuction_original(U0, UL, UR, gamma, Scheme)          ! æ•°å€¼æ ¼å¼
+    else if (Reconstruction .eq. Reconst_Conservative) then
+! ä½¿ç”¨å®ˆæ’å˜é‡é‡æ„ U0(:,:) å­˜å‚¨çš„æ˜¯4ä¸ªç‚¹ä¸Šçš„å®ˆæ’å˜é‡ï¼ˆè´¨é‡å¯†åº¦ã€åŠ¨é‡å¯†åº¦å’Œèƒ½é‡å¯†åº¦ï¼‰
+      do m = 1, 5
+        U0(:, m) = B%U(m, i, j, k-LAP:k+LAP-1)
+      end do
+      call Reconstuction_conservative(U0, UL, UR, gamma, Scheme)
+    else
+! é‡‡ç”¨ç‰¹å¾å˜é‡é‡æ„
+      do m = 1, 5
+        U0(:, m) = B%U(m, i, j, k-LAP:k+LAP-1)
+      end do
+      call Reconstuction_Characteristic(U0, UL, UR, gamma, Scheme)
+    end if
+!-------é‡æ„ç»“æŸï¼Œå¾—åˆ°(I,J-1/2,K)ç‚¹ä¸Šçš„å·¦ã€å³å€¼UL,UR  ï¼ˆåŸå§‹å˜é‡ï¼šå¯†åº¦ã€é€Ÿåº¦ã€å‹åŠ›ï¼‰------------
 
-!----¼ì²é UL, UR ÖĞµÄÃÜ¶È¡¢Ñ¹Á¦ÊÇ·ñÎª¸º -------------------------
-! Èç¹ûÎª¸º£¬ÔòÊ¹ÓÃ1½×Ó­·ç        
-	  if(IF_Scheme_Positivity == 1) then
-		if(UL(1) .le. Lim_Zero  .or. UL(5) .le. Lim_Zero) then      ! Lim_Zero=1.d-20 
-          UL(1)=d(i,j,k-1)            ! 1½×Ó­·ç
-		  UL(2)=uu(i,j,k-1)
-		  UL(3)=v(i,j,k-1)
-		  UL(4)=w(i,j,k-1)
-		  UL(5)=p(i,j,k-1)
-		endif
+!----æ£€æŸ¥ UL, UR ä¸­çš„å¯†åº¦ã€å‹åŠ›æ˜¯å¦ä¸ºè´Ÿ -------------------------
+! å¦‚æœä¸ºè´Ÿï¼Œåˆ™ä½¿ç”¨1é˜¶è¿é£
+    if (IF_Scheme_Positivity == 1) then
+    if (UL(1) .le. Lim_Zero .or. UL(5) .le. Lim_Zero) then      ! Lim_Zero=1.d-20
+      UL(1) = d(i, j, k-1)            ! 1é˜¶è¿é£
+      UL(2) = uu(i, j, k-1)
+      UL(3) = v(i, j, k-1)
+      UL(4) = w(i, j, k-1)
+      UL(5) = p(i, j, k-1)
+    end if
 
-       if(UR(1) .le. Lim_Zero .or. UR(5) .le. Lim_Zero) then
-          UR(1)=d(i,j,k)         ! 1½×Ó­·ç
-		  UR(2)=uu(i,j,k)
-		  UR(3)=v(i,j,k)
-		  UR(4)=w(i,j,k)
-		  UR(5)=p(i,j,k)
-       endif
-     endif
+    if (UR(1) .le. Lim_Zero .or. UR(5) .le. Lim_Zero) then
+      UR(1) = d(i, j, k)         ! 1é˜¶è¿é£
+      UR(2) = uu(i, j, k)
+      UR(3) = v(i, j, k)
+      UR(4) = w(i, j, k)
+      UR(5) = p(i, j, k)
+    end if
+    end if
 
+!-----å°†UL,URè¿›è¡Œåæ ‡æ—‹è½¬å˜æ¢ï¼Œå¾—åˆ°åæ ‡ç³»(s1,s2,s3) (æ³•æ–¹å‘ï¼Œåˆ‡æ–¹å‘1ï¼Œåˆ‡æ–¹å‘2) ä¸­çš„å®ˆæ’å˜é‡QL,QR
+!  å·¦å€¼
+    QL(1) = UL(1)                           ! å¯†åº¦ï¼ˆæ ‡é‡ï¼Œåæ ‡æ—‹è½¬ä¿æŒä¸å˜ï¼‰
+    QL(2) = UL(2)*s1x+UL(3)*s1y+UL(4)*s1z   ! æ³•æ–¹å‘çš„é€Ÿåº¦åˆ†é‡  ï¼ˆæŠ•å½±åˆ°æ³•æ–¹å‘ï¼‰
+    QL(3) = UL(2)*s2x+UL(3)*s2y+UL(4)*s2z   ! åˆ‡æ–¹å‘1çš„é€Ÿåº¦åˆ†é‡
+    QL(4) = UL(2)*s3x+UL(3)*s3y+UL(4)*s3z   ! åˆ‡æ–¹å‘2çš„é€Ÿåº¦åˆ†é‡
+    QL(5) = UL(5)                           ! å‹åŠ›ï¼ˆæ ‡é‡ï¼‰
+! å³å€¼ ï¼ˆå„å˜é‡å«ä¹‰åŒä¸Šï¼‰
+    QR(1) = UR(1)
+    QR(2) = UR(2)*s1x+UR(3)*s1y+UR(4)*s1z
+    QR(3) = UR(2)*s2x+UR(3)*s2y+UR(4)*s2z
+    QR(4) = UR(2)*s3x+UR(3)*s3y+UR(4)*s3z
+    QR(5) = UR(5)
+!---------é€šé‡åˆ†è£‚ (FVSæˆ–FDS), æ ¹æ®å·¦ã€å³å€¼è®¡ç®—ç©¿è¿‡ç•Œé¢çš„é€šé‡(æ‰©å±•1ç»´é—®é¢˜ï¼‰-------------
+    if (IFlux .eq. Flux_Steger_Warming) then
+      call Flux_steger_warming_1Da(QL, QR, Flux0, gamma)     ! Steger-Warming FVSæ–¹æ³•
+    else if (IFlux .eq. Flux_Roe) then
+      call Flux_Roe_1D(QL, QR, Flux0, gamma)                ! Roe FDSæ–¹æ³•
+    else if (IFlux .eq. Flux_Van_Leer) then
+      call Flux_Van_Leer_1Da(QL, QR, Flux0, gamma)          ! Van Leer FVSæ–¹æ³•
+    else if (IFlux .eq. Flux_Ausm) then
+      call Flux_Ausmpw_1Da(QL, QR, Flux0, gamma)
+    else
+      call Flux_HLL_HLLC_1D(QL, QR, Flux0, gamma, IFlux)    !HLL/HLLC FDSæ–¹æ³•ï¼ˆè¿‘ä¼¼Riemannè§£ï¼‰
+    end if
+! ---å°†(s1,s2,s3)åæ ‡ç³»ä¸‹çš„é€šé‡Flux0 è¿›è¡Œå˜æ¢ï¼Œå¾—åˆ°(x,y,z)åæ ‡ç³»ä¸‹çš„é€šé‡ï¼› æ ‡é‡ä¿æŒä¸å˜ï¼Œå‘é‡è¿›è¡ŒæŠ•å½±
 
-
-!-----½«UL,UR½øĞĞ×ø±êĞı×ª±ä»»£¬µÃµ½×ø±êÏµ(s1,s2,s3) (·¨·½Ïò£¬ÇĞ·½Ïò1£¬ÇĞ·½Ïò2) ÖĞµÄÊØºã±äÁ¿QL,QR
-!  ×óÖµ
-          QL(1)=UL(1)                           ! ÃÜ¶È£¨±êÁ¿£¬×ø±êĞı×ª±£³Ö²»±ä£©
-          QL(2)=UL(2)*s1x+UL(3)*s1y+UL(4)*s1z   ! ·¨·½ÏòµÄËÙ¶È·ÖÁ¿  £¨Í¶Ó°µ½·¨·½Ïò£©
-          QL(3)=UL(2)*s2x+UL(3)*s2y+UL(4)*s2z   ! ÇĞ·½Ïò1µÄËÙ¶È·ÖÁ¿
-          QL(4)=UL(2)*s3x+UL(3)*s3y+UL(4)*s3z   ! ÇĞ·½Ïò2µÄËÙ¶È·ÖÁ¿
-          QL(5)=UL(5)                           ! Ñ¹Á¦£¨±êÁ¿£© 
-! ÓÒÖµ £¨¸÷±äÁ¿º¬ÒåÍ¬ÉÏ£©
-          QR(1)=UR(1)                           
-          QR(2)=UR(2)*s1x+UR(3)*s1y+UR(4)*s1z   
-          QR(3)=UR(2)*s2x+UR(3)*s2y+UR(4)*s2z   
-          QR(4)=UR(2)*s3x+UR(3)*s3y+UR(4)*s3z   
-          QR(5)=UR(5)                          
-!---------Í¨Á¿·ÖÁÑ (FVS»òFDS), ¸ù¾İ×ó¡¢ÓÒÖµ¼ÆËã´©¹ı½çÃæµÄÍ¨Á¿(À©Õ¹1Î¬ÎÊÌâ£©-------------
-          if(IFlux .eq. Flux_Steger_Warming ) then
-            call Flux_steger_warming_1Da(QL,QR,Flux0,gamma)     ! Steger-Warming FVS·½·¨ 
-          else  if(IFlux .eq. Flux_Roe ) then
-            call Flux_Roe_1D(QL,QR,Flux0,gamma)                ! Roe FDS·½·¨
-          else  if(IFlux .eq. Flux_Van_Leer ) then
-            call Flux_Van_Leer_1Da(QL,QR,Flux0,gamma)          ! Van Leer FVS·½·¨
-          else  if(IFlux .eq. Flux_Ausm ) then
-            call Flux_Ausmpw_1Da(QL,QR,Flux0,gamma)   
-          else
-            call Flux_HLL_HLLC_1D(QL,QR,Flux0,gamma,IFlux)    !HLL/HLLC FDS·½·¨£¨½üËÆRiemann½â£©
-          endif
-! ---½«(s1,s2,s3)×ø±êÏµÏÂµÄÍ¨Á¿Flux0 ½øĞĞ±ä»»£¬µÃµ½(x,y,z)×ø±êÏµÏÂµÄÍ¨Á¿£» ±êÁ¿±£³Ö²»±ä£¬ÏòÁ¿½øĞĞÍ¶Ó°
-	  
-          Flux(1,i,j,k)=-Flux0(1)*B%Sk(i,j,k)                                  ! ÖÊÁ¿Í¨Á¿ £¨±êÁ¿£¬²»Ëæ×ø±êĞı×ª¶ø±ä»¯£©
-          Flux(2,i,j,k)=-(Flux0(2)*s1x+Flux0(3)*s2x+Flux0(4)*s3x)*B%Sk(i,j,k)  ! x·½ÏòµÄ¶¯Á¿Í¨Á¿  £¨Í¶Ó°µ½x·½Ïò£©
-          Flux(3,i,j,k)=-(Flux0(2)*s1y+Flux0(3)*s2y+Flux0(4)*s3y)*B%Sk(i,j,k)  ! y·½ÏòµÄ¶¯Á¿Í¨Á¿
-          Flux(4,i,j,k)=-(Flux0(2)*s1z+Flux0(3)*s2z+Flux0(4)*s3z)*B%Sk(i,j,k)  ! z·½ÏòµÄ¶¯Á¿Í¨Á¿
-          Flux(5,i,j,k)=-Flux0(5)*B%Sk(i,j,k)                                  ! ÄÜÁ¿Í¨Á¿ £¨±êÁ¿£©
-        enddo
-      enddo
-    enddo
-!$OMP END DO  
+    Flux(1, i, j, k) = -Flux0(1)*B%Sk(i, j, k)                                  ! è´¨é‡é€šé‡ ï¼ˆæ ‡é‡ï¼Œä¸éšåæ ‡æ—‹è½¬è€Œå˜åŒ–ï¼‰
+    Flux(2, i, j, k) = -(Flux0(2)*s1x+Flux0(3)*s2x+Flux0(4)*s3x)*B%Sk(i, j, k)  ! xæ–¹å‘çš„åŠ¨é‡é€šé‡  ï¼ˆæŠ•å½±åˆ°xæ–¹å‘ï¼‰
+    Flux(3, i, j, k) = -(Flux0(2)*s1y+Flux0(3)*s2y+Flux0(4)*s3y)*B%Sk(i, j, k)  ! yæ–¹å‘çš„åŠ¨é‡é€šé‡
+    Flux(4, i, j, k) = -(Flux0(2)*s1z+Flux0(3)*s2z+Flux0(4)*s3z)*B%Sk(i, j, k)  ! zæ–¹å‘çš„åŠ¨é‡é€šé‡
+    Flux(5, i, j, k) = -Flux0(5)*B%Sk(i, j, k)                                  ! èƒ½é‡é€šé‡ ï¼ˆæ ‡é‡ï¼‰
+  end do
+  end do
+  end do
+!$OMP END DO
 
 !---------------------------------------------------------------
-!  ±ß½ç´¦Àí
-!$OMP  DO  
-    do  ksub=1,B%subface
-      Bc=> B%bc_msg(ksub)
-      if(Bc%bc .gt. 0  .and. (Bc%face .eq. 3 .or. Bc%face .eq. 6)) then   ! ·ÇÄÚ±ß½ç£¬ÇÒÎªk-»òk+±ß½ç
-        k=Bc%kb
-        do j= Bc%jb, Bc%je-1
-          do i= Bc%ib, Bc%ie-1
-            d0=(d(i,j,k)+d(i,j,k-1))*0.5d0 
-            uu0=(uu(i,j,k)+uu(i,j,k-1))*0.5d0 
-            v0=(v(i,j,k)+v(i,j,k-1))*0.5d0 
-            w0=(w(i,j,k)+w(i,j,k-1))*0.5d0
-            p0=(p(i,j,k)+p(i,j,k-1))*0.5d0
-            E0=p0/(gamma-1.d0)+d0*(uu0*uu0+v0*v0+w0*w0)*0.5d0
-            un=uu0*B%nk1(i,j,k)+v0*B%nk2(i,j,k)+w0*B%nk3(i,j,k)          ! ·¨ÏòËÙ¶È       
-            Flux(1,i,j,k)=-d0*un*B%Sk(i,j,k)
-            Flux(2,i,j,k)=-(d0*un*uu0+p0*B%nk1(i,j,k))*B%Sk(i,j,k)
-            Flux(3,i,j,k)=-(d0*un*v0+p0*B%nk2(i,j,k))*B%Sk(i,j,k)
-            Flux(4,i,j,k)=-(d0*un*w0+p0*B%nk3(i,j,k))*B%Sk(i,j,k)
-            Flux(5,i,j,k)=-(E0+p0)*un*B%Sk(i,j,k)
-          enddo
-        enddo
-      endif
-    enddo
-!$OMP END DO  
+!  è¾¹ç•Œå¤„ç†
+!$OMP  DO
+  do ksub = 1, B%subface
+    Bc => B%bc_msg(ksub)
+    if (Bc%bc .gt. 0 .and. (Bc%face .eq. 3 .or. Bc%face .eq. 6)) then   ! éå†…è¾¹ç•Œï¼Œä¸”ä¸ºk-æˆ–k+è¾¹ç•Œ
+      k = Bc%kb
+      do j = Bc%jb, Bc%je-1
+      do i = Bc%ib, Bc%ie-1
+        d0 = (d(i, j, k)+d(i, j, k-1))*0.5d0
+        uu0 = (uu(i, j, k)+uu(i, j, k-1))*0.5d0
+        v0 = (v(i, j, k)+v(i, j, k-1))*0.5d0
+        w0 = (w(i, j, k)+w(i, j, k-1))*0.5d0
+        p0 = (p(i, j, k)+p(i, j, k-1))*0.5d0
+        E0 = p0/(gamma-1.d0)+d0*(uu0*uu0+v0*v0+w0*w0)*0.5d0
+        un = uu0*B%nk1(i, j, k)+v0*B%nk2(i, j, k)+w0*B%nk3(i, j, k)          ! æ³•å‘é€Ÿåº¦
+        Flux(1, i, j, k) = -d0*un*B%Sk(i, j, k)
+        Flux(2, i, j, k) = -(d0*un*uu0+p0*B%nk1(i, j, k))*B%Sk(i, j, k)
+        Flux(3, i, j, k) = -(d0*un*v0+p0*B%nk2(i, j, k))*B%Sk(i, j, k)
+        Flux(4, i, j, k) = -(d0*un*w0+p0*B%nk3(i, j, k))*B%Sk(i, j, k)
+        Flux(5, i, j, k) = -(E0+p0)*un*B%Sk(i, j, k)
+      end do
+      end do
+    end if
+  end do
+!$OMP END DO
 
 !----------------Residual -------------------------------
-!$OMP  DO  
-    do k=1,nz1-1
-      do j=1,ny1-1
-        do i=1,nx1-1
-          do m=1,5
-            B%Res(m,i,j,k)=B%Res(m,i,j,k)+Flux(m,i,j,k+1)-Flux(m,i,j,k)           
-          enddo
-        enddo
-      enddo
-    enddo
-!$OMP END DO  
+!$OMP  DO
+  do k = 1, nz1-1
+  do j = 1, ny1-1
+  do i = 1, nx1-1
+  do m = 1, 5
+    B%Res(m, i, j, k) = B%Res(m, i, j, k)+Flux(m, i, j, k+1)-Flux(m, i, j, k)
+  end do
+  end do
+  end do
+  end do
+!$OMP END DO
 !$OMP END PARALLEL
 
-   end subroutine flux_inviscous_k
+end subroutine flux_inviscous_k
 
-!----------------Õ³ĞÔÍ¨Á¿---------------------------------------------------------------------------------------------- 
+!----------------ç²˜æ€§é€šé‡----------------------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------------------------------------------
-!-----------i-·½ÏòµÄÕ³ĞÔÍ¨Á¿-----------------------------------------------------------------  
-! ÎªÁË±£Ö¤ÎÈ¶¨ĞÔ£¬±ÜÃâÊ¹ÓÃ¼ÆËãÓò½Ç²¿µÄÍø¸ñµã£¨Èç (0,0,k), (0,j,0) µÈÍø¸ñµã´¦µÄÖµ£©
+!-----------i-æ–¹å‘çš„ç²˜æ€§é€šé‡-----------------------------------------------------------------
+! ä¸ºäº†ä¿è¯ç¨³å®šæ€§ï¼Œé¿å…ä½¿ç”¨è®¡ç®—åŸŸè§’éƒ¨çš„ç½‘æ ¼ç‚¹ï¼ˆå¦‚ (0,0,k), (0,j,0) ç­‰ç½‘æ ¼ç‚¹å¤„çš„å€¼ï¼‰
 
-   subroutine flux_viscous_i(nMesh,mBlock)
-    Use Global_Var
-    Use Flow_Var
-    implicit none
-    integer:: mBlock,i,j,k,m,nx,ny,nz,nMesh
-    real(PRE_EC):: ix,iy,iz,jx,jy,jz,kx,ky,kz,s1x,s1y,s1z,ui,vi,wi,Ti,uj,vj,wj,Tj,uk,vk,wk,Tk
-    real(PRE_EC):: ux,uy,uz,vx,vy,vz,wx,wy,wz,Tx,Ty,Tz
-    real(PRE_EC):: s11,s12,s13,s22,s23,s33,u1,v1,w1,E1,E2,E3
-    real(PRE_EC):: mu0,k0
-    real(PRE_EC):: tmp1,tmp2
-    real(PRE_EC):: ui1,ui2,uj1,uj2,uk1,uk2,vi1,vi2,vj1,vj2,vk1,vk2, &
-	               wi1,wi2,wj1,wj2,wk1,wk2,Ti1,Ti2,Tj1,Tj2,Tk1,Tk2
+subroutine flux_viscous_i(nMesh, mBlock)
+  Use Global_Var
+  Use Flow_Var
+  implicit none
+  integer:: mBlock, i, j, k, m, nx, ny, nz, nMesh
+  real(PRE_EC):: ix, iy, iz, jx, jy, jz, kx, ky, kz, s1x, s1y, s1z, ui, vi, wi, Ti, uj, vj, wj, Tj, uk, vk, wk, Tk
+  real(PRE_EC):: ux, uy, uz, vx, vy, vz, wx, wy, wz, Tx, Ty, Tz
+  real(PRE_EC):: s11, s12, s13, s22, s23, s33, u1, v1, w1, E1, E2, E3
+  real(PRE_EC):: mu0, k0
+  real(PRE_EC):: tmp1, tmp2
+  real(PRE_EC):: ui1, ui2, uj1, uj2, uk1, uk2, vi1, vi2, vj1, vj2, vk1, vk2, &
+                 wi1, wi2, wj1, wj2, wk1, wk2, Ti1, Ti2, Tj1, Tj2, Tk1, Tk2
 
-    Type (Block_TYPE),pointer:: B
-    TYPE (Mesh_TYPE),pointer:: MP
-    MP=> Mesh(nMesh)
-    B => MP%Block(mBlock)
-    nx=B%nx; ny=B%ny; nz=B%nz
-    tmp1=4.d0/3.d0; tmp2=2.d0/3.d0
-
+  Type(Block_TYPE), pointer:: B
+  TYPE(Mesh_TYPE), pointer:: MP
+  MP => Mesh(nMesh)
+  B => MP%Block(mBlock)
+  nx = B%nx; ny = B%ny; nz = B%nz
+  tmp1 = 4.d0/3.d0; tmp2 = 2.d0/3.d0
 
 ! revised 2017-7-11
-if(B%IF_OverLimit == 1 ) then     ! ÎïÀíÁ¿³¬ÏŞ£¬ ²ÉÓÃ1½×Ó­·ç¼ÆËãÎŞÕ³ĞÔ£¬ ²»¼ÆËãÕ³ĞÔÏî
+  if (B%IF_OverLimit == 1) then     ! ç‰©ç†é‡è¶…é™ï¼Œ é‡‡ç”¨1é˜¶è¿é£è®¡ç®—æ— ç²˜æ€§ï¼Œ ä¸è®¡ç®—ç²˜æ€§é¡¹
 
-!$OMP  PARALLEL DO  
-   do k=1,nz-1 
-   do j=1,ny-1
-     B%Surf1(j,k,1)=0.d0
-     B%Surf1(j,k,2)=0.d0
-     B%Surf1(j,k,3)=0.d0
-     B%Surf4(j,k,1)=0.d0
-     B%Surf4(j,k,2)=0.d0
-     B%Surf4(j,k,3)=0.d0
-   enddo
-   enddo
-!$OMP END  PARALLEL DO  
+!$OMP  PARALLEL DO
+    do k = 1, nz-1
+    do j = 1, ny-1
+      B%Surf1(j, k, 1) = 0.d0
+      B%Surf1(j, k, 2) = 0.d0
+      B%Surf1(j, k, 3) = 0.d0
+      B%Surf4(j, k, 1) = 0.d0
+      B%Surf4(j, k, 2) = 0.d0
+      B%Surf4(j, k, 3) = 0.d0
+    end do
+    end do
+!$OMP END  PARALLEL DO
 
-	return             ! Ìø¹ıÕ³ĞÔÏî¼ÆËã
-endif
+    return             ! è·³è¿‡ç²˜æ€§é¡¹è®¡ç®—
+  end if
 
 !$OMP PARALLEL DEFAULT(FIRSTPRIVATE) SHARED(MP,B,nx,ny,nz,tmp1,tmp2,Cp,PrL,PrT,uu,v,w,T,flux)
 
-!$OMP  DO  
-    do k=1,nz-1 
-      do j=1,ny-1
-        do i=1,nx
-          s1x=B%ni1(i,j,k); s1y=B%ni2(i,j,k) ; s1z= B%ni3(i,j,k)  ! ¹éÒ»»¯µÄ·¨·½Ïò
-! ÎïÀíÁ¿¶ÔÓÚ¼ÆËã×ø±ê£¨ÏÂ±ê£©µÄµ¼Êı;  (I-1/2,J,K)µã
-! ×¢Òâ£¬ÎïÀíÁ¿´æ´¢ÔÚÍø¸ñÖĞĞÄ£¬Óë×ø±ê£¨´æ´¢ÔÚÍø¸ñ½Úµã£©ÓĞÇø±ğ
-! µ¼Êı¾ù²ÉÓÃ¶ş½×ÖĞĞÄ²î·Ö¼ÆËã£¬²¢ÀûÓÃÖÜÎ§Íø¸ñµãµ¼ÊıµÄÆ½¾ù
+!$OMP  DO
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do i = 1, nx
+    s1x = B%ni1(i, j, k); s1y = B%ni2(i, j, k); s1z = B%ni3(i, j, k)  ! å½’ä¸€åŒ–çš„æ³•æ–¹å‘
+! ç‰©ç†é‡å¯¹äºè®¡ç®—åæ ‡ï¼ˆä¸‹æ ‡ï¼‰çš„å¯¼æ•°;  (I-1/2,J,K)ç‚¹
+! æ³¨æ„ï¼Œç‰©ç†é‡å­˜å‚¨åœ¨ç½‘æ ¼ä¸­å¿ƒï¼Œä¸åæ ‡ï¼ˆå­˜å‚¨åœ¨ç½‘æ ¼èŠ‚ç‚¹ï¼‰æœ‰åŒºåˆ«
+! å¯¼æ•°å‡é‡‡ç”¨äºŒé˜¶ä¸­å¿ƒå·®åˆ†è®¡ç®—ï¼Œå¹¶åˆ©ç”¨å‘¨å›´ç½‘æ ¼ç‚¹å¯¼æ•°çš„å¹³å‡
 ! e.g. uj(I-1/2,J,K)=0.5*(uj(I,J,K)+uj(I-1,J,K));  uj(I,J,K)=(uu(I,J+1,k)-uu(I,J-1,K))*0.5
-          ui=uu(i,j,k)-uu(i-1,j,k)              ! du/di (I-1/2,J,K)= u(I,J,K)-u(I-1,J,K)
-          vi=v(i,j,k)-v(i-1,j,k)
-          wi=w(i,j,k)-w(i-1,j,k)
-          Ti=T(i,j,k)-T(i-1,j,k)
-  
-  ! ÎªÁË±£Ö¤ÎÈ¶¨ĞÔ£¬±ÜÃâÊ¹ÓÃ¼ÆËãÓò½Ç²¿µÄÍø¸ñµã£¨Èç (0,0,k), (0,j,0) µÈÍø¸ñµã´¦µÄÖµ£©
-      
-		  if( (i==1 .or. i==B%nx) .and. (j==1 .or. j==B%ny-1) ) then
-           
-		   uj1=0.d0; vj1=0.d0; wj1=0.d0; Tj1=0.d0
-		   uj2=0.d0; vj2=0.d0; wj2=0.d0; Tj2=0.d0
-		   		 
-		  else 
-		   uj1=0.5d0*(uu(i,j-1,k)+uu(i-1,j-1,k))
-		   vj1=0.5d0*(v(i,j-1,k)+v(i-1,j-1,k))
-		   wj1=0.5d0*(w(i,j-1,k)+w(i-1,j-1,k))
-		   Tj1=0.5d0*(T(i,j-1,k)+T(i-1,j-1,k))
-		   uj2=0.5d0*(uu(i,j+1,k)+uu(i-1,j+1,k))
-		   vj2=0.5d0*(v(i,j+1,k)+v(i-1,j+1,k))
-		   wj2=0.5d0*(w(i,j+1,k)+w(i-1,j+1,k))
-		   Tj2=0.5d0*(T(i,j+1,k)+T(i-1,j+1,k))
-          endif
-        
-          if( (i==1 .or. i==B%nx) .and. (k==1 .or. k==B%nz-1) ) then
+    ui = uu(i, j, k)-uu(i-1, j, k)              ! du/di (I-1/2,J,K)= u(I,J,K)-u(I-1,J,K)
+    vi = v(i, j, k)-v(i-1, j, k)
+    wi = w(i, j, k)-w(i-1, j, k)
+    Ti = T(i, j, k)-T(i-1, j, k)
 
- 		   uk1=0.d0; vk1=0.d0; wk1=0.d0; Tk1=0.d0
-		   uk2=0.d0; vk2=0.d0; wk2=0.d0; Tk2=0.d0
-		 
-		  else
-            uk1=0.5d0*(uu(i,j,k-1)+uu(i-1,j,k-1))
-            vk1=0.5d0*(v(i,j,k-1)+v(i-1,j,k-1))
-            wk1=0.5d0*(w(i,j,k-1)+w(i-1,j,k-1))
-            Tk1=0.5d0*(T(i,j,k-1)+T(i-1,j,k-1))
-            uk2=0.5d0*(uu(i,j,k+1)+uu(i-1,j,k+1))
-            vk2=0.5d0*(v(i,j,k+1)+v(i-1,j,k+1))
-            wk2=0.5d0*(w(i,j,k+1)+w(i-1,j,k+1))
-            Tk2=0.5d0*(T(i,j,k+1)+T(i-1,j,k+1))
-          endif
- 		   uj=0.5d0*(uj2-uj1)
- 		   vj=0.5d0*(vj2-vj1)
- 		   wj=0.5d0*(wj2-wj1)
- 		   Tj=0.5d0*(Tj2-Tj1)
- 		   uk=0.5d0*(uk2-uk1)
-		   vk=0.5d0*(vk2-vk1)
-		   wk=0.5d0*(wk2-wk1)
-		   Tk=0.5d0*(Tk2-Tk1)
+! ä¸ºäº†ä¿è¯ç¨³å®šæ€§ï¼Œé¿å…ä½¿ç”¨è®¡ç®—åŸŸè§’éƒ¨çš„ç½‘æ ¼ç‚¹ï¼ˆå¦‚ (0,0,k), (0,j,0) ç­‰ç½‘æ ¼ç‚¹å¤„çš„å€¼ï¼‰
 
-          ix=B%ix1(i,j,k); iy=B%iy1(i,j,k); iz=B%iz1(i,j,k)
-          jx=B%jx1(i,j,k); jy=B%jy1(i,j,k); jz=B%jz1(i,j,k)
-          kx=B%kx1(i,j,k); ky=B%ky1(i,j,k); kz=B%kz1(i,j,k)
+    if ((i == 1 .or. i == B%nx) .and. (j == 1 .or. j == B%ny-1)) then
 
-!----¶ÔÎïÀí×ø±êµÄÆ«µ¼Êı----------------------------------------------
-          ux=ui*ix+uj*jx+uk*kx
-          vx=vi*ix+vj*jx+vk*kx
-          wx=wi*ix+wj*jx+wk*kx
-          Tx=Ti*ix+Tj*jx+Tk*kx
+      uj1 = 0.d0; vj1 = 0.d0; wj1 = 0.d0; Tj1 = 0.d0
+      uj2 = 0.d0; vj2 = 0.d0; wj2 = 0.d0; Tj2 = 0.d0
 
-          uy=ui*iy+uj*jy+uk*ky
-          vy=vi*iy+vj*jy+vk*ky
-          wy=wi*iy+wj*jy+wk*ky
-          Ty=Ti*iy+Tj*jy+Tk*ky
+    else
+      uj1 = 0.5d0*(uu(i, j-1, k)+uu(i-1, j-1, k))
+      vj1 = 0.5d0*(v(i, j-1, k)+v(i-1, j-1, k))
+      wj1 = 0.5d0*(w(i, j-1, k)+w(i-1, j-1, k))
+      Tj1 = 0.5d0*(T(i, j-1, k)+T(i-1, j-1, k))
+      uj2 = 0.5d0*(uu(i, j+1, k)+uu(i-1, j+1, k))
+      vj2 = 0.5d0*(v(i, j+1, k)+v(i-1, j+1, k))
+      wj2 = 0.5d0*(w(i, j+1, k)+w(i-1, j+1, k))
+      Tj2 = 0.5d0*(T(i, j+1, k)+T(i-1, j+1, k))
+    end if
 
-          uz=ui*iz+uj*jz+uk*kz
-          vz=vi*iz+vj*jz+vk*kz
-          wz=wi*iz+wj*jz+wk*kz
-          Tz=Ti*iz+Tj*jz+Tk*kz
+    if ((i == 1 .or. i == B%nx) .and. (k == 1 .or. k == B%nz-1)) then
 
-!---Õ³ĞÔÓ¦Á¦----------------------------------------------------------
-    ! (I-1/2,J,k)µã, ¼´ (i,j+1/2,k+1/2)µã ´¦µÄÕ³ĞÔÏµÊı
-         mu0=0.5d0*(B%mu(i,j,k)+B%mu_t(i,j,k) + B%mu(i-1,j,k)+B%mu_t(i-1,j,k))  
-         k0=0.5d0*Cp*(B%mu(i,j,k)/PrL + B%mu_t(i,j,k)/PrT + B%mu(i-1,j,k)/PrL +B%mu_t(i-1,j,k)/PrT)   ! (I-1/2,J,K) µãµÄÈÈ´«µ¼ÏµÊı
+      uk1 = 0.d0; vk1 = 0.d0; wk1 = 0.d0; Tk1 = 0.d0
+      uk2 = 0.d0; vk2 = 0.d0; wk2 = 0.d0; Tk2 = 0.d0
+
+    else
+      uk1 = 0.5d0*(uu(i, j, k-1)+uu(i-1, j, k-1))
+      vk1 = 0.5d0*(v(i, j, k-1)+v(i-1, j, k-1))
+      wk1 = 0.5d0*(w(i, j, k-1)+w(i-1, j, k-1))
+      Tk1 = 0.5d0*(T(i, j, k-1)+T(i-1, j, k-1))
+      uk2 = 0.5d0*(uu(i, j, k+1)+uu(i-1, j, k+1))
+      vk2 = 0.5d0*(v(i, j, k+1)+v(i-1, j, k+1))
+      wk2 = 0.5d0*(w(i, j, k+1)+w(i-1, j, k+1))
+      Tk2 = 0.5d0*(T(i, j, k+1)+T(i-1, j, k+1))
+    end if
+    uj = 0.5d0*(uj2-uj1)
+    vj = 0.5d0*(vj2-vj1)
+    wj = 0.5d0*(wj2-wj1)
+    Tj = 0.5d0*(Tj2-Tj1)
+    uk = 0.5d0*(uk2-uk1)
+    vk = 0.5d0*(vk2-vk1)
+    wk = 0.5d0*(wk2-wk1)
+    Tk = 0.5d0*(Tk2-Tk1)
+
+    ix = B%ix1(i, j, k); iy = B%iy1(i, j, k); iz = B%iz1(i, j, k)
+    jx = B%jx1(i, j, k); jy = B%jy1(i, j, k); jz = B%jz1(i, j, k)
+    kx = B%kx1(i, j, k); ky = B%ky1(i, j, k); kz = B%kz1(i, j, k)
+
+!----å¯¹ç‰©ç†åæ ‡çš„åå¯¼æ•°----------------------------------------------
+    ux = ui*ix+uj*jx+uk*kx
+    vx = vi*ix+vj*jx+vk*kx
+    wx = wi*ix+wj*jx+wk*kx
+    Tx = Ti*ix+Tj*jx+Tk*kx
+
+    uy = ui*iy+uj*jy+uk*ky
+    vy = vi*iy+vj*jy+vk*ky
+    wy = wi*iy+wj*jy+wk*ky
+    Ty = Ti*iy+Tj*jy+Tk*ky
+
+    uz = ui*iz+uj*jz+uk*kz
+    vz = vi*iz+vj*jz+vk*kz
+    wz = wi*iz+wj*jz+wk*kz
+    Tz = Ti*iz+Tj*jz+Tk*kz
+
+!---ç²˜æ€§åº”åŠ›----------------------------------------------------------
+! (I-1/2,J,k)ç‚¹, å³ (i,j+1/2,k+1/2)ç‚¹ å¤„çš„ç²˜æ€§ç³»æ•°
+    mu0 = 0.5d0*(B%mu(i, j, k)+B%mu_t(i, j, k)+B%mu(i-1, j, k)+B%mu_t(i-1, j, k))
+    k0 = 0.5d0*Cp*(B%mu(i, j, k)/PrL+B%mu_t(i, j, k)/PrT+B%mu(i-1, j, k)/PrL+B%mu_t(i-1, j, k)/PrT)   ! (I-1/2,J,K) ç‚¹çš„çƒ­ä¼ å¯¼ç³»æ•°
 !-----------------------------------------------------------
-         s11=mu0*(tmp1*ux-tmp2*(vy+wz))    ! tmp1=4.d0/3.d0; tmp2=2.d0/3.d0
-         s12=mu0*(uy+vx)
-         s13=mu0*(uz+wx)
-         s22=mu0*(tmp1*vy-tmp2*(ux+wz))
-         s23=mu0*(vz+wy)
-         s33=mu0*(tmp1*wz-tmp2*(ux+vy))
-!---(I-1/2,J,K)µãÉÏµÄËÙ¶È--------------------------------------------   
-         u1=(uu(i,j,k)+uu(i-1,j,k))*0.5d0
-         v1=(v(i,j,k)+v(i-1,j,k))*0.5d0
-         w1=(w(i,j,k)+w(i-1,j,k))*0.5d0
-!--ÄÜÁ¿µÄÕ³ĞÔÍ¨Á¿-------------------------------
-         E1=u1*s11+v1*s12+w1*s13+k0*Tx
-         E2=u1*s12+v1*s22+w1*s23+k0*Ty
-         E3=u1*s13+v1*s23+w1*s33+k0*Tz
-!-------Í¨Á¿=ÎŞÕ³Í¨Á¿+Õ³ĞÔÍ¨Á¿---------------------------------------
-! Õ³ĞÔÍ¨Á¿=Fv.n=Fv1*s1x+Fv2*s1y+Fv3*s1z---------------
-         Flux(2,i,j,k)= (s11*s1x+s12*s1y+s13*s1z)* B%Si(i,j,k)  
-         Flux(3,i,j,k)= (s12*s1x+s22*s1y+s23*s1z)* B%Si(i,j,k)
-         Flux(4,i,j,k)= (s13*s1x+s23*s1y+s33*s1z)* B%Si(i,j,k)
-         Flux(5,i,j,k)= (E1*s1x+E2*s1y+E3*s1z)* B%Si(i,j,k)
+    s11 = mu0*(tmp1*ux-tmp2*(vy+wz))    ! tmp1=4.d0/3.d0; tmp2=2.d0/3.d0
+    s12 = mu0*(uy+vx)
+    s13 = mu0*(uz+wx)
+    s22 = mu0*(tmp1*vy-tmp2*(ux+wz))
+    s23 = mu0*(vz+wy)
+    s33 = mu0*(tmp1*wz-tmp2*(ux+vy))
+!---(I-1/2,J,K)ç‚¹ä¸Šçš„é€Ÿåº¦--------------------------------------------
+    u1 = (uu(i, j, k)+uu(i-1, j, k))*0.5d0
+    v1 = (v(i, j, k)+v(i-1, j, k))*0.5d0
+    w1 = (w(i, j, k)+w(i-1, j, k))*0.5d0
+!--èƒ½é‡çš„ç²˜æ€§é€šé‡-------------------------------
+    E1 = u1*s11+v1*s12+w1*s13+k0*Tx
+    E2 = u1*s12+v1*s22+w1*s23+k0*Ty
+    E3 = u1*s13+v1*s23+w1*s33+k0*Tz
+!-------é€šé‡=æ— ç²˜é€šé‡+ç²˜æ€§é€šé‡---------------------------------------
+! ç²˜æ€§é€šé‡=Fv.n=Fv1*s1x+Fv2*s1y+Fv3*s1z---------------
+    Flux(2, i, j, k) = (s11*s1x+s12*s1y+s13*s1z)*B%Si(i, j, k)
+    Flux(3, i, j, k) = (s12*s1x+s22*s1y+s23*s1z)*B%Si(i, j, k)
+    Flux(4, i, j, k) = (s13*s1x+s23*s1y+s33*s1z)*B%Si(i, j, k)
+    Flux(5, i, j, k) = (E1*s1x+E2*s1y+E3*s1z)*B%Si(i, j, k)
 !----------------------------------------------------------
-      enddo
-    enddo
-  enddo
-!$OMP END DO  
+  end do
+  end do
+  end do
+!$OMP END DO
 
 !---------------------------------------------------------
-!$OMP  DO  
+!$OMP  DO
 
-     do k=1,nz-1
-     do j=1,ny-1
-     do i=1,nx-1
-     do m=2,5
-      B%Res(m,i,j,k)=B%Res(m,i,j,k)+Flux(m,i+1,j,k)-Flux(m,i,j,k)           
-     enddo
-     enddo
-     enddo
-     enddo
-!$OMP END DO  
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do i = 1, nx-1
+  do m = 2, 5
+    B%Res(m, i, j, k) = B%Res(m, i, j, k)+Flux(m, i+1, j, k)-Flux(m, i, j, k)
+  end do
+  end do
+  end do
+  end do
+!$OMP END DO
 
-!---¼ÇÂ¼±ß½ç´¦µÄÕ³ĞÔÁ¦-------------------------------------
-!$OMP  DO  
-   do k=1,nz-1 
-   do j=1,ny-1
-     B%Surf1(j,k,1)=Flux(2,1,j,k)
-     B%Surf1(j,k,2)=Flux(3,1,j,k)
-     B%Surf1(j,k,3)=Flux(4,1,j,k)
-     B%Surf4(j,k,1)=Flux(2,nx,j,k)
-     B%Surf4(j,k,2)=Flux(3,nx,j,k)
-     B%Surf4(j,k,3)=Flux(4,nx,j,k)
-   enddo
-   enddo
-!$OMP END DO  
+!---è®°å½•è¾¹ç•Œå¤„çš„ç²˜æ€§åŠ›-------------------------------------
+!$OMP  DO
+  do k = 1, nz-1
+  do j = 1, ny-1
+    B%Surf1(j, k, 1) = Flux(2, 1, j, k)
+    B%Surf1(j, k, 2) = Flux(3, 1, j, k)
+    B%Surf1(j, k, 3) = Flux(4, 1, j, k)
+    B%Surf4(j, k, 1) = Flux(2, nx, j, k)
+    B%Surf4(j, k, 2) = Flux(3, nx, j, k)
+    B%Surf4(j, k, 3) = Flux(4, nx, j, k)
+  end do
+  end do
+!$OMP END DO
 !$OMP  END PARALLEL
 
- end subroutine flux_viscous_i
+end subroutine flux_viscous_i
 
 !----------------------------------------------------------------------------------------------------
 !----------------------------------------------------------------------------------------------------
-! j·½ÏòµÄÕ³ĞÔÍ¨Á¿   
-   subroutine flux_viscous_j(nMesh,mBlock)
-   Use Global_Var
-   Use Flow_Var
-   implicit none
-   integer:: mBlock,i,j,k,m,nx,ny,nz,nMesh
-   real(PRE_EC):: s1x,s1y,s1z
-   real(PRE_EC):: ix,iy,iz,jx,jy,jz,kx,ky,kz,ui,vi,wi,Ti,uj,vj,wj,Tj,uk,vk,wk,Tk
-   real(PRE_EC):: ux,uy,uz,vx,vy,vz,wx,wy,wz,Tx,Ty,Tz
-   real(PRE_EC):: s11,s12,s13,s22,s23,s33,u1,v1,w1,E1,E2,E3
-   real(PRE_EC):: mu0,k0
-   real(PRE_EC):: tmp1,tmp2
-   Type (Block_TYPE),pointer:: B
-   TYPE (Mesh_TYPE),pointer:: MP
-   real(PRE_EC):: ui1,ui2,uj1,uj2,uk1,uk2,vi1,vi2,vj1,vj2,vk1,vk2, &
-	               wi1,wi2,wj1,wj2,wk1,wk2,Ti1,Ti2,Tj1,Tj2,Tk1,Tk2
-   
-   MP=> Mesh(nMesh)
-   B => MP%Block(mBlock)
-   nx=B%nx; ny=B%ny; nz=B%nz
+! jæ–¹å‘çš„ç²˜æ€§é€šé‡
+subroutine flux_viscous_j(nMesh, mBlock)
+  Use Global_Var
+  Use Flow_Var
+  implicit none
+  integer:: mBlock, i, j, k, m, nx, ny, nz, nMesh
+  real(PRE_EC):: s1x, s1y, s1z
+  real(PRE_EC):: ix, iy, iz, jx, jy, jz, kx, ky, kz, ui, vi, wi, Ti, uj, vj, wj, Tj, uk, vk, wk, Tk
+  real(PRE_EC):: ux, uy, uz, vx, vy, vz, wx, wy, wz, Tx, Ty, Tz
+  real(PRE_EC):: s11, s12, s13, s22, s23, s33, u1, v1, w1, E1, E2, E3
+  real(PRE_EC):: mu0, k0
+  real(PRE_EC):: tmp1, tmp2
+  Type(Block_TYPE), pointer:: B
+  TYPE(Mesh_TYPE), pointer:: MP
+  real(PRE_EC):: ui1, ui2, uj1, uj2, uk1, uk2, vi1, vi2, vj1, vj2, vk1, vk2, &
+                 wi1, wi2, wj1, wj2, wk1, wk2, Ti1, Ti2, Tj1, Tj2, Tk1, Tk2
 
-   tmp1=4.d0/3.d0; tmp2=2.d0/3.d0
+  MP => Mesh(nMesh)
+  B => MP%Block(mBlock)
+  nx = B%nx; ny = B%ny; nz = B%nz
 
-  if(B%IF_OverLimit == 1 ) then     ! ÎïÀíÁ¿³¬ÏŞ£¬ ²ÉÓÃ1½×Ó­·ç¼ÆËãÎŞÕ³ĞÔ£¬ ²»¼ÆËãÕ³ĞÔÏî
- !$OMP Parallel DO
-   do k=1,nz-1 
-   do i=1,nx-1
-     B%Surf2(i,k,1)=0.d0
-     B%Surf2(i,k,2)=0.d0
-     B%Surf2(i,k,3)=0.d0
-     B%Surf5(i,k,1)=0.d0
-     B%Surf5(i,k,2)=0.d0
-     B%Surf5(i,k,3)=0.d0
-   enddo
-   enddo
+  tmp1 = 4.d0/3.d0; tmp2 = 2.d0/3.d0
+
+  if (B%IF_OverLimit == 1) then     ! ç‰©ç†é‡è¶…é™ï¼Œ é‡‡ç”¨1é˜¶è¿é£è®¡ç®—æ— ç²˜æ€§ï¼Œ ä¸è®¡ç®—ç²˜æ€§é¡¹
+!$OMP Parallel DO
+    do k = 1, nz-1
+    do i = 1, nx-1
+      B%Surf2(i, k, 1) = 0.d0
+      B%Surf2(i, k, 2) = 0.d0
+      B%Surf2(i, k, 3) = 0.d0
+      B%Surf5(i, k, 1) = 0.d0
+      B%Surf5(i, k, 2) = 0.d0
+      B%Surf5(i, k, 3) = 0.d0
+    end do
+    end do
 !$OMP END Parallel DO
-   return
-   endif
-
+    return
+  end if
 
 !$OMP PARALLEL DEFAULT(FIRSTPRIVATE) SHARED(MP,B,nx,ny,nz,tmp1,tmp2,Cp,PrL,PrT,uu,v,w,T,flux)
 !$OMP DO
-   do k=1,nz-1 
-   do j=1,ny
-   do i=1,nx-1
-    s1x=B%nj1(i,j,k); s1y=B%nj2(i,j,k) ; s1z= B%nj3(i,j,k)  ! ¹éÒ»»¯µÄ·¨·½Ïò
+  do k = 1, nz-1
+  do j = 1, ny
+  do i = 1, nx-1
+    s1x = B%nj1(i, j, k); s1y = B%nj2(i, j, k); s1z = B%nj3(i, j, k)  ! å½’ä¸€åŒ–çš„æ³•æ–¹å‘
 
-! ÎïÀíÁ¿¶ÔÓÚ¼ÆËã×ø±ê£¨ÏÂ±ê£©µÄµ¼Êı;  (I,J-1/2,K)µã
-   uj=uu(i,j,k)-uu(i,j-1,k)
-   vj=v(i,j,k)-v(i,j-1,k)
-   wj=w(i,j,k)-w(i,j-1,k)
-   Tj=T(i,j,k)-T(i,j-1,k)
+! ç‰©ç†é‡å¯¹äºè®¡ç®—åæ ‡ï¼ˆä¸‹æ ‡ï¼‰çš„å¯¼æ•°;  (I,J-1/2,K)ç‚¹
+    uj = uu(i, j, k)-uu(i, j-1, k)
+    vj = v(i, j, k)-v(i, j-1, k)
+    wj = w(i, j, k)-w(i, j-1, k)
+    Tj = T(i, j, k)-T(i, j-1, k)
 
+    if ((j == 1 .or. j == B%ny) .and. (i == 1 .or. i == B%nx-1)) then
 
-	   if( (j==1 .or. j==B%ny) .and. (i==1 .or. i==B%nx-1) ) then
- 
- 	    ui1=0.d0; vi1=0.d0; wi1=0.d0; Ti1=0.d0
-	    ui2=0.d0; vi2=0.d0; wi2=0.d0; Ti2=0.d0
+      ui1 = 0.d0; vi1 = 0.d0; wi1 = 0.d0; Ti1 = 0.d0
+      ui2 = 0.d0; vi2 = 0.d0; wi2 = 0.d0; Ti2 = 0.d0
 
-	   else
-		ui1=0.5d0*(uu(i-1,j,k)+uu(i-1,j-1,k))
-		vi1=0.5d0*(v(i-1,j,k)+v(i-1,j-1,k))
-		wi1=0.5d0*(w(i-1,j,k)+w(i-1,j-1,k))
-		Ti1=0.5d0*(T(i-1,j,k)+T(i-1,j-1,k))
-		ui2=0.5d0*(uu(i+1,j,k)+uu(i+1,j-1,k))
-		vi2=0.5d0*(v(i+1,j,k)+v(i+1,j-1,k))
-		wi2=0.5d0*(w(i+1,j,k)+w(i+1,j-1,k))
-		Ti2=0.5d0*(T(i+1,j,k)+T(i+1,j-1,k))
-       endif
-	
-	   if( (j==1 .or. j==B%ny) .and. (k==1 .or. k==B%nz-1) ) then
-   		   uk1=0.d0; vk1=0.d0; wk1=0.d0; Tk1=0.d0
-		   uk2=0.d0; vk2=0.d0; wk2=0.d0; Tk2=0.d0
+    else
+      ui1 = 0.5d0*(uu(i-1, j, k)+uu(i-1, j-1, k))
+      vi1 = 0.5d0*(v(i-1, j, k)+v(i-1, j-1, k))
+      wi1 = 0.5d0*(w(i-1, j, k)+w(i-1, j-1, k))
+      Ti1 = 0.5d0*(T(i-1, j, k)+T(i-1, j-1, k))
+      ui2 = 0.5d0*(uu(i+1, j, k)+uu(i+1, j-1, k))
+      vi2 = 0.5d0*(v(i+1, j, k)+v(i+1, j-1, k))
+      wi2 = 0.5d0*(w(i+1, j, k)+w(i+1, j-1, k))
+      Ti2 = 0.5d0*(T(i+1, j, k)+T(i+1, j-1, k))
+    end if
 
-	   else	 
-		 uk1=0.5d0*(uu(i,j,k-1)+uu(i,j-1,k-1))
-		 vk1=0.5d0*(v(i,j,k-1)+v(i,j-1,k-1))
-		 wk1=0.5d0*(w(i,j,k-1)+w(i,j-1,k-1))
-		 Tk1=0.5d0*(T(i,j,k-1)+T(i,j-1,k-1))
-		 uk2=0.5d0*(uu(i,j,k+1)+uu(i,j-1,k+1))
-		 vk2=0.5d0*(v(i,j,k+1)+v(i,j-1,k+1))
-		 wk2=0.5d0*(w(i,j,k+1)+w(i,j-1,k+1))
-		 Tk2=0.5d0*(T(i,j,k+1)+T(i,j-1,k+1))
-       endif
-	    ui=0.5d0*(ui2-ui1)
-	    vi=0.5d0*(vi2-vi1)
-	    wi=0.5d0*(wi2-wi1)
-	    Ti=0.5d0*(Ti2-Ti1)
-	    uk=0.5d0*(uk2-uk1)
-	    vk=0.5d0*(vk2-vk1)
-	    wk=0.5d0*(wk2-wk1)
-	    Tk=0.5d0*(Tk2-Tk1)
+    if ((j == 1 .or. j == B%ny) .and. (k == 1 .or. k == B%nz-1)) then
+      uk1 = 0.d0; vk1 = 0.d0; wk1 = 0.d0; Tk1 = 0.d0
+      uk2 = 0.d0; vk2 = 0.d0; wk2 = 0.d0; Tk2 = 0.d0
 
+    else
+      uk1 = 0.5d0*(uu(i, j, k-1)+uu(i, j-1, k-1))
+      vk1 = 0.5d0*(v(i, j, k-1)+v(i, j-1, k-1))
+      wk1 = 0.5d0*(w(i, j, k-1)+w(i, j-1, k-1))
+      Tk1 = 0.5d0*(T(i, j, k-1)+T(i, j-1, k-1))
+      uk2 = 0.5d0*(uu(i, j, k+1)+uu(i, j-1, k+1))
+      vk2 = 0.5d0*(v(i, j, k+1)+v(i, j-1, k+1))
+      wk2 = 0.5d0*(w(i, j, k+1)+w(i, j-1, k+1))
+      Tk2 = 0.5d0*(T(i, j, k+1)+T(i, j-1, k+1))
+    end if
+    ui = 0.5d0*(ui2-ui1)
+    vi = 0.5d0*(vi2-vi1)
+    wi = 0.5d0*(wi2-wi1)
+    Ti = 0.5d0*(Ti2-Ti1)
+    uk = 0.5d0*(uk2-uk1)
+    vk = 0.5d0*(vk2-vk1)
+    wk = 0.5d0*(wk2-wk1)
+    Tk = 0.5d0*(Tk2-Tk1)
 
-      ix=B%ix2(i,j,k); iy=B%iy2(i,j,k); iz=B%iz2(i,j,k)
-      jx=B%jx2(i,j,k); jy=B%jy2(i,j,k); jz=B%jz2(i,j,k)
-      kx=B%kx2(i,j,k); ky=B%ky2(i,j,k); kz=B%kz2(i,j,k)
+    ix = B%ix2(i, j, k); iy = B%iy2(i, j, k); iz = B%iz2(i, j, k)
+    jx = B%jx2(i, j, k); jy = B%jy2(i, j, k); jz = B%jz2(i, j, k)
+    kx = B%kx2(i, j, k); ky = B%ky2(i, j, k); kz = B%kz2(i, j, k)
 
-!----¶ÔÎïÀí×ø±êµÄÆ«µ¼Êı----------------------------------------------
-   ux=ui*ix+uj*jx+uk*kx
-   vx=vi*ix+vj*jx+vk*kx
-   wx=wi*ix+wj*jx+wk*kx
-   Tx=Ti*ix+Tj*jx+Tk*kx
+!----å¯¹ç‰©ç†åæ ‡çš„åå¯¼æ•°----------------------------------------------
+    ux = ui*ix+uj*jx+uk*kx
+    vx = vi*ix+vj*jx+vk*kx
+    wx = wi*ix+wj*jx+wk*kx
+    Tx = Ti*ix+Tj*jx+Tk*kx
 
-   uy=ui*iy+uj*jy+uk*ky
-   vy=vi*iy+vj*jy+vk*ky
-   wy=wi*iy+wj*jy+wk*ky
-   Ty=Ti*iy+Tj*jy+Tk*ky
+    uy = ui*iy+uj*jy+uk*ky
+    vy = vi*iy+vj*jy+vk*ky
+    wy = wi*iy+wj*jy+wk*ky
+    Ty = Ti*iy+Tj*jy+Tk*ky
 
-   uz=ui*iz+uj*jz+uk*kz
-   vz=vi*iz+vj*jz+vk*kz
-   wz=wi*iz+wj*jz+wk*kz
-   Tz=Ti*iz+Tj*jz+Tk*kz
+    uz = ui*iz+uj*jz+uk*kz
+    vz = vi*iz+vj*jz+vk*kz
+    wz = wi*iz+wj*jz+wk*kz
+    Tz = Ti*iz+Tj*jz+Tk*kz
 
-!---Õ³ĞÔÓ¦Á¦----------------------------------------------------------
-   mu0=0.5d0*(B%mu(i,j,k)+B%mu_t(i,j,k) + B%mu(i,j-1,k)+B%mu_t(i,j-1,k))  
-   k0=0.5d0*Cp*(B%mu(i,j,k)/PrL + B%mu_t(i,j,k)/PrT + B%mu(i,j-1,k)/PrL +B%mu_t(i,j-1,k)/PrT)   ! (I-1/2,J,K) µãµÄÈÈ´«µ¼ÏµÊı
-   
-   s11=mu0*(tmp1*ux-tmp2*(vy+wz))    ! tmp1=4.d0/3.d0; tmp2=2.d0/3.d0
-   s12=mu0*(uy+vx)
-   s13=mu0*(uz+wx)
-   s22=mu0*(tmp1*vy-tmp2*(ux+wz))
-   s23=mu0*(vz+wy)
-   s33=mu0*(tmp1*wz-tmp2*(ux+vy))
-!---(I,J-1/2,K)µãÉÏµÄËÙ¶È--------------------------------------------   
-   u1=(uu(i,j,k)+uu(i,j-1,k))*0.5d0
-   v1=(v(i,j,k)+v(i,j-1,k))*0.5d0
-   w1=(w(i,j,k)+w(i,j-1,k))*0.5d0
-!--ÄÜÁ¿µÄÕ³ĞÔÍ¨Á¿-------------------------------
-   E1=u1*s11+v1*s12+w1*s13+k0*Tx
-   E2=u1*s12+v1*s22+w1*s23+k0*Ty
-   E3=u1*s13+v1*s23+w1*s33+k0*Tz
+!---ç²˜æ€§åº”åŠ›----------------------------------------------------------
+    mu0 = 0.5d0*(B%mu(i, j, k)+B%mu_t(i, j, k)+B%mu(i, j-1, k)+B%mu_t(i, j-1, k))
+    k0 = 0.5d0*Cp*(B%mu(i, j, k)/PrL+B%mu_t(i, j, k)/PrT+B%mu(i, j-1, k)/PrL+B%mu_t(i, j-1, k)/PrT)   ! (I-1/2,J,K) ç‚¹çš„çƒ­ä¼ å¯¼ç³»æ•°
 
-!-------Í¨Á¿=ÎŞÕ³Í¨Á¿+Õ³ĞÔÍ¨Á¿---------------------------------------
-! Õ³ĞÔÍ¨Á¿=Fv.n=Fv1*s1x+Fv2*s1y+Fv3*s1z---------------
-    Flux(2,i,j,k)=(s11*s1x+s12*s1y+s13*s1z)* B%Sj(i,j,k)  
-    Flux(3,i,j,k)=(s12*s1x+s22*s1y+s23*s1z)* B%Sj(i,j,k)
-    Flux(4,i,j,k)=(s13*s1x+s23*s1y+s33*s1z)* B%Sj(i,j,k)
-    Flux(5,i,j,k)=(E1*s1x+E2*s1y+E3*s1z)* B%Sj(i,j,k)
+    s11 = mu0*(tmp1*ux-tmp2*(vy+wz))    ! tmp1=4.d0/3.d0; tmp2=2.d0/3.d0
+    s12 = mu0*(uy+vx)
+    s13 = mu0*(uz+wx)
+    s22 = mu0*(tmp1*vy-tmp2*(ux+wz))
+    s23 = mu0*(vz+wy)
+    s33 = mu0*(tmp1*wz-tmp2*(ux+vy))
+!---(I,J-1/2,K)ç‚¹ä¸Šçš„é€Ÿåº¦--------------------------------------------
+    u1 = (uu(i, j, k)+uu(i, j-1, k))*0.5d0
+    v1 = (v(i, j, k)+v(i, j-1, k))*0.5d0
+    w1 = (w(i, j, k)+w(i, j-1, k))*0.5d0
+!--èƒ½é‡çš„ç²˜æ€§é€šé‡-------------------------------
+    E1 = u1*s11+v1*s12+w1*s13+k0*Tx
+    E2 = u1*s12+v1*s22+w1*s23+k0*Ty
+    E3 = u1*s13+v1*s23+w1*s33+k0*Tz
 
-   enddo
-   enddo
-   enddo
+!-------é€šé‡=æ— ç²˜é€šé‡+ç²˜æ€§é€šé‡---------------------------------------
+! ç²˜æ€§é€šé‡=Fv.n=Fv1*s1x+Fv2*s1y+Fv3*s1z---------------
+    Flux(2, i, j, k) = (s11*s1x+s12*s1y+s13*s1z)*B%Sj(i, j, k)
+    Flux(3, i, j, k) = (s12*s1x+s22*s1y+s23*s1z)*B%Sj(i, j, k)
+    Flux(4, i, j, k) = (s13*s1x+s23*s1y+s33*s1z)*B%Sj(i, j, k)
+    Flux(5, i, j, k) = (E1*s1x+E2*s1y+E3*s1z)*B%Sj(i, j, k)
+
+  end do
+  end do
+  end do
 !$OMP END DO
 
 !$OMP DO
-     do k=1,nz-1
-     do j=1,ny-1
-     do i=1,nx-1
-     do m=2,5
-      B%Res(m,i,j,k)=B%Res(m,i,j,k)+Flux(m,i,j+1,k)-Flux(m,i,j,k)           
-     enddo
-     enddo
-     enddo
-     enddo
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do i = 1, nx-1
+  do m = 2, 5
+    B%Res(m, i, j, k) = B%Res(m, i, j, k)+Flux(m, i, j+1, k)-Flux(m, i, j, k)
+  end do
+  end do
+  end do
+  end do
 !$OMP END DO
 
-!---¼ÇÂ¼±ß½ç´¦µÄÕ³ĞÔÁ¦-------------------------------------
+!---è®°å½•è¾¹ç•Œå¤„çš„ç²˜æ€§åŠ›-------------------------------------
 
 !$OMP  DO
-   do k=1,nz-1 
-   do i=1,nx-1
-     B%Surf2(i,k,1)=Flux(2,i,1,k)
-     B%Surf2(i,k,2)=Flux(3,i,1,k)
-     B%Surf2(i,k,3)=Flux(4,i,1,k)
-     B%Surf5(i,k,1)=Flux(2,i,ny,k)
-     B%Surf5(i,k,2)=Flux(3,i,ny,k)
-     B%Surf5(i,k,3)=Flux(4,i,ny,k)
-   enddo
-   enddo
+  do k = 1, nz-1
+  do i = 1, nx-1
+    B%Surf2(i, k, 1) = Flux(2, i, 1, k)
+    B%Surf2(i, k, 2) = Flux(3, i, 1, k)
+    B%Surf2(i, k, 3) = Flux(4, i, 1, k)
+    B%Surf5(i, k, 1) = Flux(2, i, ny, k)
+    B%Surf5(i, k, 2) = Flux(3, i, ny, k)
+    B%Surf5(i, k, 3) = Flux(4, i, ny, k)
+  end do
+  end do
 !$OMP END DO
 !$OMP END PARALLEL
 
+end subroutine flux_viscous_j
 
- end subroutine flux_viscous_j
- 
-!------------------------------------------------------------------------------------------------------------- 
-!------------------------------------------------------------------------------------------------------------- 
-! k·½ÏòµÄÕ³ĞÔÍ¨Á¿   
-   subroutine flux_viscous_k(nMesh,mBlock)
-   Use Global_Var
-   Use Flow_Var
-   implicit none
-   integer:: mBlock,i,j,k,m,nx,ny,nz,nMesh
-   real(PRE_EC):: s1x,s1y,s1z
-   real(PRE_EC):: ix,iy,iz,jx,jy,jz,kx,ky,kz,ui,vi,wi,Ti,uj,vj,wj,Tj,uk,vk,wk,Tk
-   real(PRE_EC):: ux,uy,uz,vx,vy,vz,wx,wy,wz,Tx,Ty,Tz
-   real(PRE_EC):: s11,s12,s13,s22,s23,s33,u1,v1,w1,E1,E2,E3
-   real(PRE_EC):: mu0,k0
-   real(PRE_EC):: tmp1,tmp2
-   Type (Block_TYPE),pointer:: B
-   TYPE (Mesh_TYPE),pointer:: MP
-   real(PRE_EC):: ui1,ui2,uj1,uj2,uk1,uk2,vi1,vi2,vj1,vj2,vk1,vk2, &
-	               wi1,wi2,wj1,wj2,wk1,wk2,Ti1,Ti2,Tj1,Tj2,Tk1,Tk2
+!-------------------------------------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------
+! kæ–¹å‘çš„ç²˜æ€§é€šé‡
+subroutine flux_viscous_k(nMesh, mBlock)
+  Use Global_Var
+  Use Flow_Var
+  implicit none
+  integer:: mBlock, i, j, k, m, nx, ny, nz, nMesh
+  real(PRE_EC):: s1x, s1y, s1z
+  real(PRE_EC):: ix, iy, iz, jx, jy, jz, kx, ky, kz, ui, vi, wi, Ti, uj, vj, wj, Tj, uk, vk, wk, Tk
+  real(PRE_EC):: ux, uy, uz, vx, vy, vz, wx, wy, wz, Tx, Ty, Tz
+  real(PRE_EC):: s11, s12, s13, s22, s23, s33, u1, v1, w1, E1, E2, E3
+  real(PRE_EC):: mu0, k0
+  real(PRE_EC):: tmp1, tmp2
+  Type(Block_TYPE), pointer:: B
+  TYPE(Mesh_TYPE), pointer:: MP
+  real(PRE_EC):: ui1, ui2, uj1, uj2, uk1, uk2, vi1, vi2, vj1, vj2, vk1, vk2, &
+                 wi1, wi2, wj1, wj2, wk1, wk2, Ti1, Ti2, Tj1, Tj2, Tk1, Tk2
 
-   MP=> Mesh(nMesh)
-   B => MP%Block(mBlock)
-   nx=B%nx; ny=B%ny; nz=B%nz
+  MP => Mesh(nMesh)
+  B => MP%Block(mBlock)
+  nx = B%nx; ny = B%ny; nz = B%nz
 
-   tmp1=4.d0/3.d0; tmp2=2.d0/3.d0
+  tmp1 = 4.d0/3.d0; tmp2 = 2.d0/3.d0
 
- if(B%IF_OverLimit == 1 ) then     ! ÎïÀíÁ¿³¬ÏŞ£¬ ²ÉÓÃ1½×Ó­·ç¼ÆËãÎŞÕ³ĞÔ£¬ ²»¼ÆËãÕ³ĞÔÏî
+  if (B%IF_OverLimit == 1) then     ! ç‰©ç†é‡è¶…é™ï¼Œ é‡‡ç”¨1é˜¶è¿é£è®¡ç®—æ— ç²˜æ€§ï¼Œ ä¸è®¡ç®—ç²˜æ€§é¡¹
 !$OMP  Parallel DO
-   do j=1,ny-1 
-   do i=1,nx-1
-     B%Surf3(i,j,1)=0.d0
-     B%Surf3(i,j,2)=0.d0
-     B%Surf3(i,j,3)=0.d0
-     B%Surf6(i,j,1)=0.d0
-     B%Surf6(i,j,2)=0.d0
-     B%Surf6(i,j,3)=0.d0
-   enddo
-   enddo
+    do j = 1, ny-1
+    do i = 1, nx-1
+      B%Surf3(i, j, 1) = 0.d0
+      B%Surf3(i, j, 2) = 0.d0
+      B%Surf3(i, j, 3) = 0.d0
+      B%Surf6(i, j, 1) = 0.d0
+      B%Surf6(i, j, 2) = 0.d0
+      B%Surf6(i, j, 3) = 0.d0
+    end do
+    end do
 !$OMP END Parallel DO
- return
-  endif
-
-
+    return
+  end if
 
 !$OMP PARALLEL DEFAULT(FIRSTPRIVATE) SHARED(MP,B,nx,ny,nz,tmp1,tmp2,Cp,PrL,PrT,uu,v,w,T,flux)
 
 !$OMP  DO
-   do k=1,nz 
-   do j=1,ny-1
-   do i=1,nx-1
-    s1x=B%nk1(i,j,k); s1y=B%nk2(i,j,k) ; s1z= B%nk3(i,j,k)  ! ¹éÒ»»¯µÄ·¨·½Ïò
+  do k = 1, nz
+  do j = 1, ny-1
+  do i = 1, nx-1
+    s1x = B%nk1(i, j, k); s1y = B%nk2(i, j, k); s1z = B%nk3(i, j, k)  ! å½’ä¸€åŒ–çš„æ³•æ–¹å‘
 
-! ÎïÀíÁ¿¶ÔÓÚ¼ÆËã×ø±ê£¨ÏÂ±ê£©µÄµ¼Êı;  (I,J,K-1/2)µã
+! ç‰©ç†é‡å¯¹äºè®¡ç®—åæ ‡ï¼ˆä¸‹æ ‡ï¼‰çš„å¯¼æ•°;  (I,J,K-1/2)ç‚¹
 
-   uk=uu(i,j,k)-uu(i,j,k-1)
-   vk=v(i,j,k)-v(i,j,k-1)
-   wk=w(i,j,k)-w(i,j,k-1)
-   Tk=T(i,j,k)-T(i,j,k-1)
+    uk = uu(i, j, k)-uu(i, j, k-1)
+    vk = v(i, j, k)-v(i, j, k-1)
+    wk = w(i, j, k)-w(i, j, k-1)
+    Tk = T(i, j, k)-T(i, j, k-1)
 
- 	 if( (k==1 .or. k==B%nz) .and. (i==1 .or. i==B%nx-1) ) then
- 	    ui1=0.d0; vi1=0.d0; wi1=0.d0; Ti1=0.d0
-	    ui2=0.d0; vi2=0.d0; wi2=0.d0; Ti2=0.d0
-    
-	 else
-	  ui1=0.5d0*(uu(i-1,j,k)+uu(i-1,j,k-1))
-	  vi1=0.5d0*(v(i-1,j,k)+v(i-1,j,k-1))
-	  wi1=0.5d0*(w(i-1,j,k)+w(i-1,j,k-1))
-	  Ti1=0.5d0*(T(i-1,j,k)+T(i-1,j,k-1))
-	  ui2=0.5d0*(uu(i+1,j,k)+uu(i+1,j,k-1))
-	  vi2=0.5d0*(v(i+1,j,k)+v(i+1,j,k-1))
-	  wi2=0.5d0*(w(i+1,j,k)+w(i+1,j,k-1))
-	  Ti2=0.5d0*(T(i+1,j,k)+T(i+1,j,k-1))
-     endif
+    if ((k == 1 .or. k == B%nz) .and. (i == 1 .or. i == B%nx-1)) then
+      ui1 = 0.d0; vi1 = 0.d0; wi1 = 0.d0; Ti1 = 0.d0
+      ui2 = 0.d0; vi2 = 0.d0; wi2 = 0.d0; Ti2 = 0.d0
 
-  	 if( (k==1 .or. k==B%nz) .and. (j==1 .or. j==B%ny-1) ) then
-	   uj1=0.d0; vj1=0.d0; wj1=0.d0; Tj1=0.d0
-	   uj2=0.d0; vj2=0.d0; wj2=0.d0; Tj2=0.d0
+    else
+      ui1 = 0.5d0*(uu(i-1, j, k)+uu(i-1, j, k-1))
+      vi1 = 0.5d0*(v(i-1, j, k)+v(i-1, j, k-1))
+      wi1 = 0.5d0*(w(i-1, j, k)+w(i-1, j, k-1))
+      Ti1 = 0.5d0*(T(i-1, j, k)+T(i-1, j, k-1))
+      ui2 = 0.5d0*(uu(i+1, j, k)+uu(i+1, j, k-1))
+      vi2 = 0.5d0*(v(i+1, j, k)+v(i+1, j, k-1))
+      wi2 = 0.5d0*(w(i+1, j, k)+w(i+1, j, k-1))
+      Ti2 = 0.5d0*(T(i+1, j, k)+T(i+1, j, k-1))
+    end if
 
-	 else
-      uj1=0.5d0*(uu(i,j-1,k)+uu(i,j-1,k-1))
-      vj1=0.5d0*(v(i,j-1,k)+v(i,j-1,k-1))
-      wj1=0.5d0*(w(i,j-1,k)+w(i,j-1,k-1))
-      Tj1=0.5d0*(T(i,j-1,k)+T(i,j-1,k-1))
-      uj2=0.5d0*(uu(i,j+1,k)+uu(i,j+1,k-1))
-      vj2=0.5d0*(v(i,j+1,k)+v(i,j+1,k-1))
-      wj2=0.5d0*(w(i,j+1,k)+w(i,j+1,k-1))
-      Tj2=0.5d0*(T(i,j+1,k)+T(i,j+1,k-1))
-	 endif
-	  ui=0.5d0*(ui2-ui1)
-	  vi=0.5d0*(vi2-vi1)
-	  wi=0.5d0*(wi2-wi1)
-	  Ti=0.5d0*(Ti2-Ti1)
+    if ((k == 1 .or. k == B%nz) .and. (j == 1 .or. j == B%ny-1)) then
+      uj1 = 0.d0; vj1 = 0.d0; wj1 = 0.d0; Tj1 = 0.d0
+      uj2 = 0.d0; vj2 = 0.d0; wj2 = 0.d0; Tj2 = 0.d0
 
-	  uj=0.5d0*(uj2-uj1)
-	  vj=0.5d0*(vj2-vj1)
-	  wj=0.5d0*(wj2-wj1)
-	  Tj=0.5d0*(Tj2-Tj1)
+    else
+      uj1 = 0.5d0*(uu(i, j-1, k)+uu(i, j-1, k-1))
+      vj1 = 0.5d0*(v(i, j-1, k)+v(i, j-1, k-1))
+      wj1 = 0.5d0*(w(i, j-1, k)+w(i, j-1, k-1))
+      Tj1 = 0.5d0*(T(i, j-1, k)+T(i, j-1, k-1))
+      uj2 = 0.5d0*(uu(i, j+1, k)+uu(i, j+1, k-1))
+      vj2 = 0.5d0*(v(i, j+1, k)+v(i, j+1, k-1))
+      wj2 = 0.5d0*(w(i, j+1, k)+w(i, j+1, k-1))
+      Tj2 = 0.5d0*(T(i, j+1, k)+T(i, j+1, k-1))
+    end if
+    ui = 0.5d0*(ui2-ui1)
+    vi = 0.5d0*(vi2-vi1)
+    wi = 0.5d0*(wi2-wi1)
+    Ti = 0.5d0*(Ti2-Ti1)
 
+    uj = 0.5d0*(uj2-uj1)
+    vj = 0.5d0*(vj2-vj1)
+    wj = 0.5d0*(wj2-wj1)
+    Tj = 0.5d0*(Tj2-Tj1)
 
-      ix=B%ix3(i,j,k); iy=B%iy3(i,j,k); iz=B%iz3(i,j,k)
-      jx=B%jx3(i,j,k); jy=B%jy3(i,j,k); jz=B%jz3(i,j,k)
-      kx=B%kx3(i,j,k); ky=B%ky3(i,j,k); kz=B%kz3(i,j,k)
+    ix = B%ix3(i, j, k); iy = B%iy3(i, j, k); iz = B%iz3(i, j, k)
+    jx = B%jx3(i, j, k); jy = B%jy3(i, j, k); jz = B%jz3(i, j, k)
+    kx = B%kx3(i, j, k); ky = B%ky3(i, j, k); kz = B%kz3(i, j, k)
 
-!----¶ÔÎïÀí×ø±êµÄÆ«µ¼Êı----------------------------------------------
-   ux=ui*ix+uj*jx+uk*kx
-   vx=vi*ix+vj*jx+vk*kx
-   wx=wi*ix+wj*jx+wk*kx
-   Tx=Ti*ix+Tj*jx+Tk*kx
+!----å¯¹ç‰©ç†åæ ‡çš„åå¯¼æ•°----------------------------------------------
+    ux = ui*ix+uj*jx+uk*kx
+    vx = vi*ix+vj*jx+vk*kx
+    wx = wi*ix+wj*jx+wk*kx
+    Tx = Ti*ix+Tj*jx+Tk*kx
 
-   uy=ui*iy+uj*jy+uk*ky
-   vy=vi*iy+vj*jy+vk*ky
-   wy=wi*iy+wj*jy+wk*ky
-   Ty=Ti*iy+Tj*jy+Tk*ky
+    uy = ui*iy+uj*jy+uk*ky
+    vy = vi*iy+vj*jy+vk*ky
+    wy = wi*iy+wj*jy+wk*ky
+    Ty = Ti*iy+Tj*jy+Tk*ky
 
-   uz=ui*iz+uj*jz+uk*kz
-   vz=vi*iz+vj*jz+vk*kz
-   wz=wi*iz+wj*jz+wk*kz
-   Tz=Ti*iz+Tj*jz+Tk*kz
+    uz = ui*iz+uj*jz+uk*kz
+    vz = vi*iz+vj*jz+vk*kz
+    wz = wi*iz+wj*jz+wk*kz
+    Tz = Ti*iz+Tj*jz+Tk*kz
 
-!---Õ³ĞÔÓ¦Á¦----------------------------------------------------------
-   mu0=0.5d0*(B%mu(i,j,k)+B%mu_t(i,j,k) + B%mu(i,j,k-1)+B%mu_t(i,j,k-1))          ! (I,J,k-1/2)µãµÄÕ³ĞÔÏµÊı £¨²ãÁ÷+ÍÄÁ÷£©  
-   k0=0.5d0*Cp*(B%mu(i,j,k)/PrL + B%mu_t(i,j,k)/PrT + B%mu(i,j,k-1)/PrL +B%mu_t(i,j,k-1)/PrT)   ! (I,J,K-1/2) µãµÄÈÈ´«µ¼ÏµÊı
+!---ç²˜æ€§åº”åŠ›----------------------------------------------------------
+    mu0 = 0.5d0*(B%mu(i, j, k)+B%mu_t(i, j, k)+B%mu(i, j, k-1)+B%mu_t(i, j, k-1))          ! (I,J,k-1/2)ç‚¹çš„ç²˜æ€§ç³»æ•° ï¼ˆå±‚æµ+æ¹æµï¼‰
+    k0 = 0.5d0*Cp*(B%mu(i, j, k)/PrL+B%mu_t(i, j, k)/PrT+B%mu(i, j, k-1)/PrL+B%mu_t(i, j, k-1)/PrT)   ! (I,J,K-1/2) ç‚¹çš„çƒ­ä¼ å¯¼ç³»æ•°
 
-   s11=mu0*(tmp1*ux-tmp2*(vy+wz))    ! tmp1=4.d0/3.d0; tmp2=2.d0/3.d0
-   s12=mu0*(uy+vx)
-   s13=mu0*(uz+wx)
-   s22=mu0*(tmp1*vy-tmp2*(ux+wz))
-   s23=mu0*(vz+wy)
-   s33=mu0*(tmp1*wz-tmp2*(ux+vy))
+    s11 = mu0*(tmp1*ux-tmp2*(vy+wz))    ! tmp1=4.d0/3.d0; tmp2=2.d0/3.d0
+    s12 = mu0*(uy+vx)
+    s13 = mu0*(uz+wx)
+    s22 = mu0*(tmp1*vy-tmp2*(ux+wz))
+    s23 = mu0*(vz+wy)
+    s33 = mu0*(tmp1*wz-tmp2*(ux+vy))
 
-!---(I,J,K-1/2)µãÉÏµÄËÙ¶È--------------------------------------------   
-   u1=(uu(i,j,k)+uu(i,j,k-1))*0.5d0
-   v1=(v(i,j,k)+v(i,j,k-1))*0.5d0
-   w1=(w(i,j,k)+w(i,j,k-1))*0.5d0
-!--ÄÜÁ¿µÄÕ³ĞÔÍ¨Á¿-------------------------------
-   E1=u1*s11+v1*s12+w1*s13+k0*Tx
-   E2=u1*s12+v1*s22+w1*s23+k0*Ty
-   E3=u1*s13+v1*s23+w1*s33+k0*Tz
-!-------Í¨Á¿=ÎŞÕ³Í¨Á¿+Õ³ĞÔÍ¨Á¿---------------------------------------
-! Õ³ĞÔÍ¨Á¿=Fv.n=Fv1*s1x+Fv2*s1y+Fv3*s1z---------------
-    Flux(2,i,j,k)=(s11*s1x+s12*s1y+s13*s1z)* B%Sk(i,j,k)  
-    Flux(3,i,j,k)=(s12*s1x+s22*s1y+s23*s1z)* B%Sk(i,j,k)
-    Flux(4,i,j,k)=(s13*s1x+s23*s1y+s33*s1z)* B%Sk(i,j,k)
-    Flux(5,i,j,k)=(E1*s1x+E2*s1y+E3*s1z)* B%Sk(i,j,k)
-!--------------------------------------------------------------------  
-   enddo
-   enddo
-   enddo
+!---(I,J,K-1/2)ç‚¹ä¸Šçš„é€Ÿåº¦--------------------------------------------
+    u1 = (uu(i, j, k)+uu(i, j, k-1))*0.5d0
+    v1 = (v(i, j, k)+v(i, j, k-1))*0.5d0
+    w1 = (w(i, j, k)+w(i, j, k-1))*0.5d0
+!--èƒ½é‡çš„ç²˜æ€§é€šé‡-------------------------------
+    E1 = u1*s11+v1*s12+w1*s13+k0*Tx
+    E2 = u1*s12+v1*s22+w1*s23+k0*Ty
+    E3 = u1*s13+v1*s23+w1*s33+k0*Tz
+!-------é€šé‡=æ— ç²˜é€šé‡+ç²˜æ€§é€šé‡---------------------------------------
+! ç²˜æ€§é€šé‡=Fv.n=Fv1*s1x+Fv2*s1y+Fv3*s1z---------------
+    Flux(2, i, j, k) = (s11*s1x+s12*s1y+s13*s1z)*B%Sk(i, j, k)
+    Flux(3, i, j, k) = (s12*s1x+s22*s1y+s23*s1z)*B%Sk(i, j, k)
+    Flux(4, i, j, k) = (s13*s1x+s23*s1y+s33*s1z)*B%Sk(i, j, k)
+    Flux(5, i, j, k) = (E1*s1x+E2*s1y+E3*s1z)*B%Sk(i, j, k)
+!--------------------------------------------------------------------
+  end do
+  end do
+  end do
 !$OMP END DO
 
 !$OMP  DO
-     do k=1,nz-1
-     do j=1,ny-1
-     do i=1,nx-1
-     do m=2,5
-      B%Res(m,i,j,k)=B%Res(m,i,j,k)+Flux(m,i,j,k+1)-Flux(m,i,j,k)           
-     enddo
-	 enddo
-     enddo
-     enddo
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do i = 1, nx-1
+  do m = 2, 5
+    B%Res(m, i, j, k) = B%Res(m, i, j, k)+Flux(m, i, j, k+1)-Flux(m, i, j, k)
+  end do
+  end do
+  end do
+  end do
 !$OMP END DO
 
-!---¼ÇÂ¼±ß½ç´¦µÄÕ³ĞÔÁ¦-------------------------------------
+!---è®°å½•è¾¹ç•Œå¤„çš„ç²˜æ€§åŠ›-------------------------------------
 !$OMP  DO
-   do j=1,ny-1 
-   do i=1,nx-1
-     B%Surf3(i,j,1)=Flux(2,i,j,1)
-     B%Surf3(i,j,2)=Flux(3,i,j,1)
-     B%Surf3(i,j,3)=Flux(4,i,j,1)
-     B%Surf6(i,j,1)=Flux(2,i,j,nz)
-     B%Surf6(i,j,2)=Flux(3,i,j,nz)
-     B%Surf6(i,j,3)=Flux(4,i,j,nz)
-   enddo
-   enddo
+  do j = 1, ny-1
+  do i = 1, nx-1
+    B%Surf3(i, j, 1) = Flux(2, i, j, 1)
+    B%Surf3(i, j, 2) = Flux(3, i, j, 1)
+    B%Surf3(i, j, 3) = Flux(4, i, j, 1)
+    B%Surf6(i, j, 1) = Flux(2, i, j, nz)
+    B%Surf6(i, j, 2) = Flux(3, i, j, nz)
+    B%Surf6(i, j, 3) = Flux(4, i, j, nz)
+  end do
+  end do
 !$OMP END DO
 !$OMP END PARALLEL
 
-
- end subroutine flux_viscous_k
-
-
-
-
-
-
-
+end subroutine flux_viscous_k
 
 !--------------------------------------------------------------------------
-! Ô­Ê¼±äÁ¿ÖØ¹¹  
-   subroutine Reconstuction_original(U0,UL,UR,gamma,Iflag_Scheme)
-     use  const_var
-  	 implicit none
-     real(PRE_EC):: U0(1-LAP:LAP,5) ,UL(5),UR(5),gamma
-     integer:: Iflag_Scheme,m
+! åŸå§‹å˜é‡é‡æ„
+subroutine Reconstuction_original(U0, UL, UR, gamma, Iflag_Scheme)
+  use const_var
+  implicit none
+  real(PRE_EC):: U0(1-LAP:LAP, 5), UL(5), UR(5), gamma
+  integer:: Iflag_Scheme, m
 !    U0(k,m) : k=1,4 for  i-2,i-1,i,i+1    ;   m=1,5 for d,u,v,w,p
-     do m=1,5
-       call scheme_fP(UL(m),U0(:,m),Iflag_Scheme) 
-       call scheme_fm(UR(m),U0(:,m),Iflag_Scheme) 
-     enddo
-   end subroutine Reconstuction_original
+  do m = 1, 5
+    call scheme_fP(UL(m), U0(:, m), Iflag_Scheme)
+    call scheme_fm(UR(m), U0(:, m), Iflag_Scheme)
+  end do
+end subroutine Reconstuction_original
 
-! ÊØºã±äÁ¿ÖØ¹¹
-   subroutine Reconstuction_conservative(U0,UL,UR,gamma,Iflag_Scheme)
-     use  const_var
-   	 implicit none
-     real(PRE_EC):: U0(1-LAP:LAP,5),UL(5),UR(5),QL(5),QR(5),gamma
-     integer:: Iflag_Scheme,m
+! å®ˆæ’å˜é‡é‡æ„
+subroutine Reconstuction_conservative(U0, UL, UR, gamma, Iflag_Scheme)
+  use const_var
+  implicit none
+  real(PRE_EC):: U0(1-LAP:LAP, 5), UL(5), UR(5), QL(5), QR(5), gamma
+  integer:: Iflag_Scheme, m
 !    U0(k,m) : k=1,4 for  i-2,i-1,i,i+1   ; m for the conservative variables U0(1,m)=d, U0(2,m)=d*u, ....
-     do m=1,5
-        call scheme_fP(QL(m),U0(:,m),Iflag_Scheme) 
-        call scheme_fm(QR(m),U0(:,m),Iflag_Scheme) 
-      enddo
-!          find a bug  UL(4)=(QL(4)-(UL(2)*QL(2)+ .... 
-       UL(1)=QL(1); UL(2)=QL(2)/UL(1); UL(3)=QL(3)/UL(1); UL(4)=QL(4)/UL(1)    ! density and velocities
-       UL(5)=(QL(5)-(UL(2)*QL(2)+UL(3)*QL(3)+UL(4)*QL(4))*0.5d0)*(gamma-1.d0)  ! pressure
-       UR(1)=QR(1); UR(2)=QR(2)/UR(1); UR(3)=QR(3)/UR(1); UR(4)=QR(4)/UR(1) 
-       UR(5)=(QR(5)-(UR(2)*QR(2)+UR(3)*QR(3)+UR(4)*QR(4))*0.5d0)*(gamma-1.d0)  ! pressure
-   end subroutine Reconstuction_conservative
+  do m = 1, 5
+    call scheme_fP(QL(m), U0(:, m), Iflag_Scheme)
+    call scheme_fm(QR(m), U0(:, m), Iflag_Scheme)
+  end do
+!          find a bug  UL(4)=(QL(4)-(UL(2)*QL(2)+ ....
+  UL(1) = QL(1); UL(2) = QL(2)/UL(1); UL(3) = QL(3)/UL(1); UL(4) = QL(4)/UL(1)    ! density and velocities
+  UL(5) = (QL(5)-(UL(2)*QL(2)+UL(3)*QL(3)+UL(4)*QL(4))*0.5d0)*(gamma-1.d0)  ! pressure
+  UR(1) = QR(1); UR(2) = QR(2)/UR(1); UR(3) = QR(3)/UR(1); UR(4) = QR(4)/UR(1)
+  UR(5) = (QR(5)-(UR(2)*QR(2)+UR(3)*QR(3)+UR(4)*QR(4))*0.5d0)*(gamma-1.d0)  ! pressure
+end subroutine Reconstuction_conservative
 
-
-!------------------------------ ÌØÕ÷±äÁ¿ÖØ¹¹ --------------------------------------------------
-! ´úÂëÓÉÀäÑÒ¿ª·¢
-   subroutine Reconstuction_Characteristic(U0,UL,UR,gamma,Iflag_Scheme)
-   use  const_var
-   implicit none
-   real(PRE_EC):: U0(1-LAP:LAP,5),V0(1-LAP:LAP,5),UL(5),UR(5),gamma
-   real(PRE_EC):: Uh(5),S(5,5),S1(5,5),VL(5),VR(5),QL(5),QR(5)
-   real(PRE_EC):: v2,d1,u1,v1,p1,c1,w1,tmp0,tmp1,tmp3,tmp5
-   integer:: Iflag_Scheme,i,j,k,m
+!------------------------------ ç‰¹å¾å˜é‡é‡æ„ --------------------------------------------------
+! ä»£ç ç”±å†·å²©å¼€å‘
+subroutine Reconstuction_Characteristic(U0, UL, UR, gamma, Iflag_Scheme)
+  use const_var
+  implicit none
+  real(PRE_EC):: U0(1-LAP:LAP, 5), V0(1-LAP:LAP, 5), UL(5), UR(5), gamma
+  real(PRE_EC):: Uh(5), S(5, 5), S1(5, 5), VL(5), VR(5), QL(5), QR(5)
+  real(PRE_EC):: v2, d1, u1, v1, p1, c1, w1, tmp0, tmp1, tmp3, tmp5
+  integer:: Iflag_Scheme, i, j, k, m
 ! U0(k,m) : k=1-LAP,LAP    ; m for the conservative variables U0(1,m)=d, U0(2,m)=d*u, ....
-   Uh(:)=0.5d0*(U0(0,:)+U0(1,:))           ! conservative variables in the point I-1/2  (or i)
-   d1=Uh(1); u1=Uh(2)/d1; v1=Uh(3)/d1; w1=Uh(4)/d1; p1=(Uh(5)-(Uh(2)*u1+Uh(3)*v1+Uh(4)*w1)*0.5d0)*(gamma-1.d0)  ! density, velocity, pressure and sound speed
-   c1=sqrt(gamma*p1/d1)
-   v2=(u1*u1+v1*v1+w1*w1)*0.5d0
-   tmp1=(gamma-1.d0)/c1
-   tmp3=(gamma-1.d0)/(c1*c1)
-   tmp5=1.d0/(2.d0*c1)
-   tmp0=1.d0/tmp3
+  Uh(:) = 0.5d0*(U0(0, :)+U0(1, :))           ! conservative variables in the point I-1/2  (or i)
+  d1 = Uh(1); u1 = Uh(2)/d1; v1 = Uh(3)/d1; w1 = Uh(4)/d1; p1 = (Uh(5)-(Uh(2)*u1+Uh(3)*v1+Uh(4)*w1)*0.5d0)*(gamma-1.d0)  ! density, velocity, pressure and sound speed
+  c1 = sqrt(gamma*p1/d1)
+  v2 = (u1*u1+v1*v1+w1*w1)*0.5d0
+  tmp1 = (gamma-1.d0)/c1
+  tmp3 = (gamma-1.d0)/(c1*c1)
+  tmp5 = 1.d0/(2.d0*c1)
+  tmp0 = 1.d0/tmp3
 
-! A=S(-1)*LAMDA*S    see ¡¶¼ÆËã¿ÕÆø¶¯Á¦Ñ§¡· 158-159Ò³   (with alfa1=1, alfa2=0, alfa3=0)
-   S(1,1)=V2-tmp0;       S(1,2)=-u1 ;   S(1,3)=-v1 ;        S(1,4)=-w1;                  S(1,5)=1.d0
-   S(2,1)=-v1 ;          S(2,2)=0.d0 ;  S(2,3)=1.d0 ;       S(2,4)=0.d0;                 S(2,5)=0.d0 
-   S(3,1)=-w1 ;          S(3,2)=0.d0 ;  S(3,3)=0.d0 ;       S(3,4)=1.d0 ;                S(3,5)=0.d0 
-   S(4,1)=-u1-V2*tmp1;   S(4,2)=1.d0+tmp1*u1;     S(4,3)=tmp1*v1;     S(4,4)=tmp1*w1;    S(4,5)=-tmp1
-   S(5,1)=-u1+V2*tmp1;   S(5,2)=1.d0-tmp1*u1;     S(5,3)=-tmp1*v1;    S(5,4)=-tmp1*w1;   S(5,5)=tmp1 
-   
-   S1(1,1)=-tmp3;    S1(1,2)=0.d0;   S1(1,3)=0.d0;    S1(1,4)=-tmp5 ;                   S1(1,5)=tmp5
-   S1(2,1)=-tmp3*u1; S1(2,2)=0.d0;   S1(2,3)=0.d0;    S1(2,4)=0.5d0-u1*tmp5 ;           S1(2,5)=0.5d0+u1*tmp5
-   S1(3,1)=-tmp3*v1; S1(3,2)=1.d0;   S1(3,3)=0.d0;    S1(3,4)=-v1*tmp5;                 S1(3,5)=v1*tmp5
-   S1(4,1)=-tmp3*w1; S1(4,2)=0.d0;   S1(4,3)=1.d0;    S1(4,4)=-w1*tmp5;                 S1(4,5)=w1*tmp5
-   S1(5,1)=-tmp3*V2; S1(5,2)=v1;     S1(5,3)=w1;      S1(5,4)=(c1*u1-V2-tmp0)*tmp5;     S1(5,5)=(c1*u1+V2+tmp0)*tmp5
+! A=S(-1)*LAMDA*S    see ã€Šè®¡ç®—ç©ºæ°”åŠ¨åŠ›å­¦ã€‹ 158-159é¡µ   (with alfa1=1, alfa2=0, alfa3=0)
+  S(1, 1) = V2-tmp0; S(1, 2) = -u1; S(1, 3) = -v1; S(1, 4) = -w1; S(1, 5) = 1.d0
+  S(2, 1) = -v1; S(2, 2) = 0.d0; S(2, 3) = 1.d0; S(2, 4) = 0.d0; S(2, 5) = 0.d0
+  S(3, 1) = -w1; S(3, 2) = 0.d0; S(3, 3) = 0.d0; S(3, 4) = 1.d0; S(3, 5) = 0.d0
+  S(4, 1) = -u1-V2*tmp1; S(4, 2) = 1.d0+tmp1*u1; S(4, 3) = tmp1*v1; S(4, 4) = tmp1*w1; S(4, 5) = -tmp1
+  S(5, 1) = -u1+V2*tmp1; S(5, 2) = 1.d0-tmp1*u1; S(5, 3) = -tmp1*v1; S(5, 4) = -tmp1*w1; S(5, 5) = tmp1
+
+  S1(1, 1) = -tmp3; S1(1, 2) = 0.d0; S1(1, 3) = 0.d0; S1(1, 4) = -tmp5; S1(1, 5) = tmp5
+  S1(2, 1) = -tmp3*u1; S1(2, 2) = 0.d0; S1(2, 3) = 0.d0; S1(2, 4) = 0.5d0-u1*tmp5; S1(2, 5) = 0.5d0+u1*tmp5
+  S1(3, 1) = -tmp3*v1; S1(3, 2) = 1.d0; S1(3, 3) = 0.d0; S1(3, 4) = -v1*tmp5; S1(3, 5) = v1*tmp5
+  S1(4, 1) = -tmp3*w1; S1(4, 2) = 0.d0; S1(4, 3) = 1.d0; S1(4, 4) = -w1*tmp5; S1(4, 5) = w1*tmp5
+  S1(5, 1) = -tmp3*V2; S1(5, 2) = v1; S1(5, 3) = w1; S1(5, 4) = (c1*u1-V2-tmp0)*tmp5; S1(5, 5) = (c1*u1+V2+tmp0)*tmp5
 ! V=SU      V(k)=S*U(k)
-   do k=1-LAP,LAP     
-     do m=1,5
-       V0(k,m)=0.d0
-       do j=1,5
-         V0(k,m)=V0(k,m)+S(m,j)*U0(k,j)
-       enddo
-     enddo
-   enddo  
-   do m=1,5
-     call scheme_fP(VL(m),V0(:,m),Iflag_Scheme) 
-     call scheme_fm(VR(m),V0(:,m),Iflag_Scheme) 
-   enddo
-   do m=1,5
-     QL(m)=0.d0; QR(m)=0.d0
-     do j=1,5
-       QL(m)=QL(m)+S1(m,j)*VL(j)
-       QR(m)=QR(m)+S1(m,j)*VR(j)
-     enddo
-   enddo
-   UL(1)=QL(1); UL(2)=QL(2)/UL(1)
-   UL(3)=QL(3)/UL(1); UL(4)=QL(4)/UL(1)
-   UL(5)=(QL(5)-(UL(2)*QL(2)+UL(3)*QL(3)+UL(4)*QL(4))*0.5d0)*(gamma-1.d0)  ! density, velocity, pressure and sound speed
-  
-   UR(1)=QR(1); UR(2)=QR(2)/UR(1)
-   UR(3)=QR(3)/UR(1); UR(4)=QR(4)/UR(1)
-   UR(5)=(QR(5)-(UR(2)*QR(2)+UR(3)*QR(3)+UR(4)*QR(4))*0.5d0)*(gamma-1.d0)  
-   end subroutine Reconstuction_Characteristic
+  do k = 1-LAP, LAP
+  do m = 1, 5
+    V0(k, m) = 0.d0
+    do j = 1, 5
+      V0(k, m) = V0(k, m)+S(m, j)*U0(k, j)
+    end do
+  end do
+  end do
+  do m = 1, 5
+    call scheme_fP(VL(m), V0(:, m), Iflag_Scheme)
+    call scheme_fm(VR(m), V0(:, m), Iflag_Scheme)
+  end do
+  do m = 1, 5
+    QL(m) = 0.d0; QR(m) = 0.d0
+    do j = 1, 5
+      QL(m) = QL(m)+S1(m, j)*VL(j)
+      QR(m) = QR(m)+S1(m, j)*VR(j)
+    end do
+  end do
+  UL(1) = QL(1); UL(2) = QL(2)/UL(1)
+  UL(3) = QL(3)/UL(1); UL(4) = QL(4)/UL(1)
+  UL(5) = (QL(5)-(UL(2)*QL(2)+UL(3)*QL(3)+UL(4)*QL(4))*0.5d0)*(gamma-1.d0)  ! density, velocity, pressure and sound speed
+
+  UR(1) = QR(1); UR(2) = QR(2)/UR(1)
+  UR(3) = QR(3)/UR(1); UR(4) = QR(4)/UR(1)
+  UR(5) = (QR(5)-(UR(2)*QR(2)+UR(3)*QR(3)+UR(4)*QR(4))*0.5d0)*(gamma-1.d0)
+end subroutine Reconstuction_Characteristic
 !-----------------------------------------------------------------------------------------------------------
 
-
-
-
-
-!----------¼ÆËãÕ³ĞÔÏµÊı (Surthland¹«Ê½)------------------------
-   subroutine get_viscous(nMesh,mBlock)
-   Use Global_Var
-   Use Flow_Var
-   implicit none
-   real(PRE_EC):: Tsb
-   integer:: mBlock,i,j,k,nMesh,nx,ny,nz
-  Type (Block_TYPE),pointer:: B
-   B => Mesh(nMesh)%Block(mBlock)
-   Tsb=110.4d0/T_inf
-    nx=B%nx ; ny=B%ny ; nz=B%nz
+!----------è®¡ç®—ç²˜æ€§ç³»æ•° (Surthlandå…¬å¼)------------------------
+subroutine get_viscous(nMesh, mBlock)
+  Use Global_Var
+  Use Flow_Var
+  implicit none
+  real(PRE_EC):: Tsb
+  integer:: mBlock, i, j, k, nMesh, nx, ny, nz
+  Type(Block_TYPE), pointer:: B
+  B => Mesh(nMesh)%Block(mBlock)
+  Tsb = 110.4d0/T_inf
+  nx = B%nx; ny = B%ny; nz = B%nz
 
 !$OMP PARALLEL DO DEFAULT(PRIVATE) SHARED(B,nx,ny,nz,Tsb,T,Re)
-     do k=1,nz-1
-     do j=1,ny-1
-     do i=1,nx-1
-       B%mu(i,j,k)=1.d0/Re*(1.d0+Tsb)*sqrt(T(i,j,k)**3)/(Tsb+T(i,j,k))
-     enddo
-     enddo
-     enddo
+  do k = 1, nz-1
+  do j = 1, ny-1
+  do i = 1, nx-1
+    B%mu(i, j, k) = 1.d0/Re*(1.d0+Tsb)*sqrt(T(i, j, k)**3)/(Tsb+T(i, j, k))
+  end do
+  end do
+  end do
 !$OMP END PARALLEL DO
 
-!  Õ³ĞÔÏµÊıĞéÍø¸ñÉÏµÄÖµ £¨¸´ÖÆÁÙ½üÃæµÄÖµ£©
-    B%mu(0,1:ny-1,1:nz-1)=B%mu(1,1:ny-1,1:nz-1)
-	B%mu(nx,1:ny-1,1:nz-1)=B%mu(nx-1,1:ny-1,1:nz-1)
-	B%mu(1:nx-1,0,1:nz-1)=B%mu(1:nx-1,1,1:nz-1)
-	B%mu(1:nx-1,ny,1:nz-1)=B%mu(1:nx-1,ny-1,1:nz-1)
- 	B%mu(1:nx-1,1:ny-1,0)=B%mu(1:nx-1,1:ny-1,1)
-  	B%mu(1:nx-1,1:ny-1,nz)=B%mu(1:nx-1,1:ny-1,nz-1)
-  end subroutine get_viscous
+!  ç²˜æ€§ç³»æ•°è™šç½‘æ ¼ä¸Šçš„å€¼ ï¼ˆå¤åˆ¶ä¸´è¿‘é¢çš„å€¼ï¼‰
+  B%mu(0, 1:ny-1, 1:nz-1) = B%mu(1, 1:ny-1, 1:nz-1)
+  B%mu(nx, 1:ny-1, 1:nz-1) = B%mu(nx-1, 1:ny-1, 1:nz-1)
+  B%mu(1:nx-1, 0, 1:nz-1) = B%mu(1:nx-1, 1, 1:nz-1)
+  B%mu(1:nx-1, ny, 1:nz-1) = B%mu(1:nx-1, ny-1, 1:nz-1)
+  B%mu(1:nx-1, 1:ny-1, 0) = B%mu(1:nx-1, 1:ny-1, 1)
+  B%mu(1:nx-1, 1:ny-1, nz) = B%mu(1:nx-1, 1:ny-1, nz-1)
+end subroutine get_viscous
 
 !----------------------------------------------------
-!  ¶ÔÍÄÁ÷Õ³ĞÔÏµÊı½øĞĞÏŞÖÆ (²»ÄÜ³öÏÖ¸ºÖµ£¬²»ÄÜ³¬¹ı²ãÁ÷Õ³ĞÔÏµÊıµÄMUT_MAX±¶£©
-  subroutine limit_mut(nMesh,mBlock)
-   Use Global_Var
-   Use Flow_Var
-   implicit none
+!  å¯¹æ¹æµç²˜æ€§ç³»æ•°è¿›è¡Œé™åˆ¶ (ä¸èƒ½å‡ºç°è´Ÿå€¼ï¼Œä¸èƒ½è¶…è¿‡å±‚æµç²˜æ€§ç³»æ•°çš„MUT_MAXå€ï¼‰
+subroutine limit_mut(nMesh, mBlock)
+  Use Global_Var
+  Use Flow_Var
+  implicit none
 !   real(PRE_EC),parameter:: MUT_MAX=200.d0
-   integer:: mBlock,i,j,k,nMesh,nx,ny,nz
-  Type (Block_TYPE),pointer:: B
+  integer:: mBlock, i, j, k, nMesh, nx, ny, nz
+  Type(Block_TYPE), pointer:: B
   B => Mesh(nMesh)%Block(mBlock)
-  nx=B%nx ; ny=B%ny ; nz=B%nz
+  nx = B%nx; ny = B%ny; nz = B%nz
 
 !$OMP PARALLEL DO DEFAULT(FIRSTPRIVATE) SHARED(B,nx,ny,nz,MUT_MAX)
-     do k=0,nz
-     do j=0,ny
-     do i=0,nx
-       if(B%mu_t(i,j,k) .lt. 0.)  B%mu_t(i,j,k)=0.
-       if( MUT_MAX >=0.d0 .and. B%mu_t(i,j,k) > MUT_MAX*B%mu(i,j,k)) B%mu_t(i,j,k)=MUT_MAX*B%mu(i,j,k)
-     enddo
-     enddo
-     enddo
+  do k = 0, nz
+  do j = 0, ny
+  do i = 0, nx
+    if (B%mu_t(i, j, k) .lt. 0.) B%mu_t(i, j, k) = 0.
+    if (MUT_MAX >= 0.d0 .and. B%mu_t(i, j, k) > MUT_MAX*B%mu(i, j, k)) B%mu_t(i, j, k) = MUT_MAX*B%mu(i, j, k)
+  end do
+  end do
+  end do
 !$OMP END PARALLEL DO
-   call Amut_boundary(nMesh,mBlock)
-   end subroutine limit_mut
-
-
-
+  call Amut_boundary(nMesh, mBlock)
+end subroutine limit_mut
 
 !---------------------------------------------------------
-!  ÀûÓÃÊØºã±äÁ¿£¬¼ÆËã»ù±¾Á¿ (d,u,v,T,p,c) 
-!  ´¦Àí¼ÆËãÒì³£ (ÀıÈç ÎÂ¶ÈÎª¸ºÖµ)
+!  åˆ©ç”¨å®ˆæ’å˜é‡ï¼Œè®¡ç®—åŸºæœ¬é‡ (d,u,v,T,p,c)
+!  å¤„ç†è®¡ç®—å¼‚å¸¸ (ä¾‹å¦‚ æ¸©åº¦ä¸ºè´Ÿå€¼)
 !----------------------------------------------------------
-  subroutine comput_duvtpc(nMesh,mBlock)
-   use Global_Var
-   use Flow_Var 
-   implicit none
-   Type (Block_TYPE),pointer:: B
-   integer nMesh,mBlock,nx,ny,nz,i,j,k
-   real(PRE_EC) p00  
-   
-   p00=1.d0/(gamma*Ma*Ma)
-   B => Mesh(nMesh)%Block(mBlock)                 !µÚnMesh ÖØÍø¸ñµÄµÚmBlock¿é
-   nx=B%nx; ny=B%ny; nz=B%nz
+subroutine comput_duvtpc(nMesh, mBlock)
+  use Global_Var
+  use Flow_Var
+  implicit none
+  Type(Block_TYPE), pointer:: B
+  integer nMesh, mBlock, nx, ny, nz, i, j, k
+  real(PRE_EC) p00
 
+  p00 = 1.d0/(gamma*Ma*Ma)
+  B => Mesh(nMesh)%Block(mBlock)                 !ç¬¬nMesh é‡ç½‘æ ¼çš„ç¬¬mBlockå—
+  nx = B%nx; ny = B%ny; nz = B%nz
 
 !$OMP PARALLEL DO DEFAULT(FIRSTPRIVATE) SHARED(p00,nx,ny,nz,B,d,uu,v,w,T,p,cc,Ma,Cv)
-   do k=1-LAP,nz+LAP-1
-     do j=1-LAP,ny+LAP-1
-       do i=1-LAP,nx+LAP-1
-         d(i,j,k)= B%U(1,i,j,k)
-         uu(i,j,k)=B%U(2,i,j,k)/d(i,j,k)
-         v(i,j,k)= B%U(3,i,j,k)/d(i,j,k)
-         w(i,j,k)= B%U(4,i,j,k)/d(i,j,k)
-         T(i,j,k)=(B%U(5,i,j,k)-0.5d0*d(i,j,k)*(uu(i,j,k)*uu(i,j,k)+v(i,j,k)*v(i,j,k)+w(i,j,k)*w(i,j,k)))/(Cv*d(i,j,k))
-         p(i,j,k)= p00*d(i,j,k)*T(i,j,k)
-		 cc(i,j,k)=sqrt(T(i,j,k))/Ma                   ! ÉùËÙ
-       enddo
-     enddo
-   enddo
-!$OMP END PARALLEL  DO 
+  do k = 1-LAP, nz+LAP-1
+  do j = 1-LAP, ny+LAP-1
+  do i = 1-LAP, nx+LAP-1
+    d(i, j, k) = B%U(1, i, j, k)
+    uu(i, j, k) = B%U(2, i, j, k)/d(i, j, k)
+    v(i, j, k) = B%U(3, i, j, k)/d(i, j, k)
+    w(i, j, k) = B%U(4, i, j, k)/d(i, j, k)
+    T(i,j,k)=(B%U(5,i,j,k)-0.5d0*d(i,j,k)*(uu(i,j,k)*uu(i,j,k)+v(i,j,k)*v(i,j,k)+w(i,j,k)*w(i,j,k)))/(Cv*d(i,j,k))
+    p(i, j, k) = p00*d(i, j, k)*T(i, j, k)
+    cc(i, j, k) = sqrt(T(i, j, k))/Ma                   ! å£°é€Ÿ
+  end do
+  end do
+  end do
+!$OMP END PARALLEL  DO
 
 ! Debug Debug message
-   if(IF_Debug == 2) then   ! show values at one point 
-     if(B%Block_no == Pdebug(1)) then
-	  i=Pdebug(2); j=Pdebug(3); k=Pdebug(4)
-	  print*, "-----Debug , d,u,v,w,T,p= ----"
-	  print*, d(i,j,k),uu(i,j,k),v(i,j,k),w(i,j,k),T(i,j,k),p(i,j,k)
-	endif
-  endif
+  if (IF_Debug == 2) then   ! show values at one point
+  if (B%Block_no == Pdebug(1)) then
+    i = Pdebug(2); j = Pdebug(3); k = Pdebug(4)
+    print *, "-----Debug , d,u,v,w,T,p= ----"
+    print *, d(i, j, k), uu(i, j, k), v(i, j, k), w(i, j, k), T(i, j, k), p(i, j, k)
+  end if
+  end if
 
-
-  end subroutine comput_duvtpc
-
-
-
+end subroutine comput_duvtpc

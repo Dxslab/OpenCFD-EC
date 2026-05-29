@@ -1,209 +1,203 @@
-! È«¾Ö±äÁ¿¼°Àà¶¨Òå
+! å…¨å±€å˜é‡åŠç±»å®šä¹‰
 !-----------------------------------------------------------------------------------
-! Consts  
-  module precision_EC
+! Consts
+module precision_EC
+  use mpi
   implicit none
-  include "mpif.h"
+  ! include "mpif.h"
 !     integer,parameter:: PRE_EC=4            ! Single precision
-     integer,parameter:: PRE_EC=8           ! Double Precision
-!    integer,parameter:: OCFD_DATA_TYPE=MPI_REAL  
-	integer,parameter:: OCFD_DATA_TYPE=MPI_DOUBLE_PRECISION ! Double precision
-  end module  precision_EC 
+  integer, parameter:: PRE_EC = 8           ! Double Precision
+!    integer,parameter:: OCFD_DATA_TYPE=MPI_REAL
+  integer, parameter:: OCFD_DATA_TYPE = MPI_DOUBLE_PRECISION ! Double precision
+end module precision_EC
 
 !------------------------------------------------------------------------------------
 
-! ³£Êı
-  module const_var
-   use precision_EC
-   implicit none
-   real(PRE_EC),parameter::  PI=3.1415926535897932d0, Lim_Zero=1.d-20   ! Ğ¡ÓÚ¸ÃÖµÈÏÎª0
-   integer,parameter:: LAP=4                          ! ĞéÍø¸ñµÄÊıÄ¿ £¨Ê¹ÓÃ3½×¸ñÊ½¸ÃÖµ²»Ğ¡ÓÚ2£»ÈçÊ¹ÓÃ5½×WENO, ¸ÃÖµ²»Ğ¡ÓÚ3; Èç¹ûÊ¹ÓÃWENO7, Ôò¸ÃÖµ²»Ğ¡ÓÚ4£©
-   integer,parameter:: Scheme_UD1=0, Scheme_NND2=1, Scheme_UD3=2,Scheme_MUSCL2U=3,Scheme_MUSCL2C=4,   &
-                       Scheme_MUSCL3=5,Scheme_OMUSCL2=6,Scheme_WENO5=7,Scheme_UD5=8, Scheme_WENO7=9
-   integer,parameter:: Scheme_CD2=20, Scheme_none=-1         ! ²»Ê¹ÓÃ£¨±ß½ç£©¸ñÊ½
-   integer,parameter:: Flux_Steger_Warming=1, Flux_HLL=2, Flux_HLLC=3,Flux_Roe=4,Flux_Van_Leer=5,Flux_Ausm=6
-   integer,parameter:: Reconst_Original=0,Reconst_Conservative=1,Reconst_Characteristic=2
+! å¸¸æ•°
+module const_var
+  use precision_EC
+  implicit none
+  real(PRE_EC), parameter::  PI = 3.1415926535897932d0, Lim_Zero = 1.d-20   ! å°äºè¯¥å€¼è®¤ä¸º0
+  integer, parameter:: LAP = 4                          ! è™šç½‘æ ¼çš„æ•°ç›® ï¼ˆä½¿ç”¨3é˜¶æ ¼å¼è¯¥å€¼ä¸å°äº2ï¼›å¦‚ä½¿ç”¨5é˜¶WENO, è¯¥å€¼ä¸å°äº3; å¦‚æœä½¿ç”¨WENO7, åˆ™è¯¥å€¼ä¸å°äº4ï¼‰
+  integer, parameter:: Scheme_UD1 = 0, Scheme_NND2 = 1, Scheme_UD3 = 2, Scheme_MUSCL2U = 3, Scheme_MUSCL2C = 4, &
+                       Scheme_MUSCL3 = 5, Scheme_OMUSCL2 = 6, Scheme_WENO5 = 7, Scheme_UD5 = 8, Scheme_WENO7 = 9
+  integer, parameter:: Scheme_CD2 = 20, Scheme_none = -1         ! ä¸ä½¿ç”¨ï¼ˆè¾¹ç•Œï¼‰æ ¼å¼
+  integer, parameter:: Flux_Steger_Warming = 1, Flux_HLL = 2, Flux_HLLC = 3, Flux_Roe = 4, Flux_Van_Leer = 5, Flux_Ausm = 6
+  integer, parameter:: Reconst_Original = 0, Reconst_Conservative = 1, Reconst_Characteristic = 2
 
-
-!---------------±ß½çÌõ¼ş-------------------------
+!---------------è¾¹ç•Œæ¡ä»¶-------------------------
 !  integer,parameter:: BC_Wall=-10, BC_Farfield=-20, BC_Periodic=-30,BC_Symmetry=-40,BC_Outlet=-22
-   integer,parameter::  BC_Wall=2, BC_Symmetry=3, BC_Farfield=4,BC_Inflow=5, BC_Outflow=6 
-   integer,parameter::  BC_Wall_Turbo=201             ! Ò¶ÂÖ»úĞµÖĞ»úÏ»µÄ±ß½çÌõ¼ş £¨¾ø¶ÔËÙ¶ÈÎª0£¬ Ïà¶Ô×ø±êÏµÓĞĞı×ª£© 
-   integer,parameter::  BC_Periodic=501, BC_Extrapolate=401      ! (À©Õ¹) ÓëGriggen .inpÎÄ¼şµÄ¶¨Òå¿ÉÄÜÓĞËùÇø±ğ£¬Çë×¢Òâ
-!                     ÖÜÆÚĞÔ±ß½çÌõ¼ş²¢·ÇÉèÖÃ³ÉBC_Peridodic=501, ¶øÊÇÉèÖÃBC_PeriodicL=-2, BC_PeriodicR=-3
+  integer, parameter::  BC_Wall = 2, BC_Symmetry = 3, BC_Farfield = 4, BC_Inflow = 5, BC_Outflow = 6
+  integer, parameter::  BC_Wall_Turbo = 201             ! å¶è½®æœºæ¢°ä¸­æœºåŒ£çš„è¾¹ç•Œæ¡ä»¶ ï¼ˆç»å¯¹é€Ÿåº¦ä¸º0ï¼Œ ç›¸å¯¹åæ ‡ç³»æœ‰æ—‹è½¬ï¼‰
+  integer, parameter::  BC_Periodic = 501, BC_Extrapolate = 401      ! (æ‰©å±•) ä¸Griggen .inpæ–‡ä»¶çš„å®šä¹‰å¯èƒ½æœ‰æ‰€åŒºåˆ«ï¼Œè¯·æ³¨æ„
+!                     å‘¨æœŸæ€§è¾¹ç•Œæ¡ä»¶å¹¶éè®¾ç½®æˆBC_Peridodic=501, è€Œæ˜¯è®¾ç½®BC_PeriodicL=-2, BC_PeriodicR=-3
 
-!   ÖÜÆÚ±ß½ç°´ÕÕÄÚ±ß½ç´¦Àí£¬ µ«¼¸ºÎ±äÁ¿Ğë×¨ÃÅ´¦Àí¡£ Ò¶ÂÖ»úÄ£Ê½ÏÂ£¬ÖÜÆÚ±ß½çÒ²ĞëÌØÊâ´¦Àí   
+!   å‘¨æœŸè¾¹ç•ŒæŒ‰ç…§å†…è¾¹ç•Œå¤„ç†ï¼Œ ä½†å‡ ä½•å˜é‡é¡»ä¸“é—¨å¤„ç†ã€‚ å¶è½®æœºæ¨¡å¼ä¸‹ï¼Œå‘¨æœŸè¾¹ç•Œä¹Ÿé¡»ç‰¹æ®Šå¤„ç†
 
-!  -1 ÄÚ±ß½ç £¨·ÇÎïÀí±ß½ç£©£»  -2  ×óÖÜÆÚ±ß½ç£» -3 ÓÒÖÜÆÚ±ß½ç £¨Çø·Ö×ó¡¢ÓÒ±ãÓÚ´¦Àí¼¸ºÎ×ø±ê£©
-   integer,parameter::  BC_Inner=-1, BC_PeriodicL=-2, BC_PeriodicR=-3   
-   
-   integer,parameter::  BC_Zero=0       ! ÎŞ±ß½çÌõ¼ş
+!  -1 å†…è¾¹ç•Œ ï¼ˆéç‰©ç†è¾¹ç•Œï¼‰ï¼›  -2  å·¦å‘¨æœŸè¾¹ç•Œï¼› -3 å³å‘¨æœŸè¾¹ç•Œ ï¼ˆåŒºåˆ†å·¦ã€å³ä¾¿äºå¤„ç†å‡ ä½•åæ ‡ï¼‰
+  integer, parameter::  BC_Inner = -1, BC_PeriodicL = -2, BC_PeriodicR = -3
 
-!                 ÓÃ»§×Ô¶¨ÒåµÄ±ß½çÌõ¼ş£¬ÒªÇó´úÂë >=900  
-   integer,parameter::  BC_USER_FixedInlet=901, BC_USER_Inlet_time=902       !¸ø¶¨Èë¿ÚÁ÷¶¯£» ¸ø¶¨Èë¿ÚÊ±¼äĞòÁĞ
-   integer,parameter:: BC_USER_Blow_Suction_Wall=903    ! ´µÎüÈÅ¶¯±ÚÃæ
+  integer, parameter::  BC_Zero = 0       ! æ— è¾¹ç•Œæ¡ä»¶
 
-   integer,parameter:: Time_Euler1=1,Time_RK3=3,Time_LU_SGS=0, Time_dual_LU_SGS=-1
-   integer,parameter:: Turbulence_NONE=0, Turbulence_BL=1, Turbulence_SA=2, Turbulence_SST=3,Turbulence_NewSA=21
-   integer,parameter:: Init_continue=1, Init_By_FreeStream=0, Init_By_Zeroflow=-1,  Smooth_2nd=0,Smooth_4th=1 
+!                 ç”¨æˆ·è‡ªå®šä¹‰çš„è¾¹ç•Œæ¡ä»¶ï¼Œè¦æ±‚ä»£ç  >=900
+  integer, parameter::  BC_USER_FixedInlet = 901, BC_USER_Inlet_time = 902       !ç»™å®šå…¥å£æµåŠ¨ï¼› ç»™å®šå…¥å£æ—¶é—´åºåˆ—
+  integer, parameter:: BC_USER_Blow_Suction_Wall = 903    ! å¹å¸æ‰°åŠ¨å£é¢
+
+  integer, parameter:: Time_Euler1 = 1, Time_RK3 = 3, Time_LU_SGS = 0, Time_dual_LU_SGS = -1
+  integer, parameter:: Turbulence_NONE = 0, Turbulence_BL = 1, Turbulence_SA = 2, Turbulence_SST = 3, Turbulence_NewSA = 21
+  integer, parameter:: Init_continue = 1, Init_By_FreeStream = 0, Init_By_Zeroflow = -1, Smooth_2nd = 0, Smooth_4th = 1
 !   real(PRE_EC), parameter::  Density_LIMIT=1.d-4,Temperature_LIMIT=1.d-4,Pressure_LIMIT=1.d-4
 
-   integer,parameter:: Method_FVM=0, Method_FDM=1        ! ²î·Ö¡¢ÓĞÏŞÌå»ı
-   integer,parameter:: FD_WENO5=1,FD_WENO7=2,FD_OMP6=3  ! ²î·Ö·¨²ÉÓÃµÄÊıÖµ¸ñÊ½
-   integer,parameter:: FD_Steger_Warming=1,FD_Van_Leer=2
+  integer, parameter:: Method_FVM = 0, Method_FDM = 1        ! å·®åˆ†ã€æœ‰é™ä½“ç§¯
+  integer, parameter:: FD_WENO5 = 1, FD_WENO7 = 2, FD_OMP6 = 3  ! å·®åˆ†æ³•é‡‡ç”¨çš„æ•°å€¼æ ¼å¼
+  integer, parameter:: FD_Steger_Warming = 1, FD_Van_Leer = 2
 
+end module const_var
 
-  end module const_var
+! å®šä¹‰ç±» (è¾¹ç•Œè¿æ¥ï¼Œ ç½‘æ ¼å—ï¼Œ "ç½‘æ ¼")
+module Mod_Type_Def
+  use precision_EC
+  implicit none
 
-! ¶¨ÒåÀà (±ß½çÁ¬½Ó£¬ Íø¸ñ¿é£¬ "Íø¸ñ")
- module Mod_Type_Def
-   use precision_EC
-   implicit none
+  TYPE BC_MSG_TYPE              ! è¾¹ç•Œé“¾æ¥ä¿¡æ¯
+    !   integer::  f_no, face, ist, iend, jst, jend, kst, kend, neighb, subface, orient   ! BXCFD .in format
+    integer:: ib, ie, jb, je, kb, ke, bc, face, f_no                      ! è¾¹ç•ŒåŒºåŸŸï¼ˆå­é¢ï¼‰çš„å®šä¹‰ï¼Œ .inp format
+    integer:: ib1, ie1, jb1, je1, kb1, ke1, nb1, face1, f_no1             ! è¿æ¥åŒºåŸŸ
+    integer:: L1, L2, L3                     ! å­é¢å·ï¼Œè¿æ¥é¡ºåºæè¿°ç¬¦
+  END TYPE BC_MSG_TYPE
 
-    TYPE BC_MSG_TYPE              ! ±ß½çÁ´½ÓĞÅÏ¢
- !   integer::  f_no, face, ist, iend, jst, jend, kst, kend, neighb, subface, orient   ! BXCFD .in format
-     integer:: ib,ie,jb,je,kb,ke,bc,face,f_no                      ! ±ß½çÇøÓò£¨×ÓÃæ£©µÄ¶¨Òå£¬ .inp format
-     integer:: ib1,ie1,jb1,je1,kb1,ke1,nb1,face1,f_no1             ! Á¬½ÓÇøÓò
-	 integer:: L1,L2,L3                     ! ×ÓÃæºÅ£¬Á¬½ÓË³ĞòÃèÊö·û
-   END TYPE BC_MSG_TYPE
+!------------------------------------ç½‘æ ¼å—--------------------------------------
+  TYPE Block_TYPE                                 ! æ•°æ®ç»“æ„ï¼šç½‘æ ¼å— ï¼›åŒ…å«å‡ ä½•å˜é‡åŠç‰©ç†å˜é‡çš„ä¿¡æ¯
+    integer::  Block_no, mpi_id           ! å—å·ï¼›æ‰€å±çš„è¿›ç¨‹å·
+    integer::  nx, ny, nz                   ! ç½‘æ ¼æ•°nx,ny,nz
+    integer::  subface                   ! å­é¢æ•°
+    !   å‡ ä½•é‡
+    real(PRE_EC), pointer, dimension(:, :, :):: x, y, z     ! coordinates of vortex, ç½‘æ ¼èŠ‚ç‚¹åæ ‡
+    real(PRE_EC), pointer, dimension(:, :, :):: xc, yc, zc  ! coordinates of cell center, ç½‘æ ¼ä¸­å¿ƒåæ ‡
+    real(PRE_EC), pointer, dimension(:, :, :):: Vol, Si, Sj, Sk ! Volume and surface area, æ§åˆ¶ä½“çš„ä½“ç§¯ï¼Œi,j,kæ–¹å‘æ§åˆ¶ä½“è¾¹ç•Œé¢çš„é¢ç§¯
+    real(PRE_EC), pointer, dimension(:, :, :):: ni1, ni2, ni3, nj1, nj2, nj3, nk1, nk2, nk3  !  i,j,kæ–¹å‘ä¸‰ä¸ªæ§åˆ¶é¢çš„æ³•æ–¹å‘
+!      Jocabian å˜æ¢ç³»æ•°
+    real(PRE_EC), pointer, dimension(:, :, :):: ix1, iy1, iz1, jx1, jy1, jz1, kx1, ky1, kz1
+    real(PRE_EC), pointer, dimension(:, :, :):: ix2, iy2, iz2, jx2, jy2, jz2, kx2, ky2, kz2
+    real(PRE_EC), pointer, dimension(:, :, :):: ix3, iy3, iz3, jx3, jy3, jz3, kx3, ky3, kz3
+    real(PRE_EC), pointer, dimension(:, :, :):: ix0, iy0, iz0, jx0, jy0, jz0, kx0, ky0, kz0
+!     ç‰©ç†é‡
+    real(PRE_EC), pointer, dimension(:, :, :, :) :: U, Un, Un1    ! å®ˆæ’å˜é‡ (æœ¬æ—¶é—´æ­¥åŠå‰ä¸€ã€äºŒä¸ªæ—¶é—´æ­¥çš„å€¼), conversation variables
+    real(PRE_EC), pointer, dimension(:, :, :, :) :: Res         ! æ®‹å·® ï¼ˆå‡€é€šé‡ï¼‰
+    real(PRE_EC), pointer, dimension(:, :, :):: dt          ! (å±€éƒ¨)æ—¶é—´æ­¥é•¿
+    real(PRE_EC), pointer, dimension(:, :, :, :) :: QF      ! å¼ºè¿«å‡½æ•° (å¤šé‡ç½‘æ ¼æ³•ä¸­ç²—ç½‘æ ¼ä½¿ç”¨)
+    real(PRE_EC), pointer, dimension(:, :, :, :) :: deltU   ! å®ˆæ’å˜é‡çš„å·®å€¼, dU=U(n+1)-U(n)  å¤šé‡ç½‘æ ¼ä½¿ç”¨
+    real(PRE_EC), pointer, dimension(:, :, :, :) :: DU      ! U(n+1)-U(n)    LU-SGSä¸­ä½¿ç”¨
+    real(PRE_EC), pointer, dimension(:, :, :):: dw         ! turbulent viscous ; distance to the wall  (used in SA model)
+    real(PRE_EC), pointer, dimension(:, :, :):: surf1, surf2, surf3, surf4, surf5, surf6  ! è¾¹ç•Œå¤„çš„é€šé‡ï¼Œä¾›è®¡ç®—æ°”åŠ¨åŠ›ã€çƒ­ä½¿ç”¨ï¼›
+    real(PRE_EC), pointer, dimension(:, :, :):: mu, mu_t    ! å±‚æµç²˜æ€§ç³»æ•°å’Œæ¹æµç²˜æ€§ç³»æ•°
+    real(PRE_EC), pointer, dimension(:, :, :):: dtime_mesh   ! æ—¶é—´æ­¥é•¿å› å­ ï¼ˆæ ¹æ®ç½‘æ ¼è´¨é‡æƒ…å†µï¼‰
 
-!------------------------------------Íø¸ñ¿é--------------------------------------
-   TYPE Block_TYPE                                 ! Êı¾İ½á¹¹£ºÍø¸ñ¿é £»°üº¬¼¸ºÎ±äÁ¿¼°ÎïÀí±äÁ¿µÄĞÅÏ¢ 
-     integer::  Block_no,mpi_id           ! ¿éºÅ£»ËùÊôµÄ½ø³ÌºÅ
-	 integer::  nx,ny,nz                   ! Íø¸ñÊınx,ny,nz
-	 integer::  subface                   ! ×ÓÃæÊı
- !   ¼¸ºÎÁ¿  
-     real(PRE_EC),pointer,dimension(:,:,:):: x,y,z     ! coordinates of vortex, Íø¸ñ½Úµã×ø±ê
-     real(PRE_EC),pointer,dimension(:,:,:):: xc,yc,zc  ! coordinates of cell center, Íø¸ñÖĞĞÄ×ø±ê 
-     real(PRE_EC),pointer,dimension(:,:,:):: Vol,Si,Sj,Sk ! Volume and surface area, ¿ØÖÆÌåµÄÌå»ı£¬i,j,k·½Ïò¿ØÖÆÌå±ß½çÃæµÄÃæ»ı 
-	 real(PRE_EC),pointer,dimension(:,:,:):: ni1,ni2,ni3,nj1,nj2,nj3,nk1,nk2,nk3  !  i,j,k·½ÏòÈı¸ö¿ØÖÆÃæµÄ·¨·½Ïò
-!      Jocabian ±ä»»ÏµÊı	 
-	 real(PRE_EC),pointer,dimension(:,:,:):: ix1,iy1,iz1,jx1,jy1,jz1,kx1,ky1,kz1
-	 real(PRE_EC),pointer,dimension(:,:,:):: ix2,iy2,iz2,jx2,jy2,jz2,kx2,ky2,kz2
-	 real(PRE_EC),pointer,dimension(:,:,:):: ix3,iy3,iz3,jx3,jy3,jz3,kx3,ky3,kz3
-	 real(PRE_EC),pointer,dimension(:,:,:):: ix0,iy0,iz0,jx0,jy0,jz0,kx0,ky0,kz0
-!     ÎïÀíÁ¿
-	 real(PRE_EC),pointer,dimension(:,:,:,:) :: U,Un,Un1    ! ÊØºã±äÁ¿ (±¾Ê±¼ä²½¼°Ç°Ò»¡¢¶ş¸öÊ±¼ä²½µÄÖµ), conversation variables 
-     real(PRE_EC),pointer,dimension(:,:,:,:) :: Res         ! ²Ğ²î £¨¾»Í¨Á¿£©
-     real(PRE_EC),pointer,dimension(:,:,:):: dt          ! (¾Ö²¿)Ê±¼ä²½³¤
-     real(PRE_EC),pointer,dimension(:,:,:,:) :: QF      ! Ç¿ÆÈº¯Êı (¶àÖØÍø¸ñ·¨ÖĞ´ÖÍø¸ñÊ¹ÓÃ)
-     real(PRE_EC),pointer,dimension(:,:,:,:) :: deltU   ! ÊØºã±äÁ¿µÄ²îÖµ, dU=U(n+1)-U(n)  ¶àÖØÍø¸ñÊ¹ÓÃ
-     real(PRE_EC),pointer,dimension(:,:,:,:) :: DU      ! U(n+1)-U(n)    LU-SGSÖĞÊ¹ÓÃ
-	 real(PRE_EC),pointer,dimension(:,:,:):: dw         ! turbulent viscous ; distance to the wall  (used in SA model)
-	 real(PRE_EC),pointer,dimension(:,:,:):: surf1,surf2,surf3,surf4,surf5,surf6  ! ±ß½ç´¦µÄÍ¨Á¿£¬¹©¼ÆËãÆø¶¯Á¦¡¢ÈÈÊ¹ÓÃ£»
-	 real(PRE_EC),pointer,dimension(:,:,:):: mu,mu_t    ! ²ãÁ÷Õ³ĞÔÏµÊıºÍÍÄÁ÷Õ³ĞÔÏµÊı
-     real(PRE_EC),pointer,dimension(:,:,:):: dtime_mesh   ! Ê±¼ä²½³¤Òò×Ó £¨¸ù¾İÍø¸ñÖÊÁ¿Çé¿ö£©
+    real(PRE_EC), pointer, dimension(:, :, :, :) :: U_average ! æ—¶é—´å¹³å‡åœº ï¼ˆd,u,v,w,Tï¼‰
 
-	 real(PRE_EC),pointer,dimension(:,:,:,:) :: U_average ! Ê±¼äÆ½¾ù³¡ £¨d,u,v,w,T£©
-	 
-	 TYPE(BC_MSG_TYPE),pointer,dimension(:)::bc_msg     ! ±ß½çÁ´½ÓĞÅÏ¢ 
-     integer,pointer,dimension(:,:,:):: BcI,BcJ,BcK     ! ±ß½çÖ¸Ê¾·û £¨ÎïÀí±ß½ç or ÄÚ±ß½ç£©
-   	 
-	 integer:: IFLAG_FVM_FDM               ! ²î·Ö or ÓĞÏŞÌå»ı
-	 integer:: IF_OverLimit                          ! ÎïÀíÁ¿³¬ÏŞ£¨Èç¸ºÎÂ¶È£©£¬ ĞèÒª½µµÍ¾«¶È£¨1½×£©
-	End TYPE Block_TYPE  
+    TYPE(BC_MSG_TYPE), pointer, dimension(:)::bc_msg     ! è¾¹ç•Œé“¾æ¥ä¿¡æ¯
+    integer, pointer, dimension(:, :, :):: BcI, BcJ, BcK     ! è¾¹ç•ŒæŒ‡ç¤ºç¬¦ ï¼ˆç‰©ç†è¾¹ç•Œ or å†…è¾¹ç•Œï¼‰
 
-!---------------------------Íø¸ñ -------------------------------------------------------- 
-!  (Èçµ¥ÖØÍø¸ñ£¬Ö»ÓĞ1Ì×£»Èç¶àÖØÍø¸ñ£¬¿ÉÒÔÓĞ¶àÌ×) 
-  
-   TYPE Mesh_TYPE                     ! Êı¾İ½á¹¹¡°Íø¸ñ¡±£» °üº¬¼¸ºÎ±äÁ¿¼°ÎïÀí±äÁ¿ĞÅÏ¢
-     integer:: Mesh_no,Num_Block, Num_Cell,Kstep          ! Íø¸ñ±àºÅ (1ºÅÎª×îÏ¸Íø¸ñ£¬2ºÅÎª´ÖÍø¸ñ£¬ 3ºÅÎª¸ü´ÖÍø¸ñ...)£¬Íø¸ñ¿éÊı£¬Íø¸ñÊıÄ¿(±¾½ø³ÌÖĞ), Ê±¼ä²½ 
-     integer:: NVAR       ! ±äÁ¿µÄÊıÄ¿£»»ù±¾±äÁ¿5¸ö+ 0£¬1»ò2¸ö¸½¼ş±äÁ¿ £¨BLÄ£ĞÍ0¸ö£¬SAÄ£ĞÍ1¸ö£¬SSTÄ£ĞÍ2¸ö£©£» ´ÖÍø¸ñ²»Ê¹ÓÃÍÄÁ÷Ä£ĞÍ
-	 real(PRE_EC)::  tt                   !  ÍÆ½øµÄÊ±¼ä
-	 real(PRE_EC),pointer,dimension(:)::  Res_max,Res_rms                 ! ×î´ó²Ğ²î£¬¾ù·½¸ù²Ğ²î, ÍÆ½øµÄÊ±¼ä
-	 TYPE (Block_TYPE),pointer,dimension(:):: Block       ! ¡°Íø¸ñ¿é¡±  £¨´ÓÊôÓÚ¡°Íø¸ñ¡±£©
+    integer:: IFLAG_FVM_FDM               ! å·®åˆ† or æœ‰é™ä½“ç§¯
+    integer:: IF_OverLimit                          ! ç‰©ç†é‡è¶…é™ï¼ˆå¦‚è´Ÿæ¸©åº¦ï¼‰ï¼Œ éœ€è¦é™ä½ç²¾åº¦ï¼ˆ1é˜¶ï¼‰
+  End TYPE Block_TYPE
 
-!                                                       ¿ØÖÆ²ÎÊı£¬ÓÃÓÚ¿ØÖÆÊıÖµ·½·¨¡¢Í¨Á¿¼¼Êõ¡¢ÍÄÁ÷Ä£ĞÍµÈ    
-!             ÕâĞ©¿ØÖÆ²ÎÊı´ÓÊôÓÚ¡°Íø¸ñ¡±£¬²»Í¬¡°Íø¸ñ¡±¿ÉÒÔ²ÉÓÃ²»Í¬µÄ¼ÆËã·½·¨¡¢ÍÄÁ÷Ä£ĞÍµÈ¡£	 £¨ÀıÈç£¬´ÖÍø¸ñÓÃµÍ¾«¶È·½·¨£¬´ÖÍø¸ñ²»Ê¹ÓÃÍÄÁ÷Ä£ĞÍ,...£©
-!  If_dtime_mesh     ÊÇ·ñ¸ù¾İÍø¸ñÇé¿ö½µµÍ¾Ö²¿Ê±¼ä²½³¤£¨¾Ö²¿Ê±¼ä²½³¤·¨ÓĞĞ§£©	
-    integer::   Iflag_turbulence_model,  Iflag_Scheme,IFlag_flux,IFlag_Reconstruction, Bound_Scheme
-   End TYPE Mesh_TYPE
-  
-  end module Mod_Type_Def
+!---------------------------ç½‘æ ¼ --------------------------------------------------------
+!  (å¦‚å•é‡ç½‘æ ¼ï¼Œåªæœ‰1å¥—ï¼›å¦‚å¤šé‡ç½‘æ ¼ï¼Œå¯ä»¥æœ‰å¤šå¥—)
 
+  TYPE Mesh_TYPE                     ! æ•°æ®ç»“æ„â€œç½‘æ ¼â€ï¼› åŒ…å«å‡ ä½•å˜é‡åŠç‰©ç†å˜é‡ä¿¡æ¯
+    integer:: Mesh_no, Num_Block, Num_Cell, Kstep          ! ç½‘æ ¼ç¼–å· (1å·ä¸ºæœ€ç»†ç½‘æ ¼ï¼Œ2å·ä¸ºç²—ç½‘æ ¼ï¼Œ 3å·ä¸ºæ›´ç²—ç½‘æ ¼...)ï¼Œç½‘æ ¼å—æ•°ï¼Œç½‘æ ¼æ•°ç›®(æœ¬è¿›ç¨‹ä¸­), æ—¶é—´æ­¥
+    integer:: NVAR       ! å˜é‡çš„æ•°ç›®ï¼›åŸºæœ¬å˜é‡5ä¸ª+ 0ï¼Œ1æˆ–2ä¸ªé™„ä»¶å˜é‡ ï¼ˆBLæ¨¡å‹0ä¸ªï¼ŒSAæ¨¡å‹1ä¸ªï¼ŒSSTæ¨¡å‹2ä¸ªï¼‰ï¼› ç²—ç½‘æ ¼ä¸ä½¿ç”¨æ¹æµæ¨¡å‹
+    real(PRE_EC)::  tt                   !  æ¨è¿›çš„æ—¶é—´
+    real(PRE_EC), pointer, dimension(:)::  Res_max, Res_rms                 ! æœ€å¤§æ®‹å·®ï¼Œå‡æ–¹æ ¹æ®‹å·®, æ¨è¿›çš„æ—¶é—´
+    TYPE(Block_TYPE), pointer, dimension(:):: Block       ! â€œç½‘æ ¼å—â€  ï¼ˆä»å±äºâ€œç½‘æ ¼â€ï¼‰
 
-!-------------------------------------------------------------------------------------- 
+!                                                       æ§åˆ¶å‚æ•°ï¼Œç”¨äºæ§åˆ¶æ•°å€¼æ–¹æ³•ã€é€šé‡æŠ€æœ¯ã€æ¹æµæ¨¡å‹ç­‰
+!             è¿™äº›æ§åˆ¶å‚æ•°ä»å±äºâ€œç½‘æ ¼â€ï¼Œä¸åŒâ€œç½‘æ ¼â€å¯ä»¥é‡‡ç”¨ä¸åŒçš„è®¡ç®—æ–¹æ³•ã€æ¹æµæ¨¡å‹ç­‰ã€‚         ï¼ˆä¾‹å¦‚ï¼Œç²—ç½‘æ ¼ç”¨ä½ç²¾åº¦æ–¹æ³•ï¼Œç²—ç½‘æ ¼ä¸ä½¿ç”¨æ¹æµæ¨¡å‹,...ï¼‰
+!  If_dtime_mesh     æ˜¯å¦æ ¹æ®ç½‘æ ¼æƒ…å†µé™ä½å±€éƒ¨æ—¶é—´æ­¥é•¿ï¼ˆå±€éƒ¨æ—¶é—´æ­¥é•¿æ³•æœ‰æ•ˆï¼‰
+    integer::   Iflag_turbulence_model, Iflag_Scheme, IFlag_flux, IFlag_Reconstruction, Bound_Scheme
+  End TYPE Mesh_TYPE
+
+end module Mod_Type_Def
+
+!--------------------------------------------------------------------------------------
 ! Global Variables:
-! Ma: Mach number ; Re: Reynolds number; gamma: Specific rato (=Cp/Cv); Pr: Prandtl number; 
-! AoA: Angle of Attack; p00=1/(gamma*Ma*Ma), p=p00*d*T; 
-! t_end: end time; 
-! Num_Block: Total Block number 
+! Ma: Mach number ; Re: Reynolds number; gamma: Specific rato (=Cp/Cv); Pr: Prandtl number;
+! AoA: Angle of Attack; p00=1/(gamma*Ma*Ma), p=p00*d*T;
+! t_end: end time;
+! Num_Block: Total Block number
 ! Kstep_save: Save data every Kstep_save step
 ! Iflag_turbulence_model: 0 no model, 1 BL model
 ! Iflag_flux: type of Splitting (or Riemann solver) : 0 Steger-Warming 1 HLL 2 HLLC 3 Roe
 ! Iflag_local_dt:  0 global time step, 1 local time step
-! Iflag_Reconstruction: Schemes 1 NND 2 3rd Upwind 3 WENO3  4 MUSCL 
+! Iflag_Reconstruction: Schemes 1 NND 2 3rd Upwind 3 WENO3  4 MUSCL
 !----------------------------------------------------------------------------------------
-! È«¾Ö±äÁ¿£¬°üÀ¨²ÎÊı¡¢¼¸ºÎÁ¿¼°ÎïÀíÁ¿
+! å…¨å±€å˜é‡ï¼ŒåŒ…æ‹¬å‚æ•°ã€å‡ ä½•é‡åŠç‰©ç†é‡
 !========================================================================================
 
-  module Global_Var    
-   use const_var        ! ³£Á¿
-   use mod_type_def     ! ±ß½çÁ¬½Ó
-   implicit none
-
+module Global_Var
+  use const_var        ! å¸¸é‡
+  use mod_type_def     ! è¾¹ç•Œè¿æ¥
+  implicit none
 
 !---------------------------------------------------------------------------------------------
-! global variables                                       ¸÷×Ó³ÌĞò¾ù¿É¼ûµÄÈ«¾Ö±äÁ¿
+! global variables                                       å„å­ç¨‹åºå‡å¯è§çš„å…¨å±€å˜é‡
 !----------------------------------------------------------------------------
 
-   TYPE (Mesh_TYPE),pointer,dimension(:):: Mesh                          ! Ö÷Êı¾İ ¡°Íø¸ñ¡±
-   integer,save:: Num_Mesh,NVAR , Total_block, Num_block                      ! Íø¸ñµÄÌ×Êı £¬±äÁ¿Êı£¬ ×ÜÍø¸ñ¿éÊı, ±¾mpi½ø³ÌµÄÍø¸ñ¿éÊı  
-   integer,pointer,dimension(:):: bNi,bNj,bNk                            ! ¸÷¿éµÄÎ¬Êı£¨È«¾Ö£©£¬ bNi(k)Îª£¨È«¾Ö£©µÚk¿éµÄnx
-   integer,save::  Kstep_save, Iflag_turbulence_model,Iflag_init,  &
-      Iflag_Scheme,IFlag_flux,Iflag_local_dt,IFlag_Reconstruction,Time_Method, &
-	  Kstep_show,If_viscous,If_Residual_smoothing,Mesh_File_Format,IF_Debug, &
-	  Kstep_smooth,Kstep_init_smooth,NUM_THREADS,If_dtime_mesh, Step_Inner_Limit, &  
-      Bound_Scheme, &                         ! ±ß½ç¸ñÊ½
-      IF_Walldist, IFLAG_LIMIT_FLOW, &             ! ÊÇ·ñĞèÒª¶ÁÈ¡ µ½±ÚÃæ¾àÀë; ÊÇ·ñĞèÒªÏŞÖÆÑ¹Á¦Ôö³¤ÂÊ
-      IF_Scheme_Positivity,          &    ! ¼ì²é²åÖµ¹ı³ÌÖĞÑ¹Á¦¡¢ÃÜ¶ÈÊÇ·ñ·Ç¸º£¬·ñÔòÊ¹ÓÃ1½×Ó­·ç£»
-      Kstep_average,                 &          ! Ê±¾ùÍ³¼ÆµÄ²½Êı¼ä¸ô£¬ 0 ²»Í³¼Æ
-      Iflag_savefile                       ! 0 ±£´æµ½flow3d.dat, 1 ±£´æµ½flow3d-xxxxxxx.dat
-   integer,save:: IF_TurboMachinary , Ref_medium_usrdef   !  ÊÇ·ñÆôÓÃÒ¶ÂÖ»úĞµÇó½âÆ÷Ä£Ê½£¨0 or 1£©£» ÊÇ·ñÊ¹ÓÃÓÃ»§×Ô¶¨Òå½éÖÊ £¨Ä¬ÈÏ¿ÕÆø½éÖÊ£©
-   integer,save:: IF_InnerFlow   ! ÄÚÁ÷Ä£Ê½ (Èë¿Ú±ß½çÌõ¼şÓëÒ¶ÂÖ»úÄ£Ê½ÀàËÆ)
+  TYPE(Mesh_TYPE), pointer, dimension(:):: Mesh                          ! ä¸»æ•°æ® â€œç½‘æ ¼â€
+  integer, save:: Num_Mesh, NVAR, Total_block, Num_block                      ! ç½‘æ ¼çš„å¥—æ•° ï¼Œå˜é‡æ•°ï¼Œ æ€»ç½‘æ ¼å—æ•°, æœ¬mpiè¿›ç¨‹çš„ç½‘æ ¼å—æ•°
+  integer, pointer, dimension(:):: bNi, bNj, bNk                            ! å„å—çš„ç»´æ•°ï¼ˆå…¨å±€ï¼‰ï¼Œ bNi(k)ä¸ºï¼ˆå…¨å±€ï¼‰ç¬¬kå—çš„nx
+  integer, save::  Kstep_save, Iflag_turbulence_model, Iflag_init, &
+                  Iflag_Scheme, IFlag_flux, Iflag_local_dt, IFlag_Reconstruction, Time_Method, &
+                  Kstep_show, If_viscous, If_Residual_smoothing, Mesh_File_Format, IF_Debug, &
+                  Kstep_smooth, Kstep_init_smooth, NUM_THREADS, If_dtime_mesh, Step_Inner_Limit, &
+                  Bound_Scheme, &                         ! è¾¹ç•Œæ ¼å¼
+                  IF_Walldist, IFLAG_LIMIT_FLOW, &             ! æ˜¯å¦éœ€è¦è¯»å– åˆ°å£é¢è·ç¦»; æ˜¯å¦éœ€è¦é™åˆ¶å‹åŠ›å¢é•¿ç‡
+                  IF_Scheme_Positivity, &    ! æ£€æŸ¥æ’å€¼è¿‡ç¨‹ä¸­å‹åŠ›ã€å¯†åº¦æ˜¯å¦éè´Ÿï¼Œå¦åˆ™ä½¿ç”¨1é˜¶è¿é£ï¼›
+                  Kstep_average, &          ! æ—¶å‡ç»Ÿè®¡çš„æ­¥æ•°é—´éš”ï¼Œ 0 ä¸ç»Ÿè®¡
+                  Iflag_savefile                       ! 0 ä¿å­˜åˆ°flow3d.dat, 1 ä¿å­˜åˆ°flow3d-xxxxxxx.dat
+  integer, save:: IF_TurboMachinary, Ref_medium_usrdef   !  æ˜¯å¦å¯ç”¨å¶è½®æœºæ¢°æ±‚è§£å™¨æ¨¡å¼ï¼ˆ0 or 1ï¼‰ï¼› æ˜¯å¦ä½¿ç”¨ç”¨æˆ·è‡ªå®šä¹‰ä»‹è´¨ ï¼ˆé»˜è®¤ç©ºæ°”ä»‹è´¨ï¼‰
+  integer, save:: IF_InnerFlow   ! å†…æµæ¨¡å¼ (å…¥å£è¾¹ç•Œæ¡ä»¶ä¸å¶è½®æœºæ¨¡å¼ç±»ä¼¼)
 
-   integer,save:: FD_Flux,FD_scheme   ! ÄÚÇ¶²î·Ö·¨²ÉÓÃµÄÍ¨Á¿·½Ê½¡¢ÊıÖµ¸ñÊ½
-   integer,save:: KRK=0            ! Runge-Kutta·½·¨ÖĞµÄ ×Ó²½
-   integer,save:: Istep_average=0  ! Í³¼Æ²½Êı
- ! global parameter (for all Meshes )                     Á÷¶¯²ÎÊı, ¶ÔÈ«Ìå¡°Íø¸ñ¡±¶¼ÊÊÓÃ
+  integer, save:: FD_Flux, FD_scheme   ! å†…åµŒå·®åˆ†æ³•é‡‡ç”¨çš„é€šé‡æ–¹å¼ã€æ•°å€¼æ ¼å¼
+  integer, save:: KRK = 0            ! Runge-Kuttaæ–¹æ³•ä¸­çš„ å­æ­¥
+  integer, save:: Istep_average = 0  ! ç»Ÿè®¡æ­¥æ•°
+  ! global parameter (for all Meshes )                     æµåŠ¨å‚æ•°, å¯¹å…¨ä½“â€œç½‘æ ¼â€éƒ½é€‚ç”¨
 
-   real(PRE_EC),save:: Ma,Re,gamma,Cp,Cv,t_end,P_OUTLET,&
-                       A_alfa,A_beta,PrL,PrT,T_inf,Twall,w_LU,Kt_inf,Wt_inf , Res_Inner_Limit, MUT_MAX,AoA,Aos
-   real(PRE_EC),save:: Turbo_Periodic_seta, Turbo_w, Turbo_P0, Turbo_T0 , Turbo_L0   ! ÖÜÏò¿ç¶È£¨½Ç£©£¬ ×ªËÙ£¬×ÜÑ¹£¬×ÜÎÂ, ²Î¿¼³¤¶È
-   real(PRE_EC),save:: Periodic_dX,Periodic_dY,Periodic_dZ
+  real(PRE_EC), save:: Ma, Re, gamma, Cp, Cv, t_end, P_OUTLET, &
+                       A_alfa, A_beta, PrL, PrT, T_inf, Twall, w_LU, Kt_inf, Wt_inf, Res_Inner_Limit, MUT_MAX, AoA, Aos
+  real(PRE_EC), save:: Turbo_Periodic_seta, Turbo_w, Turbo_P0, Turbo_T0, Turbo_L0   ! å‘¨å‘è·¨åº¦ï¼ˆè§’ï¼‰ï¼Œ è½¬é€Ÿï¼Œæ€»å‹ï¼Œæ€»æ¸©, å‚è€ƒé•¿åº¦
+  real(PRE_EC), save:: Periodic_dX, Periodic_dY, Periodic_dZ
 
- 
- ! È«¾Ö¿ØÖÆ²ÎÊı£¬¿ØÖÆÊıÖµ·½·¨¡¢Í¨Á¿¼¼Êõ¼°ÍÄÁ÷Ä£ĞÍµÈ £¨ÓĞĞ©Ö»¶Ô×îÏ¸Íø¸ñÓĞĞ§£©
-   real(PRE_EC),save :: Ralfa(3), Rbeta(3) , Rgamma(3),dt_global,CFL,dtmax,dtmin    ! RK·½·¨ÖĞµÄ³£Á¿£¬ÓëÊ±¼ä²½³¤ÓĞ¹ØµÄÁ¿
-   integer,save:: Pre_Step_Mesh(3)                                                 ! ¹¹½¨³õÖµÊ±£¬´ÖÍø¸ñÔ¤µü´ú²½Êı  
-   integer,save:: Cood_Y_UP             ! 1 YÖá´¹Ö±ÏòÉÏ£¬ 0 ZÖá´¹Ö±ÏòÉÏ
-   integer,save:: Pdebug(4)             ! debug Ê¹ÓÃ£¬ Êä³öÄ³¿éµÄÄ³Ò»µãµÄÖµ
-   real(PRE_EC),save:: Ref_S,Ref_L, Centroid(3)                           ! £¨¼ÆËãÁù·ÖÁ¿Ê¹ÓÃ£©²Î¿¼Ãæ»ı, ²Î¿¼³¤¶È, ¾ØĞÄ×ø±ê
-   real(PRE_EC),save:: Ldmin,Ldmax,Lpmin,Lpmax,Lumax,LSAmax                ! ¶ÔÃÜ¶È¡¢Ñ¹Á¦¡¢ËÙ¶È¡¢¼°SAÄ£ĞÍÖĞ±äÁ¿µÄÏŞÖÆÌõ¼ş (×îĞ¡Óë×î´óÖµ)
-   real(PRE_EC),save:: CP1_NSA,CP2_NSA       ! parameters in New SA model
- !-----------mpi data ----------------------------------------------------------- 
-   integer:: my_id,Total_proc                   ! my_id (±¾½ø³ÌºÅ), Total_proc ×Ü½ø³ÌÊı
-   integer,pointer,dimension(:):: B_Proc, B_n    ! B_proc(m) m¿éËùÔÚµÄ½ø³ÌºÅ; B_n(m) m¿éËùÔÚ½ø³ÌÖĞµÄÄÚ²¿±àºÅ
-   integer,pointer,dimension(:):: my_Blocks       ! ±¾½ø³Ì°üº¬µÄ¿éºÅ
-  end module Global_Var  
+  ! å…¨å±€æ§åˆ¶å‚æ•°ï¼Œæ§åˆ¶æ•°å€¼æ–¹æ³•ã€é€šé‡æŠ€æœ¯åŠæ¹æµæ¨¡å‹ç­‰ ï¼ˆæœ‰äº›åªå¯¹æœ€ç»†ç½‘æ ¼æœ‰æ•ˆï¼‰
+  real(PRE_EC), save :: Ralfa(3), Rbeta(3), Rgamma(3), dt_global, CFL, dtmax, dtmin    ! RKæ–¹æ³•ä¸­çš„å¸¸é‡ï¼Œä¸æ—¶é—´æ­¥é•¿æœ‰å…³çš„é‡
+  integer, save:: Pre_Step_Mesh(3)                                                 ! æ„å»ºåˆå€¼æ—¶ï¼Œç²—ç½‘æ ¼é¢„è¿­ä»£æ­¥æ•°
+  integer, save:: Cood_Y_UP             ! 1 Yè½´å‚ç›´å‘ä¸Šï¼Œ 0 Zè½´å‚ç›´å‘ä¸Š
+  integer, save:: Pdebug(4)             ! debug ä½¿ç”¨ï¼Œ è¾“å‡ºæŸå—çš„æŸä¸€ç‚¹çš„å€¼
+  real(PRE_EC), save:: Ref_S, Ref_L, Centroid(3)                           ! ï¼ˆè®¡ç®—å…­åˆ†é‡ä½¿ç”¨ï¼‰å‚è€ƒé¢ç§¯, å‚è€ƒé•¿åº¦, çŸ©å¿ƒåæ ‡
+  real(PRE_EC), save:: Ldmin, Ldmax, Lpmin, Lpmax, Lumax, LSAmax                ! å¯¹å¯†åº¦ã€å‹åŠ›ã€é€Ÿåº¦ã€åŠSAæ¨¡å‹ä¸­å˜é‡çš„é™åˆ¶æ¡ä»¶ (æœ€å°ä¸æœ€å¤§å€¼)
+  real(PRE_EC), save:: CP1_NSA, CP2_NSA       ! parameters in New SA model
+  !-----------mpi data -----------------------------------------------------------
+  integer:: my_id, Total_proc                   ! my_id (æœ¬è¿›ç¨‹å·), Total_proc æ€»è¿›ç¨‹æ•°
+  integer, pointer, dimension(:):: B_Proc, B_n    ! B_proc(m) må—æ‰€åœ¨çš„è¿›ç¨‹å·; B_n(m) må—æ‰€åœ¨è¿›ç¨‹ä¸­çš„å†…éƒ¨ç¼–å·
+  integer, pointer, dimension(:):: my_Blocks       ! æœ¬è¿›ç¨‹åŒ…å«çš„å—å·
+end module Global_Var
 !----------------------------------------------------------------------------
 
-
-
-! ²î·Ö-ÓĞÏŞÌå»ı»ìºÏ·½·¨Ê¹ÓÃ
+! å·®åˆ†-æœ‰é™ä½“ç§¯æ··åˆæ–¹æ³•ä½¿ç”¨
 !------------SEC part---------------------------------------------------------------------
 
-   module FDM_data
-    use precision_EC
-    implicit none
-    TYPE FDM_Block_TYPE                              ! Êı¾İ½á¹¹£ºÍø¸ñ¿é £»°üº¬¼¸ºÎ±äÁ¿¼°ÎïÀí±äÁ¿µÄĞÅÏ¢ 
-    real(PRE_EC), pointer,dimension(:,:,:):: ix,iy,iz,jx,jy,jz,kx,ky,kz,Jac   ! Jocabian±ä»»ÏµÊı
-    End TYPE FDM_Block_TYPE  
-  
-   TYPE FDM_Mesh_TYPE                     ! Êı¾İ½á¹¹¡°Íø¸ñ¡±£» °üº¬¼¸ºÎ±äÁ¿¼°ÎïÀí±äÁ¿ĞÅÏ¢
-	 TYPE (FDM_Block_TYPE),pointer,dimension(:):: Block       ! ¡°Íø¸ñ¿é¡±  £¨´ÓÊôÓÚ¡°Íø¸ñ¡±£©
-   End TYPE FDM_Mesh_TYPE 
-  
-   TYPE (FDM_Mesh_TYPE),pointer,dimension(:):: FDM_Mesh       ! Ö÷Êı¾İ ¡°Íø¸ñ¡±
-  
-   end  module FDM_data
+module FDM_data
+  use precision_EC
+  implicit none
+  TYPE FDM_Block_TYPE                              ! æ•°æ®ç»“æ„ï¼šç½‘æ ¼å— ï¼›åŒ…å«å‡ ä½•å˜é‡åŠç‰©ç†å˜é‡çš„ä¿¡æ¯
+    real(PRE_EC), pointer, dimension(:, :, :):: ix, iy, iz, jx, jy, jz, kx, ky, kz, Jac   ! Jocabianå˜æ¢ç³»æ•°
+  End TYPE FDM_Block_TYPE
+
+  TYPE FDM_Mesh_TYPE                     ! æ•°æ®ç»“æ„â€œç½‘æ ¼â€ï¼› åŒ…å«å‡ ä½•å˜é‡åŠç‰©ç†å˜é‡ä¿¡æ¯
+    TYPE(FDM_Block_TYPE), pointer, dimension(:):: Block       ! â€œç½‘æ ¼å—â€  ï¼ˆä»å±äºâ€œç½‘æ ¼â€ï¼‰
+  End TYPE FDM_Mesh_TYPE
+
+  TYPE(FDM_Mesh_TYPE), pointer, dimension(:):: FDM_Mesh       ! ä¸»æ•°æ® â€œç½‘æ ¼â€
+
+end module FDM_data

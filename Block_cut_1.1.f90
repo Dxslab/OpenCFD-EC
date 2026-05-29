@@ -1,1053 +1,967 @@
 !----Boundary message (bc3d.inp, Gridgen general format)----------------------------------------------------------
 ! Cut large Block into pieces
 ! Ver 1.1, 2013-9-6:  Cut Mesh and bc3d.inp
- 
-  module const_var1
+
+module const_var1
   implicit none
- 
+
 !    integer,parameter:: PRE_SC=4            ! Single precision
-     integer,parameter:: PRE_SC=8           ! Double Precision
-     integer,parameter::  BC_Wall=2, BC_Symmetry=3,   BC_Inflow=5, BC_Outflow=6 , BC_NonReflection=9, BC_Dilchlet=1 
-     integer,parameter::  BC_WallH=20        ! ±ÚÃæ±ß½ç (Ê¹ÓÃGhost Cell)
-     integer,parameter::  BC_inZ=-1, BC_In=-2,  BC_Periodic=-3       ! -1Ó²·ÖÇøÁ¬½Ó£» -2Èí·ÖÇøÁ¬½Ó ; -3ÖÜÆÚ±ß½ç £¨ÈíÁ¬½Ó£©
-     integer,parameter:: Maxsub=100 ,NPMAX=100  ! Ã¿¿é×î´óµÄ×ÓÃæÊý
-  end module
+  integer, parameter:: PRE_SC = 8           ! Double Precision
+  integer, parameter::  BC_Wall = 2, BC_Symmetry = 3, BC_Inflow = 5, BC_Outflow = 6, BC_NonReflection = 9, BC_Dilchlet = 1
+  integer, parameter::  BC_WallH = 20        ! å£é¢è¾¹ç•Œ (ä½¿ç”¨Ghost Cell)
+  integer, parameter::  BC_inZ = -1, BC_In = -2, BC_Periodic = -3       ! -1ç¡¬åˆ†åŒºè¿žæŽ¥ï¼› -2è½¯åˆ†åŒºè¿žæŽ¥ ; -3å‘¨æœŸè¾¹ç•Œ ï¼ˆè½¯è¿žæŽ¥ï¼‰
+  integer, parameter:: Maxsub = 100, NPMAX = 100  ! æ¯å—æœ€å¤§çš„å­é¢æ•°
+end module
 
-  module  Type_def1
-    use const_var1
-	implicit none
+module Type_def1
+  use const_var1
+  implicit none
 
-    TYPE BC_MSG_TYPE              ! ±ß½çÁ´½ÓÐÅÏ¢
-     integer:: ib,ie,jb,je,kb,ke,bc,face,f_no                      ! ±ß½çÇøÓò£¨×ÓÃæ£©µÄ¶¨Òå£¬ .inp format
-     integer:: ib1,ie1,jb1,je1,kb1,ke1,nb1,face1,f_no1             ! Á¬½ÓÇøÓò
-	 integer:: L1,L2,L3                                            ! ×ÓÃæºÅ£¬Á¬½ÓË³ÐòÃèÊö·û
-     integer:: b1,e1,b2,e2,b1t,e1t,b2t,e2t           ! ÃæÄÚÁ½Î¬µÄÃèÊö
-   END TYPE BC_MSG_TYPE
+  TYPE BC_MSG_TYPE              ! è¾¹ç•Œé“¾æŽ¥ä¿¡æ¯
+    integer:: ib, ie, jb, je, kb, ke, bc, face, f_no                      ! è¾¹ç•ŒåŒºåŸŸï¼ˆå­é¢ï¼‰çš„å®šä¹‰ï¼Œ .inp format
+    integer:: ib1, ie1, jb1, je1, kb1, ke1, nb1, face1, f_no1             ! è¿žæŽ¥åŒºåŸŸ
+    integer:: L1, L2, L3                                            ! å­é¢å·ï¼Œè¿žæŽ¥é¡ºåºæè¿°ç¬¦
+    integer:: b1, e1, b2, e2, b1t, e1t, b2t, e2t           ! é¢å†…ä¸¤ç»´çš„æè¿°
+  END TYPE BC_MSG_TYPE
 
+  TYPE Block_TYPE1                          ! æ•°æ®ç»“æž„ï¼šä»…åŒ…å«Bc_msg
+    integer::  nx, ny, nz                      ! ç½‘æ ¼æ•°nx,ny,nz
+    integer::  subface                       ! å­é¢æ•°
+    integer:: Block_No
+    real(PRE_SC), pointer, dimension(:, :, :, :):: xyz   ! x, y, z
+    TYPE(BC_MSG_TYPE), pointer, dimension(:)::bc_msg     ! è¾¹ç•Œé“¾æŽ¥ä¿¡æ¯
+    integer:: Pi, Pj, Pk                                 ! (åŽŸå—)ä¸‰ä¸ªæ–¹å‘çš„åˆ†å‰²æ•° ; (æ–°å—)ä¸‰ä¸ªæ–¹å‘çš„å—åºå·
+    integer:: ib, jb, kb                                 ! å­å—çš„èµ·å§‹ä¸‹æ ‡
+    integer:: nb_ori       ! åŽŸå—å·
+    integer:: nbk0      ! å­å—çš„èµ·å§‹å—å·
+  END TYPE Block_TYPE1
 
-    TYPE Block_TYPE1                          ! Êý¾Ý½á¹¹£º½ö°üº¬Bc_msg 
-	 integer::  nx,ny,nz                      ! Íø¸ñÊýnx,ny,nz
-	 integer::  subface                       ! ×ÓÃæÊý
- 	 integer:: Block_No
-     real(PRE_SC),pointer,dimension(:,:,:,:):: xyz   ! x, y, z
-	 TYPE(BC_MSG_TYPE),pointer,dimension(:)::bc_msg     ! ±ß½çÁ´½ÓÐÅÏ¢ 
-     integer:: Pi,Pj,Pk                                 ! (Ô­¿é)Èý¸ö·½ÏòµÄ·Ö¸îÊý ; (ÐÂ¿é)Èý¸ö·½ÏòµÄ¿éÐòºÅ
-     integer:: ib,jb,kb                                 ! ×Ó¿éµÄÆðÊ¼ÏÂ±ê
-	 integer:: nb_ori       ! Ô­¿éºÅ
-	 integer:: nbk0      ! ×Ó¿éµÄÆðÊ¼¿éºÅ
-	END TYPE Block_TYPE1   
-    
-	TYPE bcnp_type              ! ×Ó¿é
-     integer:: idx,blk,idxt,blkt,nn  ! Ê×µØÖ·£¬×Ó¿éºÅ £¨Ô´¡¢Á¬½Ó£©£» ÊýÄ¿     
-    END TYPE 
-   
-   End module  Type_def1
+  TYPE bcnp_type              ! å­å—
+    integer:: idx, blk, idxt, blkt, nn  ! é¦–åœ°å€ï¼Œå­å—å· ï¼ˆæºã€è¿žæŽ¥ï¼‰ï¼› æ•°ç›®
+  END TYPE
 
+End module Type_def1
 
-    module global_var1
-    use Type_def1
-    TYPE(Block_TYPE1),Pointer,dimension(:):: Block,Block_new
-    integer:: Mesh_form,NB,NBnew
-    integer,allocatable,dimension(:):: PI,PJ,PK
-    type(bcnp_type),target:: bcn(NPMAX,2)
-	end module global_var1
+module global_var1
+  use Type_def1
+  TYPE(Block_TYPE1), Pointer, dimension(:):: Block, Block_new
+  integer:: Mesh_form, NB, NBnew
+  integer, allocatable, dimension(:):: PI, PJ, PK
+  type(bcnp_type), target:: bcn(NPMAX, 2)
+end module global_var1
 
 !---------------------------------
 
-
-   program cut_block
-    use global_var1
-    implicit none
+program cut_block
+  use global_var1
+  implicit none
 !----Cut Mesh --------------------
-    call read_cutfile
-	call cut_mesh
-    call write_new_mesh
+  call read_cutfile
+  call cut_mesh
+  call write_new_mesh
 !---cut bc3d.inp -----------------
-     call convert_inp_inc  
-     call cut_inp   ! ¹¹Ôì×Ó¿éµÄ inpÐÅÏ¢
-     call set_new_inner  ! Éè¶¨ÐÂµÄÄÚÁª±ß½ç
-	 call search_fno1(2)  ! ½¨Á¢ fno1ÐÅÏ¢
-	 call write_inp_new  ! Ð´ÈëÐÂµÄ±ß½çÐÅÏ¢	 
+  call convert_inp_inc
+  call cut_inp   ! æž„é€ å­å—çš„ inpä¿¡æ¯
+  call set_new_inner  ! è®¾å®šæ–°çš„å†…è”è¾¹ç•Œ
+  call search_fno1(2)  ! å»ºç«‹ fno1ä¿¡æ¯
+  call write_inp_new  ! å†™å…¥æ–°çš„è¾¹ç•Œä¿¡æ¯
 
-
-   end
-
+end
 
 !----------------------------------------------------------
-   subroutine cut_inp 
-     use global_var1
-     implicit none
-	 integer:: m,ks
-     Type (Block_TYPE1),pointer:: B,B1
-     TYPE (BC_MSG_TYPE),pointer:: Bc,Bc1
- 	 
-     call creat_new_bcmsg
+subroutine cut_inp
+  use global_var1
+  implicit none
+  integer:: m, ks
+  Type(Block_TYPE1), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer:: Bc
+
+  call creat_new_bcmsg
 !---------------------------
-     do m=1,NB
-	  B=>Block(m)
-	  do ks=1,B%subface
-      Bc=>B%bc_msg(ks)
-       if(Bc%bc>0) then  
-        call search_1d_bd(m,ks) ! ÎïÀí±ß½ç
-       else
-	    call search_1d_lk(m,ks)  ! ÓÐÁ¬½ÓµÄ±ß½ç
-       endif
-	  enddo
-      
-     enddo
+  do m = 1, NB
+    B => Block(m)
+    do ks = 1, B%subface
+      Bc => B%bc_msg(ks)
+      if (Bc%bc > 0) then
+        call search_1d_bd(m, ks) ! ç‰©ç†è¾¹ç•Œ
+      else
+        call search_1d_lk(m, ks)  ! æœ‰è¿žæŽ¥çš„è¾¹ç•Œ
+      end if
+    end do
+
+  end do
 !----------------------------
-	 call set_ibie  ! ¸ù¾Ýib1,ie1µÈÐÅÏ¢£¬Éè¶¨ib,ie
-		 
-   end
+  call set_ibie  ! æ ¹æ®ib1,ie1ç­‰ä¿¡æ¯ï¼Œè®¾å®šib,ie
+
+end
 
 !-------------------------------------------------
-   subroutine set_ibie
-    use global_var1
-    Type (Block_TYPE1),pointer:: B
-    TYPE (BC_MSG_TYPE),pointer:: Bc
-    integer:: m,ks
-    do m=1,NBnew
-     B => Block_new(m)
-    do ks=1,B%subface
-     Bc=>B%bc_msg(ks)
-     select case (Bc%face)
-	  case (1)
-	    Bc%ib=1; Bc%ie=1; Bc%jb=Bc%b1 ; Bc%je =Bc%e1 ; Bc%kb=Bc%b2; Bc%ke=Bc%e2
+subroutine set_ibie
+  use global_var1
+  Type(Block_TYPE1), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer:: Bc
+  integer:: m, ks
+  do m = 1, NBnew
+    B => Block_new(m)
+    do ks = 1, B%subface
+      Bc => B%bc_msg(ks)
+      select case (Bc%face)
+      case (1)
+        Bc%ib = 1; Bc%ie = 1; Bc%jb = Bc%b1; Bc%je = Bc%e1; Bc%kb = Bc%b2; Bc%ke = Bc%e2
       case (4)
-	    Bc%ib=B%nx; Bc%ie=B%nx; Bc%jb=Bc%b1 ; Bc%je =Bc%e1 ; Bc%kb=Bc%b2; Bc%ke=Bc%e2
-      case(2)
-	    Bc%ib=Bc%b1; Bc%ie=Bc%e1; Bc%jb=1 ; Bc%je =1 ; Bc%kb=Bc%b2; Bc%ke=Bc%e2
-      case(5)
-	    Bc%ib=Bc%b1; Bc%ie=Bc%e1; Bc%jb=B%ny ; Bc%je =B%ny ; Bc%kb=Bc%b2; Bc%ke=Bc%e2
-      case(3)
-	    Bc%ib=Bc%b1; Bc%ie=Bc%e1;  Bc%jb=Bc%b2; Bc%je=Bc%e2; Bc%kb=1 ; Bc%ke =1 
-      case(6)
-	    Bc%ib=Bc%b1; Bc%ie=Bc%e1;  Bc%jb=Bc%b2; Bc%je=Bc%e2; Bc%kb=B%nz ; Bc%ke = B%nz
-	 end select 
+        Bc%ib = B%nx; Bc%ie = B%nx; Bc%jb = Bc%b1; Bc%je = Bc%e1; Bc%kb = Bc%b2; Bc%ke = Bc%e2
+      case (2)
+        Bc%ib = Bc%b1; Bc%ie = Bc%e1; Bc%jb = 1; Bc%je = 1; Bc%kb = Bc%b2; Bc%ke = Bc%e2
+      case (5)
+        Bc%ib = Bc%b1; Bc%ie = Bc%e1; Bc%jb = B%ny; Bc%je = B%ny; Bc%kb = Bc%b2; Bc%ke = Bc%e2
+      case (3)
+        Bc%ib = Bc%b1; Bc%ie = Bc%e1; Bc%jb = Bc%b2; Bc%je = Bc%e2; Bc%kb = 1; Bc%ke = 1
+      case (6)
+        Bc%ib = Bc%b1; Bc%ie = Bc%e1; Bc%jb = Bc%b2; Bc%je = Bc%e2; Bc%kb = B%nz; Bc%ke = B%nz
+      end select
 
+    end do
+  end do
 
-    enddo
-	enddo
+end
 
-    end
+subroutine write_inp_new
+  use global_var1
+  Type(Block_TYPE1), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer:: Bc
 
+  open (99, file="bc3d_new.inc")
+  write (99, *) " Inp-liked file of OpenCFD-EC"
+  write (99, *) NBnew
 
+  do m = 1, NBnew
+    B => Block_new(m)
+    write (99, *) B%nx, B%ny, B%nz
+    write (99, *) "Block ", m
+    write (99, *) B%subface
+    do ksub = 1, B%subface
+      Bc => B%bc_msg(ksub)
+      write (99, "(9I6)") Bc%ib, Bc%ie, Bc%jb, Bc%je, Bc%kb, Bc%ke, Bc%bc, Bc%face, Bc%f_no
+      write (99, "(12I6)") Bc%ib1, Bc%ie1, Bc%jb1, Bc%je1, Bc%kb1, Bc%ke1, Bc%nb1, Bc%face1, Bc%f_no1, Bc%L1, Bc%L2, Bc%L3
+    end do
+  end do
+  close (99)
+end
 
+!----creat bc_msg ----------
+subroutine creat_new_bcmsg
+  use global_var1
+  implicit none
+  Type(Block_TYPE1), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer:: Bc
+  integer:: m, ks
 
-
-
-
-
-
-
-  subroutine write_inp_new  
-    use global_var1
-    Type (Block_TYPE1),pointer:: B,B1
-    TYPE (BC_MSG_TYPE),pointer:: Bc,Bc1
-
-
-   open(99,file="bc3d_new.inc")
-    write(99,*) " Inp-liked file of OpenCFD-EC"
-    write(99,*) NBnew
-
-	do m=1,NBnew
-     B => Block_new(m)
-     write(99,*) B%nx, B%ny, B%nz
-	 write(99,*) "Block ", m
-	 write(99,*) B%subface
-	  do ksub=1,B%subface
-        Bc => B%bc_msg(ksub)
-	   write(99,"(9I6)")  Bc%ib,Bc%ie,Bc%jb,Bc%je,Bc%kb,Bc%ke,Bc%bc,Bc%face,Bc%f_no
-	   write(99,"(12I6)") Bc%ib1,Bc%ie1,Bc%jb1,Bc%je1,Bc%kb1,Bc%ke1,Bc%nb1,Bc%face1,Bc%f_no1,Bc%L1,Bc%L2,Bc%L3
-      enddo
-	enddo
-	close(99)
-   end
-
-
-
-!----creat bc_msg ----------	
-	 subroutine creat_new_bcmsg
-	 use global_var1
-	 implicit none
-     Type (Block_TYPE1),pointer:: B
-     TYPE (BC_MSG_TYPE),pointer:: Bc
-	 integer:: m,ks
-
-	 do m=1,NBnew
-      B=>Block_new(m)
-	  B%subface=0
-	  allocate(B%bc_msg(Maxsub))
-	  do ks=1,Maxsub
-	  Bc=>B%bc_msg(ks)
-	  Bc%ib=0; Bc%ie=0;Bc%jb=0;Bc%je=0;Bc%kb=0;Bc%ke=0; Bc%bc=0; Bc%face=0; Bc%f_no=0
-	  Bc%ib1=0; Bc%ie1=0; Bc%jb1=0; Bc%je1=0; Bc%kb1=0; Bc%ke1=0
-	  Bc%nb1=0; Bc%face1=0; Bc%f_no1=0; Bc%L1=0; Bc%L2=0; Bc%L3=0
-	  Bc%b1=0; Bc%e1=0; Bc%b2=0; Bc%e2=0
-	  Bc%b1t=0; Bc%e1t=0; Bc%b2t=0; Bc%e2t=0           
-	 enddo
-     enddo
-	 end
+  do m = 1, NBnew
+    B => Block_new(m)
+    B%subface = 0
+    allocate (B%bc_msg(Maxsub))
+    do ks = 1, Maxsub
+      Bc => B%bc_msg(ks)
+      Bc%ib = 0; Bc%ie = 0; Bc%jb = 0; Bc%je = 0; Bc%kb = 0; Bc%ke = 0; Bc%bc = 0; Bc%face = 0; Bc%f_no = 0
+      Bc%ib1 = 0; Bc%ie1 = 0; Bc%jb1 = 0; Bc%je1 = 0; Bc%kb1 = 0; Bc%ke1 = 0
+      Bc%nb1 = 0; Bc%face1 = 0; Bc%f_no1 = 0; Bc%L1 = 0; Bc%L2 = 0; Bc%L3 = 0
+      Bc%b1 = 0; Bc%e1 = 0; Bc%b2 = 0; Bc%e2 = 0
+      Bc%b1t = 0; Bc%e1t = 0; Bc%b2t = 0; Bc%e2t = 0
+    end do
+  end do
+end
 
 !------------------------------------------------
-! ÎÞÁ¬½ÓµÄ±ß½ç
-     subroutine search_1d_bd(m,ks)   
-	 use global_var1
-	 implicit none
-     TYPE (BC_MSG_TYPE),pointer:: Bc,Bc1
-     TYPE (bcnp_type),pointer ::BP,BP1,BP2
-     Type (Block_TYPE1),pointer:: B,B1
-	 	  
-	  integer,dimension(2)::ib,ie,ns
-      integer:: npk(2),blkm(3)  ! npk Ã¿Ò»Î¬µÄ¿éÊý£» blkm ÈýÎ¬µÄ¿éµØÖ·
-      integer:: ks,q,m,k,blk,idx,k1,k2
-	  B=>Block(m)
-      Bc=>B%bc_msg(ks)
-	  npk(:)=1   ! Ã¿Ò»Î¬µÄ¿éÊý
-	  call get_ib(ib,ie,ns,blkm,m,ks)    ! Ã¿Ò»Î¬µÄÆðÊ¼¡¢ÖÕÖ¹µØÖ·
-      
-	  do q=1,2   ! 2 Î¬
-      npk(q)=1
-	  BP=>bcn(npk(q),q)
-	  
-	  call get_bk(blk,idx,ib(q),ns(q),m)
-	  BP%blk=blk   ! ¿éµØÖ·
-	  BP%idx=idx   ! Æ«ÒÆµØÖ·
-	  BP%nn=1
-	  do k=ib(q)+1,ie(q)
-	  call get_bk(blk,idx,k,ns(q),m)
-       if(blk .ne. BP%blk ) then
-         npk(q)=npk(q)+1  ! ´´Á¢ÐÂÇø
-         BP=>bcn(npk(q),q)
-		 BP%blk=blk  ! Ê×ÔªËØ¿éµØÖ·
-		 BP%idx=idx  ! Ê×ÔªËØÆ«ÒÆµØÖ·
-         BP%nn=1
-	    else
-		 BP%nn=BP%nn+1
-		endif
-	   enddo
-	
-	 enddo
- 
+! æ— è¿žæŽ¥çš„è¾¹ç•Œ
+subroutine search_1d_bd(m, ks)
+  use global_var1
+  implicit none
+  TYPE(BC_MSG_TYPE), pointer:: Bc, Bc1
+  TYPE(bcnp_type), pointer ::BP, BP1, BP2
+  Type(Block_TYPE1), pointer:: B, B1
+
+  integer, dimension(2)::ib, ie, ns
+  integer:: npk(2), blkm(3)  ! npk æ¯ä¸€ç»´çš„å—æ•°ï¼› blkm ä¸‰ç»´çš„å—åœ°å€
+  integer:: ks, q, m, k, blk, idx, k1, k2
+  B => Block(m)
+  Bc => B%bc_msg(ks)
+  npk(:) = 1   ! æ¯ä¸€ç»´çš„å—æ•°
+  call get_ib(ib, ie, ns, blkm, m, ks)    ! æ¯ä¸€ç»´çš„èµ·å§‹ã€ç»ˆæ­¢åœ°å€
+
+  do q = 1, 2   ! 2 ç»´
+    npk(q) = 1
+    BP => bcn(npk(q), q)
+
+    call get_bk(blk, idx, ib(q), ns(q), m)
+    BP%blk = blk   ! å—åœ°å€
+    BP%idx = idx   ! åç§»åœ°å€
+    BP%nn = 1
+    do k = ib(q)+1, ie(q)
+      call get_bk(blk, idx, k, ns(q), m)
+      if (blk .ne. BP%blk) then
+        npk(q) = npk(q)+1  ! åˆ›ç«‹æ–°åŒº
+        BP => bcn(npk(q), q)
+        BP%blk = blk  ! é¦–å…ƒç´ å—åœ°å€
+        BP%idx = idx  ! é¦–å…ƒç´ åç§»åœ°å€
+        BP%nn = 1
+      else
+        BP%nn = BP%nn+1
+      end if
+    end do
+
+  end do
+
 !-  write bc msg in new block ----
-     do k1=1,npk(1)
-	 do k2=1,npk(2)
-      BP1=>bcn(k1,1)
-	  BP2=>bcn(k2,2)
+  do k1 = 1, npk(1)
+    do k2 = 1, npk(2)
+      BP1 => bcn(k1, 1)
+      BP2 => bcn(k2, 2)
 
-!	  blkm(ns(1))=k1   ! ÃæÉÏµÄµÚ1Î¬
-!	  blkm(ns(2))=k2
-	  blkm(ns(1))=BP1%blk   
-	  blkm(ns(2))=BP2%blk
+!          blkm(ns(1))=k1   ! é¢ä¸Šçš„ç¬¬1ç»´
+!          blkm(ns(2))=k2
+      blkm(ns(1)) = BP1%blk
+      blkm(ns(2)) = BP2%blk
 
+      blk = B%nbk0+B%PI*B%PJ*(blkm(3)-1)+B%PI*(blkm(2)-1)+blkm(1)-1     ! æ–°å—å·
+      B1 => block_new(blk)
+      B1%subface = B1%subface+1   ! æ–°å»ºè¾¹ç•ŒåŒºåŸŸ
+      k = B1%subface
+      Bc1 => B1%bc_msg(k)
+      Bc1%b1 = BP1%idx; Bc1%e1 = BP1%idx+BP1%nn-1
+      Bc1%b2 = BP2%idx; Bc1%e2 = BP2%idx+BP2%nn-1
+      Bc1%bc = Bc%bc
+      Bc1%face = Bc%face
+      Bc1%f_no = k
+    end do
+  end do
 
-      blk=B%nbk0+B%PI*B%PJ*(blkm(3)-1)+B%PI*(blkm(2)-1)+blkm(1)-1     ! ÐÂ¿éºÅ
-      B1=>block_new(blk)
-      B1%subface=B1%subface+1   ! ÐÂ½¨±ß½çÇøÓò
-	  k=B1%subface
-	  Bc1=>B1%bc_msg(k)
-      Bc1%b1=BP1%idx ; Bc1%e1=BP1%idx+BP1%nn-1
-	  Bc1%b2=BP2%idx ; Bc1%e2=BP2%idx+BP2%nn-1
-	  Bc1%bc=Bc%bc
-	  Bc1%face=Bc%face
-	  Bc1%f_no=k
-	 enddo
-	 enddo
-
-	end
+end
 !---------------------------------------------
 
-
-
 !------------------------------------------------
-! ÓÐÁ¬½ÓµÄ±ß½ç
-     subroutine search_1d_lk(m,ks)   
-	 use global_var1
-	 implicit none
-     TYPE (BC_MSG_TYPE),pointer:: Bc,Bc1
-     TYPE (bcnp_type),pointer ::BP,BP1,BP2
-     Type (Block_TYPE1),pointer:: B,Bt,B1,B1t
-	 	  
-	  integer,dimension(2)::ib,ie,ns   
-      integer,dimension(2):: ibt,nst,Lt  
+! æœ‰è¿žæŽ¥çš„è¾¹ç•Œ
+subroutine search_1d_lk(m, ks)
+  use global_var1
+  implicit none
+  TYPE(BC_MSG_TYPE), pointer:: Bc, Bc1
+  TYPE(bcnp_type), pointer ::BP, BP1, BP2
+  Type(Block_TYPE1), pointer:: B, Bt, B1, B1t
 
-	  integer:: npk(2),blkm(3),blkmt(3) ! npk Ã¿Ò»Î¬µÄ¿éÊý£» blkm ÈýÎ¬µÄ¿éµØÖ·
-      integer:: ks,q,m,k,blk,idx,k1,k2,mt,kt,blkt,idxt,nst3
-	  integer:: kb1t(3),ke1t(3),nkt(6)
+  integer, dimension(2)::ib, ie, ns
+  integer, dimension(2):: ibt, nst, Lt
 
-	  B=>Block(m)
-      Bc=>B%bc_msg(ks)
-	  mt=Bc%nb1   ! Á¬½Ó¿éºÅ
-      Bt=>Block(mt)  !Á¬½Ó¿é
+  integer:: npk(2), blkm(3), blkmt(3) ! npk æ¯ä¸€ç»´çš„å—æ•°ï¼› blkm ä¸‰ç»´çš„å—åœ°å€
+  integer:: ks, q, m, k, blk, idx, k1, k2, mt, kt, blkt, idxt, nst3
+  integer:: kb1t(3), ke1t(3), nkt(6)
 
-	  npk(:)=1   ! Ã¿Ò»Î¬µÄ¿éÊý
+  B => Block(m)
+  Bc => B%bc_msg(ks)
+  mt = Bc%nb1   ! è¿žæŽ¥å—å·
+  Bt => Block(mt)  !è¿žæŽ¥å—
 
-	  call get_ib(ib,ie,ns,blkm,m,ks)           ! Ã¿Ò»Î¬µÄÆðÊ¼¡¢ÖÕÖ¹µØÖ·
-      call get_ibt(ibt,ns,nst,Lt,blkmt, m,ks)   ! Á¬½ÓÎ¬µÄÆðÊ¼µØÖ·£¬Î¬ºÅ
+  npk(:) = 1   ! æ¯ä¸€ç»´çš„å—æ•°
 
+  call get_ib(ib, ie, ns, blkm, m, ks)           ! æ¯ä¸€ç»´çš„èµ·å§‹ã€ç»ˆæ­¢åœ°å€
+  call get_ibt(ibt, ns, nst, Lt, blkmt, m, ks)   ! è¿žæŽ¥ç»´çš„èµ·å§‹åœ°å€ï¼Œç»´å·
 
-	  do q=1,2   ! 2 Î¬
-      npk(q)=1
-	  BP=>bcn(npk(q),q)
-	  
-	  call get_bk(blk,idx,ib(q),ns(q),m)   ! ¿éµØÖ·£¬Ë÷ÒýµØÖ·
-      call get_bk(blkt,idxt,ibt(q),nst(q),mt)
+  do q = 1, 2   ! 2 ç»´
+    npk(q) = 1
+    BP => bcn(npk(q), q)
 
-	  BP%blk=blk   ! ¿éµØÖ·
-	  BP%idx=idx   ! Æ«ÒÆµØÖ·
-	  BP%nn=1
-	  BP%blkt=blkt
-	  BP%idxt=idxt
+    call get_bk(blk, idx, ib(q), ns(q), m)   ! å—åœ°å€ï¼Œç´¢å¼•åœ°å€
+    call get_bk(blkt, idxt, ibt(q), nst(q), mt)
 
+    BP%blk = blk   ! å—åœ°å€
+    BP%idx = idx   ! åç§»åœ°å€
+    BP%nn = 1
+    BP%blkt = blkt
+    BP%idxt = idxt
 
-	  do k=ib(q)+1,ie(q)          ! ±»Á¬½Ó index
-	     kt=ibt(q)+Lt(q)*(k-ib(q))   ! Á¬½Ó index
+    do k = ib(q)+1, ie(q)          ! è¢«è¿žæŽ¥ index
+      kt = ibt(q)+Lt(q)*(k-ib(q))   ! è¿žæŽ¥ index
 
-	  call get_bk(blk,idx,k,ns(q),m)
-	  call get_bk(blkt,idxt,kt,nst(q),mt)
+      call get_bk(blk, idx, k, ns(q), m)
+      call get_bk(blkt, idxt, kt, nst(q), mt)
 
-       if(blk .ne. BP%blk  .or. blkt .ne. BP%blkt) then
-         npk(q)=npk(q)+1  ! ´´Á¢ÐÂÇø
-         BP=>bcn(npk(q),q)
-		 BP%blk=blk  ! Ê×ÔªËØ¿éµØÖ·
-		 BP%idx=idx  ! Ê×ÔªËØÆ«ÒÆµØÖ·
-         BP%nn=1
-	     BP%blkt=blkt
-		 BP%idxt=idxt
-	    else
-		 BP%nn=BP%nn+1
-		endif
-	   enddo
-	
-	 enddo
- 
+      if (blk .ne. BP%blk .or. blkt .ne. BP%blkt) then
+        npk(q) = npk(q)+1  ! åˆ›ç«‹æ–°åŒº
+        BP => bcn(npk(q), q)
+        BP%blk = blk  ! é¦–å…ƒç´ å—åœ°å€
+        BP%idx = idx  ! é¦–å…ƒç´ åç§»åœ°å€
+        BP%nn = 1
+        BP%blkt = blkt
+        BP%idxt = idxt
+      else
+        BP%nn = BP%nn+1
+      end if
+    end do
+
+  end do
+
 !-  write bc msg in new block ----
-     do k1=1,npk(1)
-	 do k2=1,npk(2)
-      BP1=>bcn(k1,1)
-	  BP2=>bcn(k2,2)
+  do k1 = 1, npk(1)
+    do k2 = 1, npk(2)
+      BP1 => bcn(k1, 1)
+      BP2 => bcn(k2, 2)
 
-      ! ±»Á¬½ÓÃæÉÏ Á½Î¬µÄ¿éË÷Òý
-!	  blkm(ns(1))=k1   
-!	  blkm(ns(2))=k2
+      ! è¢«è¿žæŽ¥é¢ä¸Š ä¸¤ç»´çš„å—ç´¢å¼•
+!          blkm(ns(1))=k1
+!          blkm(ns(2))=k2
 
-	  blkm(ns(1))=BP1%blk   
-	  blkm(ns(2))=BP2%blk
-      blkmt(nst(1))=BP1%blkt
-	  blkmt(nst(2))=BP2%blkt
+      blkm(ns(1)) = BP1%blk
+      blkm(ns(2)) = BP2%blk
+      blkmt(nst(1)) = BP1%blkt
+      blkmt(nst(2)) = BP2%blkt
 
-      blk=B%nbk0+B%PI*B%PJ*(blkm(3)-1)+B%PI*(blkm(2)-1)+blkm(1)-1     ! ÐÂ¿éºÅ
-      blkt=Bt%nbk0+Bt%PI*Bt%PJ*(blkmt(3)-1)+Bt%PI*(blkmt(2)-1)+blkmt(1)-1     ! Á¬½Ó¿éºÅ
-         
-	 
-	 
-	  B1=>block_new(blk)
-      B1%subface=B1%subface+1   ! ÐÂ½¨±ß½çÇøÓò
-	  k=B1%subface
-	  Bc1=>B1%bc_msg(k)
-      Bc1%b1=BP1%idx ; Bc1%e1=BP1%idx+BP1%nn-1
-	  Bc1%b2=BP2%idx ; Bc1%e2=BP2%idx+BP2%nn-1
-	  Bc1%bc=Bc%bc
-	  Bc1%face=Bc%face
-	  Bc1%f_no=k
-      
+      blk = B%nbk0+B%PI*B%PJ*(blkm(3)-1)+B%PI*(blkm(2)-1)+blkm(1)-1     ! æ–°å—å·
+      blkt = Bt%nbk0+Bt%PI*Bt%PJ*(blkmt(3)-1)+Bt%PI*(blkmt(2)-1)+blkmt(1)-1     ! è¿žæŽ¥å—å·
 
-	  Bc1%b1t=BP1%idxt
-      Bc1%e1t=Bc1%b1t+Lt(1)*(BP1%nn-1)
-   	  Bc1%b2t=BP2%idxt
-      Bc1%e2t=Bc1%b2t+Lt(2)*(BP2%nn-1)	  
+      B1 => block_new(blk)
+      B1%subface = B1%subface+1   ! æ–°å»ºè¾¹ç•ŒåŒºåŸŸ
+      k = B1%subface
+      Bc1 => B1%bc_msg(k)
+      Bc1%b1 = BP1%idx; Bc1%e1 = BP1%idx+BP1%nn-1
+      Bc1%b2 = BP2%idx; Bc1%e2 = BP2%idx+BP2%nn-1
+      Bc1%bc = Bc%bc
+      Bc1%face = Bc%face
+      Bc1%f_no = k
 
+      Bc1%b1t = BP1%idxt
+      Bc1%e1t = Bc1%b1t+Lt(1)*(BP1%nn-1)
+      Bc1%b2t = BP2%idxt
+      Bc1%e2t = Bc1%b2t+Lt(2)*(BP2%nn-1)
 
-	  Bc1%L1=Bc%L1
-	  Bc1%L2=Bc%L2
-      Bc1%L3=Bc%L3
-	  Bc1%face1=Bc%face1
-	  Bc1%nb1=blkt               ! Á¬½Ó¿éºÅ
-	  B1t=>block_new(Bc1%nb1)  
-
+      Bc1%L1 = Bc%L1
+      Bc1%L2 = Bc%L2
+      Bc1%L3 = Bc%L3
+      Bc1%face1 = Bc%face1
+      Bc1%nb1 = blkt               ! è¿žæŽ¥å—å·
+      B1t => block_new(Bc1%nb1)
 
 !-----------------------------------------------------
-      kb1t(nst(1))=min(Bc1%b1t,Bc1%e1t)
-	  ke1t(nst(1))=max(Bc1%b1t,Bc1%e1t)
+      kb1t(nst(1)) = min(Bc1%b1t, Bc1%e1t)
+      ke1t(nst(1)) = max(Bc1%b1t, Bc1%e1t)
 
-      kb1t(nst(2))=min(Bc1%b2t,Bc1%e2t)
-	  ke1t(nst(2))=max(Bc1%b2t,Bc1%e2t)
-      nst3=6-nst(1)-nst(2)     ! ÁíÍâÒ»Î¬ £¨ÍË»¯Î¬£©
-    
-	  nkt(1:3)=1; nkt(4)=B1t%nx; nkt(5)=B1t%ny; nkt(6)=B1t%nz
-	  kb1t(nst3)=nkt(Bc1%face1)
-	  ke1t(nst3)=nkt(Bc1%face1)
- 
-      Bc1%ib1=kb1t(1) ; Bc1%ie1=ke1t(1) 
-	  Bc1%jb1=kb1t(2) ; Bc1%je1=ke1t(2)
-	  Bc1%kb1=kb1t(3) ; Bc1%ke1=ke1t(3)
+      kb1t(nst(2)) = min(Bc1%b2t, Bc1%e2t)
+      ke1t(nst(2)) = max(Bc1%b2t, Bc1%e2t)
+      nst3 = 6-nst(1)-nst(2)     ! å¦å¤–ä¸€ç»´ ï¼ˆé€€åŒ–ç»´ï¼‰
 
-	 enddo
-	 enddo
+      nkt(1:3) = 1; nkt(4) = B1t%nx; nkt(5) = B1t%ny; nkt(6) = B1t%nz
+      kb1t(nst3) = nkt(Bc1%face1)
+      ke1t(nst3) = nkt(Bc1%face1)
 
-	end
+      Bc1%ib1 = kb1t(1); Bc1%ie1 = ke1t(1)
+      Bc1%jb1 = kb1t(2); Bc1%je1 = ke1t(2)
+      Bc1%kb1 = kb1t(3); Bc1%ke1 = ke1t(3)
+
+    end do
+  end do
+
+end
 !---------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 !------------------------------------------------
-! Éè¶¨ÐÂµÄÄÚ±ß½ç
+! è®¾å®šæ–°çš„å†…è¾¹ç•Œ
 
-     subroutine set_new_inner
-	 use global_var1
-	 implicit none
-     TYPE (BC_MSG_TYPE),pointer:: Bc
-     Type (Block_TYPE1),pointer:: B,B1,B2
-	 	  
-     integer:: m,m0,m1,ms
-	  
-	  do m=1,NBnew
-	   B1=>Block_new(m)
-       m0=B1%nb_ori
-	   B=>Block(m0) 
+subroutine set_new_inner
+  use global_var1
+  implicit none
+  TYPE(BC_MSG_TYPE), pointer:: Bc
+  Type(Block_TYPE1), pointer:: B, B1, B2
 
-       if(B1%PI .ne. 1) then   ! ×óÁ¬½Ó
-	     m1=m-1   ! ×ó²à¿éºÅ
-		 B2=>Block_new(m1)  ! Á¬½Ó¿é
+  integer:: m, m0, m1, ms
 
-		 B1%subface=B1%subface+1  ! ´´½¨
-		 ms=B1%subface
-		 Bc=>B1%bc_msg(ms)
-	
-		 Bc%ib=1 ;  Bc%ie=1 ; Bc%jb=1; Bc%je=B1%ny ; Bc%kb=1 ; Bc%ke=B1%nz
-		 Bc%bc=BC_In ;     Bc%face=1  ;  Bc%f_no=ms
-		 Bc%ib1=B2%nx; Bc%ie1=B2%nx; Bc%jb1=1; Bc%je1=B2%ny; Bc%kb1=1; Bc%ke1=B2%nz
-		 Bc%nb1=m1 ;       Bc%face1=4   
-		 Bc%L1=1 ; Bc%L2=2 ; Bc%L3=3
-       endif
+  do m = 1, NBnew
+    B1 => Block_new(m)
+    m0 = B1%nb_ori
+    B => Block(m0)
 
-       if(B1%PI .ne. B%PI) then   ! ÓÒÁ¬½Ó
-	     m1=m+1   ! ×ó²à¿éºÅ
-		 B2=>Block_new(m1)  ! Á¬½Ó¿é
+    if (B1%PI .ne. 1) then   ! å·¦è¿žæŽ¥
+      m1 = m-1   ! å·¦ä¾§å—å·
+      B2 => Block_new(m1)  ! è¿žæŽ¥å—
 
-		 B1%subface=B1%subface+1  ! ´´½¨
-		 ms=B1%subface
-		 Bc=>B1%bc_msg(ms)
-	
-		 Bc%ib=B1%nx ;  Bc%ie=B1%nx ;  Bc%jb=1; Bc%je=B1%ny ; Bc%kb=1 ; Bc%ke=B1%nz
-		 Bc%bc=BC_In ;     Bc%face=4  ;  Bc%f_no=ms
-		 Bc%ib1=1; Bc%ie1=1; Bc%jb1=1; Bc%je1=B2%ny; Bc%kb1=1; Bc%ke1=B2%nz
-		 Bc%nb1=m1 ;       Bc%face1=1   
-		 Bc%L1=1 ; Bc%L2=2 ; Bc%L3=3
-       endif
+      B1%subface = B1%subface+1  ! åˆ›å»º
+      ms = B1%subface
+      Bc => B1%bc_msg(ms)
 
+      Bc%ib = 1; Bc%ie = 1; Bc%jb = 1; Bc%je = B1%ny; Bc%kb = 1; Bc%ke = B1%nz
+      Bc%bc = BC_In; Bc%face = 1; Bc%f_no = ms
+      Bc%ib1 = B2%nx; Bc%ie1 = B2%nx; Bc%jb1 = 1; Bc%je1 = B2%ny; Bc%kb1 = 1; Bc%ke1 = B2%nz
+      Bc%nb1 = m1; Bc%face1 = 4
+      Bc%L1 = 1; Bc%L2 = 2; Bc%L3 = 3
+    end if
 
-       if(B1%PJ .ne. 1) then   ! j- Á¬½Ó
-	     m1=m-B%PI      ! ÏÂ²à¿éºÅ
-		 B2=>Block_new(m1)  ! Á¬½Ó¿é
+    if (B1%PI .ne. B%PI) then   ! å³è¿žæŽ¥
+      m1 = m+1   ! å·¦ä¾§å—å·
+      B2 => Block_new(m1)  ! è¿žæŽ¥å—
 
-		 B1%subface=B1%subface+1  ! ´´½¨
-		 ms=B1%subface
-		 Bc=>B1%bc_msg(ms)
-	
-		 Bc%ib=1 ;  Bc%ie=B1%nx ;  Bc%jb=1; Bc%je=1 ;           Bc%kb=1 ; Bc%ke=B1%nz
-		 Bc%bc=BC_In ;     Bc%face=2  ;  Bc%f_no=ms
-		 Bc%ib1=1; Bc%ie1=B2%nx;   Bc%jb1=B2%ny; Bc%je1=B2%ny;  Bc%kb1=1; Bc%ke1=B2%nz
-		 Bc%nb1=m1 ;       Bc%face1=5   
-		 Bc%L1=1 ; Bc%L2=2 ; Bc%L3=3
-       endif
+      B1%subface = B1%subface+1  ! åˆ›å»º
+      ms = B1%subface
+      Bc => B1%bc_msg(ms)
 
-       if(B1%PJ .ne. B%PJ) then   ! j+ Á¬½Ó
-	     m1=m+B%PI      ! ÉÏ²à¿éºÅ
-		 B2=>Block_new(m1)  ! Á¬½Ó¿é
+      Bc%ib = B1%nx; Bc%ie = B1%nx; Bc%jb = 1; Bc%je = B1%ny; Bc%kb = 1; Bc%ke = B1%nz
+      Bc%bc = BC_In; Bc%face = 4; Bc%f_no = ms
+      Bc%ib1 = 1; Bc%ie1 = 1; Bc%jb1 = 1; Bc%je1 = B2%ny; Bc%kb1 = 1; Bc%ke1 = B2%nz
+      Bc%nb1 = m1; Bc%face1 = 1
+      Bc%L1 = 1; Bc%L2 = 2; Bc%L3 = 3
+    end if
 
-		 B1%subface=B1%subface+1  ! ´´½¨
-		 ms=B1%subface
-		 Bc=>B1%bc_msg(ms)
-	
-		 Bc%ib=1 ;  Bc%ie=B1%nx ;  Bc%jb=B1%ny; Bc%je=B1%ny ;      Bc%kb=1 ; Bc%ke=B1%nz
-		 Bc%bc=BC_In ;     Bc%face=5  ;  Bc%f_no=ms
-		 Bc%ib1=1; Bc%ie1=B2%nx;   Bc%jb1=1; Bc%je1=1;           Bc%kb1=1; Bc%ke1=B2%nz
-		 Bc%nb1=m1 ;       Bc%face1=2   
-		 Bc%L1=1 ; Bc%L2=2 ; Bc%L3=3
-       endif
+    if (B1%PJ .ne. 1) then   ! j- è¿žæŽ¥
+      m1 = m-B%PI      ! ä¸‹ä¾§å—å·
+      B2 => Block_new(m1)  ! è¿žæŽ¥å—
 
+      B1%subface = B1%subface+1  ! åˆ›å»º
+      ms = B1%subface
+      Bc => B1%bc_msg(ms)
 
-       if(B1%PK .ne. 1) then   ! k- Á¬½Ó
-	     m1=m-B%PI*B%PJ      ! Ç°²à¿éºÅ
-		 B2=>Block_new(m1)   ! Á¬½Ó¿é
+      Bc%ib = 1; Bc%ie = B1%nx; Bc%jb = 1; Bc%je = 1; Bc%kb = 1; Bc%ke = B1%nz
+      Bc%bc = BC_In; Bc%face = 2; Bc%f_no = ms
+      Bc%ib1 = 1; Bc%ie1 = B2%nx; Bc%jb1 = B2%ny; Bc%je1 = B2%ny; Bc%kb1 = 1; Bc%ke1 = B2%nz
+      Bc%nb1 = m1; Bc%face1 = 5
+      Bc%L1 = 1; Bc%L2 = 2; Bc%L3 = 3
+    end if
 
-		 B1%subface=B1%subface+1  ! ´´½¨
-		 ms=B1%subface
-		 Bc=>B1%bc_msg(ms)
-	
-		 Bc%ib=1 ;  Bc%ie=B1%nx ;  Bc%jb=1; Bc%je=B1%ny ;      Bc%kb=1 ; Bc%ke=1
-		 Bc%bc=BC_In ;     Bc%face=3  ;  Bc%f_no=ms
-		 Bc%ib1=1;  Bc%ie1=B2%nx;   Bc%jb1=1; Bc%je1=B2%ny;    Bc%kb1=B2%nz; Bc%ke1=B2%nz
-		 Bc%nb1=m1 ;       Bc%face1=6   
-		 Bc%L1=1 ; Bc%L2=2 ; Bc%L3=3
-       endif
+    if (B1%PJ .ne. B%PJ) then   ! j+ è¿žæŽ¥
+      m1 = m+B%PI      ! ä¸Šä¾§å—å·
+      B2 => Block_new(m1)  ! è¿žæŽ¥å—
 
+      B1%subface = B1%subface+1  ! åˆ›å»º
+      ms = B1%subface
+      Bc => B1%bc_msg(ms)
 
-       if(B1%PK .ne. B%PK) then   ! k- Á¬½Ó
-	     m1=m+B%PI*B%PJ      ! Ç°²à¿éºÅ
-		 B2=>Block_new(m1)   ! Á¬½Ó¿é
+      Bc%ib = 1; Bc%ie = B1%nx; Bc%jb = B1%ny; Bc%je = B1%ny; Bc%kb = 1; Bc%ke = B1%nz
+      Bc%bc = BC_In; Bc%face = 5; Bc%f_no = ms
+      Bc%ib1 = 1; Bc%ie1 = B2%nx; Bc%jb1 = 1; Bc%je1 = 1; Bc%kb1 = 1; Bc%ke1 = B2%nz
+      Bc%nb1 = m1; Bc%face1 = 2
+      Bc%L1 = 1; Bc%L2 = 2; Bc%L3 = 3
+    end if
 
-		 B1%subface=B1%subface+1  ! ´´½¨
-		 ms=B1%subface
-		 Bc=>B1%bc_msg(ms)
-	
-		 Bc%ib=1 ;  Bc%ie=B1%nx ;  Bc%jb=1; Bc%je=B1%ny ;      Bc%kb=B1%nz ; Bc%ke=B1%nz
-		 Bc%bc=BC_In ;     Bc%face=6  ;  Bc%f_no=ms
-		 Bc%ib1=1;  Bc%ie1=B2%nx;   Bc%jb1=1; Bc%je1=B2%ny;    Bc%kb1=1; Bc%ke1=1
-		 Bc%nb1=m1 ;       Bc%face1=3   
-		 Bc%L1=1 ; Bc%L2=2 ; Bc%L3=3
-       endif
-     enddo
-	end
+    if (B1%PK .ne. 1) then   ! k- è¿žæŽ¥
+      m1 = m-B%PI*B%PJ      ! å‰ä¾§å—å·
+      B2 => Block_new(m1)   ! è¿žæŽ¥å—
+
+      B1%subface = B1%subface+1  ! åˆ›å»º
+      ms = B1%subface
+      Bc => B1%bc_msg(ms)
+
+      Bc%ib = 1; Bc%ie = B1%nx; Bc%jb = 1; Bc%je = B1%ny; Bc%kb = 1; Bc%ke = 1
+      Bc%bc = BC_In; Bc%face = 3; Bc%f_no = ms
+      Bc%ib1 = 1; Bc%ie1 = B2%nx; Bc%jb1 = 1; Bc%je1 = B2%ny; Bc%kb1 = B2%nz; Bc%ke1 = B2%nz
+      Bc%nb1 = m1; Bc%face1 = 6
+      Bc%L1 = 1; Bc%L2 = 2; Bc%L3 = 3
+    end if
+
+    if (B1%PK .ne. B%PK) then   ! k- è¿žæŽ¥
+      m1 = m+B%PI*B%PJ      ! å‰ä¾§å—å·
+      B2 => Block_new(m1)   ! è¿žæŽ¥å—
+
+      B1%subface = B1%subface+1  ! åˆ›å»º
+      ms = B1%subface
+      Bc => B1%bc_msg(ms)
+
+      Bc%ib = 1; Bc%ie = B1%nx; Bc%jb = 1; Bc%je = B1%ny; Bc%kb = B1%nz; Bc%ke = B1%nz
+      Bc%bc = BC_In; Bc%face = 6; Bc%f_no = ms
+      Bc%ib1 = 1; Bc%ie1 = B2%nx; Bc%jb1 = 1; Bc%je1 = B2%ny; Bc%kb1 = 1; Bc%ke1 = 1
+      Bc%nb1 = m1; Bc%face1 = 3
+      Bc%L1 = 1; Bc%L2 = 2; Bc%L3 = 3
+    end if
+  end do
+end
 !---------------------------------------------
 
+!-----æ‰¾å‡ºç¬¬1,2ç»´çš„èµ·å§‹ã€ç»ˆæ­¢åœ°å€
+subroutine get_ib(ib, ie, ns, blkm, m, ks)
+  use global_var1
+  implicit none
+  integer::ib(2), ie(2), ns(2), blkm(3), m, ks
+  Type(Block_TYPE1), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer:: Bc
 
+  B => Block(m)
+  Bc => B%bc_msg(ks)
 
+  if (Bc%face == 1 .or. Bc%face == 4) then
+    ib(1) = Bc%jb; ie(1) = Bc%je; ns(1) = 2       ! ç¬¬1ç»´æ˜¯ jæ–¹å‘
+    ib(2) = Bc%kb; ie(2) = Bc%ke; ns(2) = 3       ! ç¬¬2ç»´æ˜¯ kæ–¹å‘
+  else if (Bc%face == 2 .or. Bc%face == 5) then
+    ib(1) = Bc%ib; ie(1) = Bc%ie; ns(1) = 1
+    ib(2) = Bc%kb; ie(2) = Bc%ke; ns(2) = 3
+  else
+    ib(1) = Bc%ib; ie(1) = Bc%ie; ns(1) = 1
+    ib(2) = Bc%jb; ie(2) = Bc%je; ns(2) = 2
+  end if
 
+! é€€åŒ–ç»´çš„å—ç´¢å¼•
+  select case (Bc%face)
+  case (1)
+    blkm(1) = 1
+  case (4)
+    blkm(1) = B%PI
+  case (2)
+    blkm(2) = 1
+  case (5)
+    blkm(2) = B%PJ
+  case (3)
+    blkm(3) = 1
+  case (6)
+    blkm(3) = B%PK
+  end select
+end
 
+! è¢«è¿žæŽ¥å—çš„ä¿¡æ¯
+! ibt(1), ibt(2): ç¬¬1ï¼Œç¬¬2è¿žæŽ¥ç»´
+! nst(1), nst(2): ç¬¬1,2è¿žæŽ¥ç»´çš„ ç»´å·
+! Lt(1),Lt(2): è¿žæŽ¥æ¬¡åº (1 or -1)
+subroutine get_ibt(ibt, ns, nst, Lt, blkmt, m, ks)
+  use global_var1
+  implicit none
+  integer::ibt(2), ns(2), nst(2), Lt(2), blkmt(3), m, ks, Lk(3), bt(3), et(3), k
+  Type(Block_TYPE1), pointer:: B, B1
+  TYPE(BC_MSG_TYPE), pointer:: Bc
 
+  B => Block(m)
+  Bc => B%bc_msg(ks)
+  LK(1) = Bc%L1; LK(2) = Bc%L2; LK(3) = Bc%L3
+  bt(1) = Bc%ib1; bt(2) = Bc%jb1; bt(3) = Bc%kb1
+  et(1) = Bc%ie1; et(2) = Bc%je1; et(3) = Bc%ke1
 
+  do k = 1, 2
+    nst(k) = abs(LK(ns(k)))    ! ç¬¬1,2ç»´çš„è¿žæŽ¥
+    Lt(k) = sign(1, LK(ns(k)))  ! æ­£æˆ–è´Ÿè¿žæŽ¥
+    ! è¿žæŽ¥çš„èµ·å§‹åœ°å€
+    if (Lt(k) > 0) then
+      ibt(k) = bt(nst(k))
+    else
+      ibt(k) = et(nst(k))
+    end if
+  end do
 
+  B1 => block(Bc%nb1)
 
+! ï¼ˆè¢«è¿žæŽ¥å—ï¼‰é€€åŒ–ç»´çš„å—ç´¢å¼•
+  select case (Bc%face1)
+  case (1)
+    blkmt(1) = 1
+  case (4)
+    blkmt(1) = B1%PI
+  case (2)
+    blkmt(2) = 1
+  case (5)
+    blkmt(2) = B1%PJ
+  case (3)
+    blkmt(3) = 1
+  case (6)
+    blkmt(3) = B1%PK
+  end select
 
-
-!-----ÕÒ³öµÚ1,2Î¬µÄÆðÊ¼¡¢ÖÕÖ¹µØÖ·
-	  subroutine get_ib(ib,ie,ns,blkm,m,ks)    
-	  use global_var1
-	  implicit none
-	  integer::ib(2),ie(2),ns(2),blkm(3),m,ks
-      Type (Block_TYPE1),pointer:: B
-      TYPE (BC_MSG_TYPE),pointer:: Bc
-       
-	   B=>Block(m)
-	   Bc=>B%bc_msg(ks)
-
-       if(Bc%face==1 .or. Bc%face == 4) then
-	    ib(1)=Bc%jb; ie(1)=Bc%je ; ns(1)=2       ! µÚ1Î¬ÊÇ j·½Ïò 
-		ib(2)=Bc%kb; ie(2)=Bc%ke ; ns(2)=3       ! µÚ2Î¬ÊÇ k·½Ïò
-	   else if(Bc%face== 2 .or. Bc%face == 5) then
-        ib(1)=Bc%ib; ie(1)=Bc%ie ; ns(1)=1
-		ib(2)=Bc%kb; ie(2)=Bc%ke ; ns(2)=3
-	   else
-	    ib(1)=Bc%ib; ie(1)=Bc%ie; ns(1)=1
-		ib(2)=Bc%jb; ie(2)=Bc%je; ns(2)=2
-	   endif
-
-
-! ÍË»¯Î¬µÄ¿éË÷Òý
-	  select case (Bc%face)  
-       case(1)
-		   blkm(1)=1
-	   case(4)
-		   blkm(1)=B%PI
-	   case(2)
-		   blkm(2)=1
-	   case(5)
-		   blkm(2)=B%PJ
-	   case(3)
-		   blkm(3)=1
-	   case(6)
-		   blkm(3)=B%PK
-	   end select
-    end
-
- 
-  ! ±»Á¬½Ó¿éµÄÐÅÏ¢ 
-  ! ibt(1), ibt(2): µÚ1£¬µÚ2Á¬½ÓÎ¬ 
-  ! nst(1), nst(2): µÚ1,2Á¬½ÓÎ¬µÄ Î¬ºÅ
-  ! Lt(1),Lt(2): Á¬½Ó´ÎÐò (1 or -1)
-      subroutine get_ibt(ibt,ns,nst,Lt,blkmt, m,ks)   
-	  use global_var1
-	  implicit none
-	  integer::ibt(2),ns(2),nst(2),Lt(2),blkmt(3),m,ks,Lk(3),bt(3),et(3),k
-      Type (Block_TYPE1),pointer:: B,B1
-      TYPE (BC_MSG_TYPE),pointer:: Bc
-       
-	   B=>Block(m)
-	   Bc=>B%bc_msg(ks)
-       LK(1)=Bc%L1; LK(2)=Bc%L2; LK(3)=Bc%L3 
-       bt(1)=Bc%ib1; bt(2)=Bc%jb1 ; bt(3)=Bc%kb1
-       et(1)=Bc%ie1; et(2)=Bc%je1; et(3)=Bc%ke1
-
-	   do k=1,2
-       nst(k)=abs(LK(ns(k)))    ! µÚ1,2Î¬µÄÁ¬½Ó
-	   Lt(k)=sign(1,LK(ns(k)))  ! Õý»ò¸ºÁ¬½Ó
-                               ! Á¬½ÓµÄÆðÊ¼µØÖ·
-		 if(Lt(k) > 0) then
-          ibt(k)=bt(nst(k))       
-         else
-	      ibt(k)=et(nst(k))
-		 endif
-	   enddo
-       
-	   B1=>block(Bc%nb1)
-
-! £¨±»Á¬½Ó¿é£©ÍË»¯Î¬µÄ¿éË÷Òý
-	  select case (Bc%face1)  
-       case(1)
-		   blkmt(1)=1
-	   case(4)
-		   blkmt(1)=B1%PI
-	   case(2)
-		   blkmt(2)=1
-	   case(5)
-		   blkmt(2)=B1%PJ
-	   case(3)
-		   blkmt(3)=1
-	   case(6)
-		   blkmt(3)=B1%PK
-	   end select
-
-    end
-
-
-
+end
 
 ! -----------
- !  ¸ø¶¨ÏÂ±êk, ¼ÆËã³öÊÇµÚbk¸ö×Ó¿é,±¾µØÏÂ±êbi
-  subroutine get_bk(bk,ki,k,ns,mb)    ! k, ÏÂ±ê£¬ ns Î¬Êý, nb (Ô­)¿éºÅ
-     use global_var1
-     implicit none
-     integer:: bk,ki,k,ns,mb,Pn,nn            ! Pn ¿éÊý£¬ nn Íø¸ñµãÊý
-     Type (Block_TYPE1),pointer:: B
-	 B=> block(mb)
-     if(ns == 1) then  ! µÚ1Î¬
-	  nn=B%nx
-	  Pn=B%Pi
-	 else if(ns==2) then
-	  nn=B%ny
-	  Pn=B%Pj
-	 else if(ns==3) then
-	  nn=B%nz
-	  Pn=B%Pk
-	 else
-	  print*, "Error at get_bk !!"
-	  stop
-	 endif
-     call get_bki(bk,ki,k,nn,Pn)
-  end
+!  ç»™å®šä¸‹æ ‡k, è®¡ç®—å‡ºæ˜¯ç¬¬bkä¸ªå­å—,æœ¬åœ°ä¸‹æ ‡bi
+subroutine get_bk(bk, ki, k, ns, mb)    ! k, ä¸‹æ ‡ï¼Œ ns ç»´æ•°, nb (åŽŸ)å—å·
+  use global_var1
+  implicit none
+  integer:: bk, ki, k, ns, mb, Pn, nn            ! Pn å—æ•°ï¼Œ nn ç½‘æ ¼ç‚¹æ•°
+  Type(Block_TYPE1), pointer:: B
+  B => block(mb)
+  if (ns == 1) then  ! ç¬¬1ç»´
+    nn = B%nx
+    Pn = B%Pi
+  else if (ns == 2) then
+    nn = B%ny
+    Pn = B%Pj
+  else if (ns == 3) then
+    nn = B%nz
+    Pn = B%Pk
+  else
+    print *, "Error at get_bk !!"
+    stop
+  end if
+  call get_bki(bk, ki, k, nn, Pn)
+end
 
-  subroutine get_bki(bk,ki,k,nn,Pn)
-     implicit none
-	 integer:: bk,k,nn,Pn,k1,ki
-	     bk=0
-  	     do k1=1,Pn
-          if( k >=int(nn*(k1-1)/Pn)+1  .and. k<=int(nn*k1/Pn) ) then
-           bk=k1
-	       exit 
- 	      endif
-		 enddo
-   
-         if(bk==0) then
-		 print*, "error at get_bki !!"
-		 stop
-		 endif
-        
-		ki=k-int(nn*(bk-1)/Pn)
-  end
-   
+subroutine get_bki(bk, ki, k, nn, Pn)
+  implicit none
+  integer:: bk, k, nn, Pn, k1, ki
+  bk = 0
+  do k1 = 1, Pn
+    if (k >= int(nn*(k1-1)/Pn)+1 .and. k <= int(nn*k1/Pn)) then
+      bk = k1
+      exit
+    end if
+  end do
 
+  if (bk == 0) then
+    print *, "error at get_bki !!"
+    stop
+  end if
 
-
-
-
-
-
-
+  ki = k-int(nn*(bk-1)/Pn)
+end
 
 !--------------------------------------------------------
 
-   subroutine read_cutfile
-   use global_var1
-   implicit none
-   integer:: m
-   	
-	NBnew=0
-	open(99,file="Mesh3d.cut")
-	read(99,*)
-    read(99,*) Mesh_form, NB
-    allocate(PI(NB),PJ(NB),PK(NB))
-    do m=1,NB
-	 read(99,*)
-	 read(99,*) PI(m),PJ(m),PK(m)
-	 NBnew=NBnew+PI(m)*PJ(m)*PK(m)
-	enddo
-    close(99)
-    print*, "NB=",NB, " NBnew= ",NBnew
-   end
+subroutine read_cutfile
+  use global_var1
+  implicit none
+  integer:: m
+
+  NBnew = 0
+  open (99, file="Mesh3d.cut")
+  read (99, *)
+  read (99, *) Mesh_form, NB
+  allocate (PI(NB), PJ(NB), PK(NB))
+  do m = 1, NB
+    read (99, *)
+    read (99, *) PI(m), PJ(m), PK(m)
+    NBnew = NBnew+PI(m)*PJ(m)*PK(m)
+  end do
+  close (99)
+  print *, "NB=", NB, " NBnew= ", NBnew
+end
 !---------------------------------------------------
-   
-   subroutine cut_mesh
-   use global_var1
-   implicit none
-   integer:: NB0,NB1,i,j,k,m,nx,ny,nz,nx1,ny1,nz1,i1,j1,k1,m0,m1,n
-   integer:: i2,j2,k2,m2
-   integer,allocatable,dimension(:):: NI,NJ,NK
-   Type (Block_TYPE1),pointer:: B,B1
-    
 
-    allocate(Block(NB))
-	allocate(Block_new(NBnew))
-    allocate(NI(NB),NJ(NB),NK(NB))
+subroutine cut_mesh
+  use global_var1
+  implicit none
+  integer:: NB1, i, j, k, m, nx, ny, nz, nx1, ny1, nz1, i1, j1, k1, m1, n
+  integer:: i2, j2, k2, m2
+  integer, allocatable, dimension(:):: NI, NJ, NK
+  Type(Block_TYPE1), pointer:: B, B1
 
-     if(mesh_form==0) then
-	  open(100,file="Mesh0.dat",form="unformatted")
-	  read(100) NB1
-	else
-	  open(100,file="Mesh0.dat")
-	  read(100,*) NB1
-    endif	 
+  allocate (Block(NB))
+  allocate (Block_new(NBnew))
+  allocate (NI(NB), NJ(NB), NK(NB))
 
+  if (mesh_form == 0) then
+    open (100, file="Mesh0.dat", form="unformatted")
+    read (100) NB1
+  else
+    open (100, file="Mesh0.dat")
+    read (100, *) NB1
+  end if
 
-	if(NB1 .ne. NB) then
-	 print*, "Block number in Mesh0.dat is not equal to that in Mesh3d.cut! "
-	 stop
-	endif
+  if (NB1 .ne. NB) then
+    print *, "Block number in Mesh0.dat is not equal to that in Mesh3d.cut! "
+    stop
+  end if
 
-    if(mesh_form==0) then
-     read(100) ((NI(k),NJ(k),Nk(k)),k=1,NB)
+  if (mesh_form == 0) then
+    read (100) (NI(k), NJ(k), Nk(k), k=1, NB)
+  else
+    read (100, *) (NI(k), NJ(k), Nk(k), k=1, NB)
+  end if
+
+!================================================
+  m1 = 1
+  do m = 1, NB
+    B => Block(m)
+    B%Block_no = m
+    B%Pi = PI(m)
+    B%Pj = PJ(m)
+    B%Pk = PK(m)
+    B%nbk0 = m1    ! èµ·å§‹å­å—å·
+    B%nx = NI(m)
+    B%ny = NJ(m)
+    B%nz = NK(m)
+    nx = B%nx; ny = B%ny; nz = B%nz
+    allocate (B%xyz(nx, ny, nz, 3))
+
+    if (mesh_form == 0) then
+      read (100) ((((B%xyz(i, j, k, n), i=1, nx), j=1, ny), k=1, nz), n=1, 3)
     else
-     read(100,*) ((NI(k),NJ(k),Nk(k)),k=1,NB)
-	endif
+      read (100, *) ((((B%xyz(i, j, k, n), i=1, nx), j=1, ny), k=1, nz), n=1, 3)
+    end if
 
-!================================================	 
-     m1=1
-	 do m=1,NB
- 	  B=>Block(m)
-      B%Block_no=m
-	  B%Pi=PI(m)
-	  B%Pj=PJ(m)
-	  B%Pk=PK(m)
-      B%nbk0=m1    ! ÆðÊ¼×Ó¿éºÅ
-      B%nx=NI(m)
-	  B%ny=NJ(m)
-	  B%nz=NK(m)
-	  nx=B%nx; ny=B%ny; nz=B%nz
-      allocate(B%xyz(nx,ny,nz,3))
-      
-	  if(mesh_form==0) then
-	    read(100) ((((B%xyz(i,j,k,n),i=1,nx),j=1,ny),k=1,nz),n=1,3)
-      else
-	   read(100,*) ((((B%xyz(i,j,k,n),i=1,nx),j=1,ny),k=1,nz),n=1,3)
-	  endif
+    do k1 = 1, PK(m)
+    do j1 = 1, PJ(m)
+    do i1 = 1, PI(m)
+      B1 => Block_new(m1)
+      B1%block_no = m1        ! å—å·
+      B1%nb_ori = m           ! åŽŸå—å·
+      B1%Pi = i1      ! i æ–¹å‘çš„å—åºå·
+      B1%Pj = j1
+      B1%Pk = k1
 
+      B1%nx = int((nx*i1)/PI(m))-int((nx*(i1-1))/PI(m))
+      B1%ny = int((ny*j1)/PJ(m))-int((ny*(j1-1))/PJ(m))
+      B1%nz = int((nz*k1)/PK(m))-int((nz*(k1-1))/PK(m))
+      nx1 = B1%nx; ny1 = B1%ny; nz1 = B1%nz
+      B1%ib = int((nx*(i1-1))/PI(m))+1
+      B1%jb = int((ny*(j1-1))/PJ(m))+1
+      B1%kb = int((nz*(k1-1))/PK(m))+1
+      allocate (B1%xyz(nx1, ny1, nz1, 3))
+      B1%block_no = m1
 
-	   do k1=1,PK(m)
-	   do j1=1,PJ(m)
-	   do i1=1,PI(m)
-	     B1=>Block_new(m1)
-		 B1%block_no=m1        ! ¿éºÅ
-		 B1%nb_ori=m           ! Ô­¿éºÅ
-		 B1%Pi=i1      ! i ·½ÏòµÄ¿éÐòºÅ
-		 B1%Pj=j1
-		 B1%Pk=k1
-		 
-		 B1%nx=int((nx*i1)/PI(m))- int((nx*(i1-1))/PI(m))
-		 B1%ny=int((ny*j1)/PJ(m))- int((ny*(j1-1))/PJ(m))
-		 B1%nz=int((nz*k1)/PK(m))- int((nz*(k1-1))/PK(m))
-         nx1=B1%nx; ny1=B1%ny ; nz1=B1%nz
-         B1%ib= int((nx*(i1-1))/PI(m))+1
-		 B1%jb= int((ny*(j1-1))/PJ(m))+1
-		 B1%kb= int((nz*(k1-1))/PK(m))+1
- 		 allocate(B1%xyz(nx1,ny1,nz1,3))
- 	 	 B1%block_no=m1
-		 
-		 do m2=1,3
-         do k2=1,nz1
-		 do j2=1,ny1
-		 do i2=1,nx1
-		  i=B1%ib+i2-1
-		  j=B1%jb+j2-1
-		  k=B1%kb+k2-1
-          B1%xyz(i2,j2,k2,m2)=B%xyz(i,j,k,m2)
-         enddo
- 		 enddo
-		 enddo
-		 enddo
-		 m1=m1+1
+      do m2 = 1, 3
+        do k2 = 1, nz1
+          do j2 = 1, ny1
+          do i2 = 1, nx1
+            i = B1%ib+i2-1
+            j = B1%jb+j2-1
+            k = B1%kb+k2-1
+            B1%xyz(i2, j2, k2, m2) = B%xyz(i, j, k, m2)
+          end do
+          end do
+        end do
+      end do
+      m1 = m1+1
 
-	 enddo
-	 enddo
-	 enddo
+    end do
+    end do
+    end do
 
-   enddo
-   close(100)
+  end do
+  close (100)
 
-   end
-
+end
 
 !--------------------------------------------------------
-  subroutine write_new_mesh
-   use global_var1
-   implicit none
-   integer:: i,j,k,m,n
-   Type (Block_TYPE1),pointer:: B
-   open(99,file="Mesh3d_new.dat",form="unformatted")
-   write(99) NBnew
-   write(99) (Block_new(m)%nx,Block_new(m)%ny,Block_new(m)%nz,m=1,NBnew)
-   do m=1,NBnew
-   B=> Block_new(m)
-   write(99) ((((B%xyz(i,j,k,n),i=1,B%nx),j=1,B%ny),k=1,B%nz),n=1,3)
-   enddo
-   close(99)
-   end
-        
-
+subroutine write_new_mesh
+  use global_var1
+  implicit none
+  integer:: i, j, k, m, n
+  Type(Block_TYPE1), pointer:: B
+  open (99, file="Mesh3d_new.dat", form="unformatted")
+  write (99) NBnew
+  write (99) (Block_new(m)%nx, Block_new(m)%ny, Block_new(m)%nz, m=1, NBnew)
+  do m = 1, NBnew
+    B => Block_new(m)
+    write (99) ((((B%xyz(i, j, k, n), i=1, B%nx), j=1, B%ny), k=1, B%nz), n=1, 3)
+  end do
+  close (99)
+end
 
 !------------------------------------------------------
-  subroutine convert_inp_inc 
-   use global_var1
-   implicit none
-  
-   integer:: NB1,m,ksub,nx,ny,nz,k,j,k1,ksub1
-   integer:: kb(3),ke(3),kb1(3),ke1(3),s(3),p(3),Lp(3)
-   Type (Block_TYPE1),pointer:: B,B1
-   TYPE (BC_MSG_TYPE),pointer:: Bc,Bc1
-     
-   Interface   
-     subroutine Convert_bc(Bc,kb,ke,kb1,ke1)
-       use Type_Def1
-       implicit none
-       TYPE (BC_MSG_TYPE),pointer:: Bc
-	   integer,dimension(3):: kb,ke,kb1,ke1
-	 end subroutine
-    end Interface
-   
+subroutine convert_inp_inc
+  use global_var1
+  implicit none
 
-   print*, "Convert bc3d.inp to bc3d.inc ..."
-   open(88,file="bc3d.inp")
-   read(88,*)
-   read(88,*) NB1
-   if(NB1 .ne. NB ) then
-    print*, "NB in bc3d.inp is not correct !"
-	stop
-   endif 
+  integer:: NB1, m, ksub
+  integer:: kb(3), ke(3), kb1(3), ke1(3)
+  Type(Block_TYPE1), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer:: Bc
 
-   do m=1,NB
+  Interface
+    subroutine Convert_bc(Bc_arg, kb_arg, ke_arg, kb1_arg, ke1_arg)
+      use Type_Def1
+      implicit none
+      TYPE(BC_MSG_TYPE), pointer:: Bc_arg
+      integer, dimension(3):: kb_arg, ke_arg, kb1_arg, ke1_arg
+    end subroutine
+  end Interface
+
+  print *, "Convert bc3d.inp to bc3d.inc ..."
+  open (88, file="bc3d.inp")
+  read (88, *)
+  read (88, *) NB1
+  if (NB1 .ne. NB) then
+    print *, "NB in bc3d.inp is not correct !"
+    stop
+  end if
+
+  do m = 1, NB
     B => Block(m)
-    read(88,*) B%nx,B%ny,B%nz
-	read(88,*)
-    read(88,*) B%subface   !number of the subface in the Block m
-     
-	allocate(B%bc_msg(B%subface))   ! ±ß½çÃèÊö
+    read (88, *) B%nx, B%ny, B%nz
+    read (88, *)
+    read (88, *) B%subface   !number of the subface in the Block m
 
-    do ksub=1, B%subface
+    allocate (B%bc_msg(B%subface))   ! è¾¹ç•Œæè¿°
+
+    do ksub = 1, B%subface
       Bc => B%bc_msg(ksub)
-      Bc%f_no=ksub                        ! ×ÓÃæºÅ
-	  read(88,*)  kb(1),ke(1),kb(2),ke(2),kb(3),ke(3),Bc%bc
-	 
-	  if(Bc%bc .lt. 0) then
- !  --------ÓÐÁ¬½ÓµÄÇé¿ö (ÄÚ±ß½ç)--------------------------------------------------------	    
-	   read(88,*) kb1(1),ke1(1),kb1(2),ke1(2),kb1(3),ke1(3),Bc%nb1
+      Bc%f_no = ksub                        ! å­é¢å·
+      read (88, *) kb(1), ke(1), kb(2), ke(2), kb(3), ke(3), Bc%bc
+
+      if (Bc%bc .lt. 0) then
+        !  --------æœ‰è¿žæŽ¥çš„æƒ…å†µ (å†…è¾¹ç•Œ)--------------------------------------------------------
+        read (88, *) kb1(1), ke1(1), kb1(2), ke1(2), kb1(3), ke1(3), Bc%nb1
       else
- !---------ÎÞÁ¬½ÓÇé¿ö (ÎïÀí±ß½ç)----------------------------------------
-            kb1(:)=0; ke1(:)=0; Bc%nb1=0
-	  endif
-	 call Convert_bc(Bc,kb,ke,kb1,ke1)
-  enddo
-  enddo
-   
-   close(88)
+        !---------æ— è¿žæŽ¥æƒ…å†µ (ç‰©ç†è¾¹ç•Œ)----------------------------------------
+        kb1(:) = 0; ke1(:) = 0; Bc%nb1 = 0
+      end if
+      call Convert_bc(Bc, kb, ke, kb1, ke1)
+    end do
+  end do
+
+  close (88)
 
   call search_fno1(1)
 
-   print*, "Convert bc3d.inp to bc3d.inc OK"
+  print *, "Convert bc3d.inp to bc3d.inc OK"
 
-
-  end  
+end
 
 !-----------------------------------------------------------------------------------
 
+!   å°†Gridgenæ ¼å¼ è½¬æ¢ä¸º OpenCFD-EC çš„è¾¹ç•Œè¿žæŽ¥æ ¼å¼
+!     è®¡ç®—é¢å·ã€ è¿žæŽ¥æ¬¡åº (L1,L2,L3)ç­‰
+subroutine Convert_bc(Bc, kb, ke, kb1, ke1)
+  use Type_Def1
+  implicit none
+  TYPE(BC_MSG_TYPE), pointer:: Bc
+  integer, dimension(3):: kb, ke, kb1, ke1, s, p, LP
+  integer:: k, j, k1
 
+  if (Bc%bc .ge. 0) then
+    Bc%ib1 = 0; Bc%ie1 = 0; Bc%jb1 = 0; Bc%je1 = 0; Bc%kb1 = 0; Bc%ke1 = 0; Bc%nb1 = 0
+    Bc%L1 = 0; Bc%L2 = 0; Bc%L3 = 0; Bc%face1 = 0; Bc%f_no1 = 0
+  end if
 
+!   åˆ¤æ–­è¯¥é¢çš„ç±»åž‹ (i-, i+, j-,j+, k-,k+)
+  do k = 1, 3
+    if (kb(k) .eq. ke(k)) then
+      s(k) = 0                           ! è¿žæŽ¥ç»´
+    else if (kb(k) .gt. 0) then
+      s(k) = 1                           ! æ­£
+    else
+      s(k) = -1                          ! è´Ÿ
+    end if
+  end do
 
-!   ½«Gridgen¸ñÊ½ ×ª»»Îª OpenCFD-EC µÄ±ß½çÁ¬½Ó¸ñÊ½
-!     ¼ÆËãÃæºÅ¡¢ Á¬½Ó´ÎÐò (L1,L2,L3)µÈ
-      subroutine Convert_bc(Bc,kb,ke,kb1,ke1)
-       use Type_Def1
-       implicit none
-       TYPE (BC_MSG_TYPE),pointer:: Bc
-	   integer,dimension(3):: kb,ke,kb1,ke1,s,p,LP
-       integer:: k,j,k1
+!    è¾¹ç•Œå­é¢çš„å¤§å°
+  Bc%ib = min(abs(kb(1)), abs(ke(1))); Bc%ie = max(abs(kb(1)), abs(ke(1)))
+  Bc%jb = min(abs(kb(2)), abs(ke(2))); Bc%je = max(abs(kb(2)), abs(ke(2)))
+  Bc%kb = min(abs(kb(3)), abs(ke(3))); Bc%ke = max(abs(kb(3)), abs(ke(3)))
 
-	   if(Bc%bc .ge. 0) then
-	     Bc%ib1=0; Bc%ie1=0; Bc%jb1=0; Bc%je1=0; Bc%kb1=0; Bc%ke1=0; Bc%nb1=0
-         Bc%L1=0; Bc%L2=0; Bc%L3=0; Bc%face1=0; Bc%f_no1=0
-       endif
-     
-
-!   ÅÐ¶Ï¸ÃÃæµÄÀàÐÍ (i-, i+, j-,j+, k-,k+)     
-       do k=1,3
-  	     if(kb(k) .eq. ke(k) ) then 
-	       s(k)=0                           ! Á¬½ÓÎ¬
-	     else if (kb(k) .gt. 0) then 
-	       s(k)=1                           ! Õý
-	     else
-	       s(k)=-1                          ! ¸º
-	     endif
-       enddo
-
-!    ±ß½ç×ÓÃæµÄ´óÐ¡     
-	 Bc%ib=min(abs(kb(1)),abs(ke(1))) ;  Bc%ie=max(abs(kb(1)),abs(ke(1)))
-     Bc%jb=min(abs(kb(2)),abs(ke(2))) ;  Bc%je=max(abs(kb(2)),abs(ke(2)))
-     Bc%kb=min(abs(kb(3)),abs(ke(3))) ;  Bc%ke=max(abs(kb(3)),abs(ke(3))) 
-
-
-!   ÅÐ¶Ï¸ÃÃæµÄÀàÐÍ (i-, i+, j-,j+, k-,k+)     
-      if(s(1) .eq. 0) then
-	     if (Bc%ib .eq. 1) then
-	      Bc%face=1               ! i-
-	     else
-	      Bc%face=4               ! i+
-	    endif
-      else if(s(2) .eq. 0) then
-	    if(Bc%jb .eq. 1) then
-	      Bc%face=2                 ! j-
-	    else
-	      Bc%face=5                 ! j+
-	    endif
-      else
- 	   if(Bc%kb  .eq. 1) then
-	    Bc%face=3                 ! k-
-	   else
-	    Bc%face=6                 ! k+
-	   endif
-     endif 
+!   åˆ¤æ–­è¯¥é¢çš„ç±»åž‹ (i-, i+, j-,j+, k-,k+)
+  if (s(1) .eq. 0) then
+    if (Bc%ib .eq. 1) then
+      Bc%face = 1               ! i-
+    else
+      Bc%face = 4               ! i+
+    end if
+  else if (s(2) .eq. 0) then
+    if (Bc%jb .eq. 1) then
+      Bc%face = 2                 ! j-
+    else
+      Bc%face = 5                 ! j+
+    end if
+  else
+    if (Bc%kb .eq. 1) then
+      Bc%face = 3                 ! k-
+    else
+      Bc%face = 6                 ! k+
+    end if
+  end if
 
 !---------------------------------------------------------------------------
-!------ÄÚ±ß½çµÄÇé¿ö£¬½¨Á¢Á¬½ÓÃèÊö
-  if( Bc%bc .lt. 0) then            ! ÄÚ±ß½ç
-!      ¼ÆËãÁ¬½ÓË³ÐòÃèÊö·ûL1,L2,L3
-!      ¼ÆËã¸÷Î¬Ö®¼äµÄÁ¬½Ó¹ØÏµ      
-     do k=1,3  
-	   if(kb1(k) .eq. ke1(k) ) then 
-	       p(k)=0                      ! 
-       else if (kb1(k) .gt. 0) then
-	       p(k)=1                      ! .inp ÎÄ¼þµÄ ÕýÊý
-       else
-	       p(k)=-1
-       endif
-     enddo
- 	   
-
-!    ¶ÔÓ¦Á¬½Ó×ÓÃæµÄ´óÐ¡     
-	 Bc%ib1=min(abs(kb1(1)),abs(ke1(1))) ;  Bc%ie1=max(abs(kb1(1)),abs(ke1(1)))
-     Bc%jb1=min(abs(kb1(2)),abs(ke1(2))) ;  Bc%je1=max(abs(kb1(2)),abs(ke1(2)))
-     Bc%kb1=min(abs(kb1(3)),abs(ke1(3))) ;  Bc%ke1=max(abs(kb1(3)),abs(ke1(3))) 
-    
- 	  
-!   ÅÐ¶Ï¸ÃÃæÁ¬½ÓÃæµÄÀàÐÍ (i-, i+, j-,j+, k-,k+)     
-      if(p(1) .eq. 0) then
-	     if (Bc%ib1 .eq. 1) then
-	      Bc%face1=1               ! i-
-	     else
-	      Bc%face1=4               ! i+
-	    endif
-      else if(p(2) .eq. 0) then
-	    if(Bc%jb1 .eq. 1) then
-	      Bc%face1=2                 ! j-
-	    else
-	      Bc%face1=5                 ! j+
-	    endif
+!------å†…è¾¹ç•Œçš„æƒ…å†µï¼Œå»ºç«‹è¿žæŽ¥æè¿°
+  if (Bc%bc .lt. 0) then            ! å†…è¾¹ç•Œ
+!      è®¡ç®—è¿žæŽ¥é¡ºåºæè¿°ç¬¦L1,L2,L3
+!      è®¡ç®—å„ç»´ä¹‹é—´çš„è¿žæŽ¥å…³ç³»
+    do k = 1, 3
+      if (kb1(k) .eq. ke1(k)) then
+        p(k) = 0                      !
+      else if (kb1(k) .gt. 0) then
+        p(k) = 1                      ! .inp æ–‡ä»¶çš„ æ­£æ•°
       else
- 	   if(Bc%kb1 .eq. 1) then
-	    Bc%face1=3
-	   else
-	    Bc%face1=6
-	   endif
-     endif  
+        p(k) = -1
+      end if
+    end do
 
-!  ¼ÆËã¡°Á¬½Ó¶Ô¡± ÃèÊö·û  bc%L1, bc%L2, bc%L3 
- 	   do k=1,3
-	     do j=1,3
-	       if(s(k) .eq. p(j)) Lp(k)=j          ! .inpÎÄ¼þµÄÁ¬½Ó¸ñÊ½£º Õý¶ÔÕý¡¢ ¸º¶Ô¸º¡¢ 0¶Ô0£» 
-	     enddo
-	   enddo    
-	   
-!    ¼ÆËãÁ¬½Ó´ÎÐò £¨ÕýÎªË³Ðò£»¸ºÎªÄâÐò£©	  
-	  do k=1,3
-	   if(s(k) .ne. 0) then
-	     k1=Lp(k)
-	     if( (ke(k)-kb(k))*(ke1(k1)-kb1(k1)) .lt. 0) Lp(k)=-Lp(k)      ! ÄæÐòÁ¬½Ó
-	   else
-         k1=Lp(k)
-!		 if( (mod(Bc%face,2)-mod(Bc%face1,2))==0) Lp(k)=-Lp(k)         ! ÄæÐòÁ¬½Ó £¨µ¥Ãæ£© ! Bug 2012-7-13
-! Õý-ÕýÁ¬½Ó LpÎª¸º (Àý£¬ i+ ÃæÁ¬½Óµ½ j+Ãæ£¬ ÔòÎªÄæÐòÁ¬½Ó)
-		 if( (Bc%face-1)/3 .eq. (Bc%face1-1)/3 ) Lp(k)=-Lp(k)        ! (Bc%face=1,2,3Îª +Ãæ£¬4,5,6Îª-Ãæ)  ! ÄæÐòÁ¬½Ó £¨µ¥Ãæ£©
+!    å¯¹åº”è¿žæŽ¥å­é¢çš„å¤§å°
+    Bc%ib1 = min(abs(kb1(1)), abs(ke1(1))); Bc%ie1 = max(abs(kb1(1)), abs(ke1(1)))
+    Bc%jb1 = min(abs(kb1(2)), abs(ke1(2))); Bc%je1 = max(abs(kb1(2)), abs(ke1(2)))
+    Bc%kb1 = min(abs(kb1(3)), abs(ke1(3))); Bc%ke1 = max(abs(kb1(3)), abs(ke1(3)))
 
-	   endif
-	 enddo 
-     
-	 Bc%L1=Lp(1); Bc%L2=Lp(2); Bc%L3=Lp(3)   ! Á¬½Ó´ÎÐòÃèÊö·û £¨Ïê¼û¡¶ÀíÂÛÊÖ²á¡·£©
-   endif
-  end
+!   åˆ¤æ–­è¯¥é¢è¿žæŽ¥é¢çš„ç±»åž‹ (i-, i+, j-,j+, k-,k+)
+    if (p(1) .eq. 0) then
+      if (Bc%ib1 .eq. 1) then
+        Bc%face1 = 1               ! i-
+      else
+        Bc%face1 = 4               ! i+
+      end if
+    else if (p(2) .eq. 0) then
+      if (Bc%jb1 .eq. 1) then
+        Bc%face1 = 2                 ! j-
+      else
+        Bc%face1 = 5                 ! j+
+      end if
+    else
+      if (Bc%kb1 .eq. 1) then
+        Bc%face1 = 3
+      else
+        Bc%face1 = 6
+      end if
+    end if
 
+!  è®¡ç®—â€œè¿žæŽ¥å¯¹â€ æè¿°ç¬¦  bc%L1, bc%L2, bc%L3
+    do k = 1, 3
+      do j = 1, 3
+        if (s(k) .eq. p(j)) Lp(k) = j          ! .inpæ–‡ä»¶çš„è¿žæŽ¥æ ¼å¼ï¼š æ­£å¯¹æ­£ã€ è´Ÿå¯¹è´Ÿã€ 0å¯¹0ï¼›
+      end do
+    end do
 
+!    è®¡ç®—è¿žæŽ¥æ¬¡åº ï¼ˆæ­£ä¸ºé¡ºåºï¼›è´Ÿä¸ºæ‹Ÿåºï¼‰
+    do k = 1, 3
+      if (s(k) .ne. 0) then
+        k1 = Lp(k)
+        if ((ke(k)-kb(k))*(ke1(k1)-kb1(k1)) .lt. 0) Lp(k) = -Lp(k)      ! é€†åºè¿žæŽ¥
+      else
+        k1 = Lp(k)
+!                 if( (mod(Bc%face,2)-mod(Bc%face1,2))==0) Lp(k)=-Lp(k)         ! é€†åºè¿žæŽ¥ ï¼ˆå•é¢ï¼‰ ! Bug 2012-7-13
+! æ­£-æ­£è¿žæŽ¥ Lpä¸ºè´Ÿ (ä¾‹ï¼Œ i+ é¢è¿žæŽ¥åˆ° j+é¢ï¼Œ åˆ™ä¸ºé€†åºè¿žæŽ¥)
+        if ((Bc%face-1)/3 .eq. (Bc%face1-1)/3) Lp(k) = -Lp(k)        ! (Bc%face=1,2,3ä¸º +é¢ï¼Œ4,5,6ä¸º-é¢)  ! é€†åºè¿žæŽ¥ ï¼ˆå•é¢ï¼‰
+
+      end if
+    end do
+
+    Bc%L1 = Lp(1); Bc%L2 = Lp(2); Bc%L3 = Lp(3)   ! è¿žæŽ¥æ¬¡åºæè¿°ç¬¦ ï¼ˆè¯¦è§ã€Šç†è®ºæ‰‹å†Œã€‹ï¼‰
+  end if
+end
 
 !-----------------------------------------------------
-! ËÑË÷¿é£¬½¨Á¢fno1
+! æœç´¢å—ï¼Œå»ºç«‹fno1
 ! Kflag==1 search old block;  2 new block
 subroutine search_fno1(Kflag)
-   use global_var1
-   implicit none
-   integer:: NB1,m,kflag,ksub,ksub1
-   Type (Block_TYPE1),pointer:: B,B1
-   TYPE (BC_MSG_TYPE),pointer:: Bc,Bc1
-   
-   if(Kflag==1) then
-    NB1=NB
-   else
-    NB1=NBnew
-   endif
+  use global_var1
+  implicit none
+  integer:: NB1, m, kflag, ksub, ksub1
+  Type(Block_TYPE1), pointer:: B, B1
+  TYPE(BC_MSG_TYPE), pointer:: Bc, Bc1
 
-!  ËÑË÷Á¬½Ó¿éµÄ¿éºÅ f_no1  (±ãÓÚMPI²¢ÐÐÍ¨ÐÅÊÇÊ¹ÓÃ)
-   do m=1,NB1
-     if(Kflag==1) then
- 	  B => Block(m)
-     else
-	  B=> Block_new(m)
-	 endif
+  if (Kflag == 1) then
+    NB1 = NB
+  else
+    NB1 = NBnew
+  end if
 
-	 do ksub=1, B%subface
-       Bc => B%bc_msg(ksub)
-       if(Bc%bc .lt. 0) then
-         Bc%f_no1=0
-		 
-		 if(Kflag==1) then
-		   B1=>Block(Bc%nb1)         ! Ö¸ÏòÁ¬½Ó¿é
-         else
-		   B1=>Block_new(Bc%nb1)
-		 endif
+!  æœç´¢è¿žæŽ¥å—çš„å—å· f_no1  (ä¾¿äºŽMPIå¹¶è¡Œé€šä¿¡æ˜¯ä½¿ç”¨)
+  do m = 1, NB1
+    if (Kflag == 1) then
+      B => Block(m)
+    else
+      B => Block_new(m)
+    end if
 
+    do ksub = 1, B%subface
+      Bc => B%bc_msg(ksub)
+      if (Bc%bc .lt. 0) then
+        Bc%f_no1 = 0
 
-		 do ksub1=1,B1%subface
-		 Bc1=>B1%bc_msg(ksub1)
-		 if(Bc%ib1==Bc1%ib .and. Bc%ie1==Bc1%ie .and. Bc%jb1==Bc1%jb .and. Bc%je1==Bc1%je   &
-		    .and. Bc%kb1==Bc1%kb .and. Bc%ke1==Bc1%ke  .and. Bc1%nb1==m) then
-		    Bc%f_no1=ksub1
-		  exit
-		 endif 	 
-         enddo
+        if (Kflag == 1) then
+          B1 => Block(Bc%nb1)         ! æŒ‡å‘è¿žæŽ¥å—
+        else
+          B1 => Block_new(Bc%nb1)
+        end if
 
-         if(Bc%f_no1 ==0) then
-		  print*, " Error in find linked block number !!!"
-		  print*, "Block, subface=",m, ksub
-		  stop
-		 endif
-	   endif
-      enddo
-	enddo
-  end
+        do ksub1 = 1, B1%subface
+          Bc1 => B1%bc_msg(ksub1)
+          if (Bc%ib1 == Bc1%ib .and. Bc%ie1 == Bc1%ie .and. Bc%jb1 == Bc1%jb .and. Bc%je1 == Bc1%je &
+              .and. Bc%kb1 == Bc1%kb .and. Bc%ke1 == Bc1%ke .and. Bc1%nb1 == m) then
+            Bc%f_no1 = ksub1
+            exit
+          end if
+        end do
+
+        if (Bc%f_no1 == 0) then
+          print *, " Error in find linked block number !!!"
+          print *, "Block, subface=", m, ksub
+          stop
+        end if
+      end if
+    end do
+  end do
+end
 

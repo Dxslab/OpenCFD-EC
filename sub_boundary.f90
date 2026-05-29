@@ -1,730 +1,715 @@
 ! modules for Boundary layer condition
-! Since Ver 1.1, ±ß½ç£¨·ÇÄÚ²¿Á´½Ó±ß½ç£©Ö»²ÉÓÃ1²ãĞéÍø¸ñ
-! ÖÜÆÚĞÔÌõ¼şÍ¨¹ı ÄÚ±ß½çÊµÏÖ £¨Ä³Ğ©Çé¿öÏÂĞèÒªÌØÊâ´¦Àí£©
+! Since Ver 1.1, è¾¹ç•Œï¼ˆéå†…éƒ¨é“¾æ¥è¾¹ç•Œï¼‰åªé‡‡ç”¨1å±‚è™šç½‘æ ¼
+! å‘¨æœŸæ€§æ¡ä»¶é€šè¿‡ å†…è¾¹ç•Œå®ç° ï¼ˆæŸäº›æƒ…å†µä¸‹éœ€è¦ç‰¹æ®Šå¤„ç†ï¼‰
 !---------------------------------------------------------------------
-! ´¦Àí±ß½çÌõ¼ş£¨·ÇÄÚ±ß½ç£© £¨´¦ÀíÒ»Ì×Íø¸ñ£©
-    subroutine Boundary_condition_onemesh(nMesh)
-     use Global_Var
-     implicit none
-     Type (Block_TYPE),pointer:: B
-     Type (BC_MSG_TYPE),pointer:: Bc
-     integer:: nMesh,mBlock,ksub
-     integer,parameter:: FLAG_OUTLET=1 , FLAG_INLET=2
+! å¤„ç†è¾¹ç•Œæ¡ä»¶ï¼ˆéå†…è¾¹ç•Œï¼‰ ï¼ˆå¤„ç†ä¸€å¥—ç½‘æ ¼ï¼‰
+subroutine Boundary_condition_onemesh(nMesh)
+  use Global_Var
+  implicit none
+  Type(Block_TYPE), pointer:: B
+  Type(BC_MSG_TYPE), pointer:: Bc
+  integer:: nMesh, mBlock, ksub
+  integer, parameter:: FLAG_OUTLET = 1, FLAG_INLET = 2
 
- ! ------------------------------------------------------ 
-     do mBlock=1,Mesh(nMesh)%Num_Block
-       B => Mesh(nMesh)%Block(mBlock)
-       do  ksub=1,B%subface
-        Bc=> B%bc_msg(ksub)
-        if(Bc%bc <= 0 )  cycle              ! ·ÇÄÚ±ß½ç
+  ! ------------------------------------------------------
+  do mBlock = 1, Mesh(nMesh)%Num_Block
+    B => Mesh(nMesh)%Block(mBlock)
+    do ksub = 1, B%subface
+      Bc => B%bc_msg(ksub)
+      if (Bc%bc <= 0) cycle              ! éå†…è¾¹ç•Œ
 
+      if (IF_TurboMachinary .eq. 0) then   ! éå¶è½®æœºæ¨¡å¼
 
-          if(IF_TurboMachinary .eq. 0 ) then   ! ·ÇÒ¶ÂÖ»úÄ£Ê½
+        if (Bc%bc .eq. BC_Wall .and. If_viscous .eq. 1) then   ! (ç²˜æ€§) å£é¢è¾¹ç•Œæ¡ä»¶
+          call boundary_wall(nMesh, mBlock, ksub)
+        else if (Bc%bc .eq. BC_Farfield) then    ! è¿œåœº
+          call boundary_Farfield(nMesh, mBlock, ksub, 0)
+        else if (Bc%bc .eq. BC_Inflow) then               ! modified, 2017-5-12
+          if (IF_InnerFlow .eq. 0) then
+            call boundary_Farfield(nMesh, mBlock, ksub, FLAG_INLET)   ! å¯¹äºå¤–æµï¼Œ å…¥å£å¼ºåˆ¶ç»™å®šæ¡ä»¶ï¼ˆæŒ‰è¶…å£°é€Ÿå…¥å£ï¼‰
+          else
+            call boundary_BC_Inflow_Turbo(nMesh, mBlock, ksub)        !  ! å†…æµå…¥å£ ï¼ˆç»™å®šæ€»æ¸©ã€æ€»å‹ï¼‰, ä¸å¶è½®æœºæ¨¡å¼å…¥å£ç›¸åŒ ï¼ˆTurbo_w=0ï¼‰
+          end if
 
-		    if( Bc%bc .eq. BC_Wall  .and. If_viscous .eq. 1 ) then   ! (Õ³ĞÔ) ±ÚÃæ±ß½çÌõ¼ş
-             call boundary_wall(nMesh,mBlock,ksub)
-		    else if( Bc%bc .eq. BC_Farfield  ) then    ! Ô¶³¡      
-               call boundary_Farfield(nMesh,mBlock,ksub,0)
-            else if ( Bc%bc .eq. BC_Inflow  ) then               ! modified, 2017-5-12
-			   if ( IF_InnerFlow .eq. 0) then 
-	              call boundary_Farfield(nMesh,mBlock,ksub, FLAG_INLET)   ! ¶ÔÓÚÍâÁ÷£¬ Èë¿ÚÇ¿ÖÆ¸ø¶¨Ìõ¼ş£¨°´³¬ÉùËÙÈë¿Ú£©
-	          else   
-	             call boundary_BC_Inflow_Turbo(nMesh,mBlock,ksub )        !  ! ÄÚÁ÷Èë¿Ú £¨¸ø¶¨×ÜÎÂ¡¢×ÜÑ¹£©, ÓëÒ¶ÂÖ»úÄ£Ê½Èë¿ÚÏàÍ¬ £¨Turbo_w=0£©
-              endif		
-			
-			else if( Bc%bc .eq. BC_Outflow) then
-			    if ( IF_InnerFlow .eq. 0 ) then          ! ÍâÁ÷£¬ Ç¿ÖÆÎª£¨³¬ÉùËÙ£©³ö¿Ú±ß½çÌõ¼ş¡ª¡ªÍâÍÆÌõ¼ş
-                   call boundary_Farfield(nMesh,mBlock,ksub,FLAG_OUTLET)
-               else 
-                  call boundary_BC_Outflow_Turbo(nMesh,mBlock,ksub )  ! ÄÚÁ÷  ! ÓëÒ¶ÂÖ»ú³ö¿ÚÏàÍ¬
-               endif
+        else if (Bc%bc .eq. BC_Outflow) then
+          if (IF_InnerFlow .eq. 0) then          ! å¤–æµï¼Œ å¼ºåˆ¶ä¸ºï¼ˆè¶…å£°é€Ÿï¼‰å‡ºå£è¾¹ç•Œæ¡ä»¶â€”â€”å¤–æ¨æ¡ä»¶
+            call boundary_Farfield(nMesh, mBlock, ksub, FLAG_OUTLET)
+          else
+            call boundary_BC_Outflow_Turbo(nMesh, mBlock, ksub)  ! å†…æµ  ! ä¸å¶è½®æœºå‡ºå£ç›¸åŒ
+          end if
 
-	        else if( Bc%bc .eq. BC_Symmetry .or. (Bc%bc .eq. BC_Wall .and. If_viscous .eq. 0) ) then
-             call boundary_Symmetry_or_SlideWall(nMesh,mBlock,ksub)        ! ¶Ô³Æ±ß½çÌõ¼ş»ò»¬ÒÆ¹Ì±Ú
-            else if ( Bc%bc .eq. BC_Extrapolate ) then 
-             call boundary_Extrapolate(nMesh,mBlock,ksub)
-            else if ( Bc%bc >=900 ) then     ! ÓÃ»§×Ô¶¨Òå±ß½çÌõ¼ş    
-             call boundary_USER(nMesh,mBlock,ksub)
-		   else
-		      print*, "The boundary condition is not supported!!!"
-			  print*, "Block_no is ", B%block_no, "bc=",Bc%bc
-		      stop
-		   endif
-       else   ! Ò¶ÂÖ»úÄ£Ê½  £¨½öÈë¿Ú¡¢³ö¿ÚÌõ¼şÓĞÇø±ğ£©
-	       if( Bc%bc .eq. BC_Wall  .and. If_viscous .eq. 1 ) then   ! (Õ³ĞÔ) ±ÚÃæ±ß½çÌõ¼ş
-             call boundary_wall(nMesh,mBlock,ksub)      !  ±ÚÃæÏà¶ÔËÙ¶ÈÎª0  £¨Êµ¼ÊÎªĞı×ª£¬ÈçÂÖì±£©
-           else if ( Bc%bc .eq. BC_Wall_Turbo  .and. If_viscous .eq. 1 ) then
-             call boundary_wall_Turbo(nMesh,mBlock,ksub)       ! ±ÚÃæ¾ø¶ÔËÙ¶ÈÎª0  £¨Èç»úÏ»£©
-            else if (  Bc%bc .eq. BC_Inflow ) then
-             call boundary_BC_Inflow_Turbo(nMesh,mBlock,ksub )
-		    else if (  Bc%bc .eq. BC_outflow ) then
-             call boundary_BC_Outflow_Turbo(nMesh,mBlock,ksub )
-            else if (Bc%bc .eq. BC_Farfield) then
-              call boundary_Farfield(nMesh,mBlock,ksub,0)            ! Ô¶³¡±ß½çÌõ¼ş £¨¿É×Ô¶¯Ê¶±ğ³ö¿Ú£©
-            else if( Bc%bc .eq. BC_Symmetry .or. (Bc%bc .eq. BC_Wall .and. If_viscous .eq. 0) ) then
-             call boundary_Symmetry_or_SlideWall(nMesh,mBlock,ksub)        ! ¶Ô³Æ±ß½çÌõ¼ş»ò»¬ÒÆ¹Ì±Ú
-            else if ( Bc%bc .eq. BC_Extrapolate ) then 
-             call boundary_Extrapolate(nMesh,mBlock,ksub)
-            else if ( Bc%bc >= 900 ) then      ! ÓÃ»§×Ô¶¨Òå±ß½çÌõ¼ş 
-             call boundary_USER(nMesh,mBlock,ksub)
-		    else
-		      print*, "The boundary condition is not supported  in TurboMachinary model!"
-			  print*, "Block_no is ", B%block_no, "bc=",Bc%bc
-		      stop
-		    endif
-	
-	   endif			 
-      enddo
-      enddo
-      
-	 end subroutine Boundary_condition_onemesh
+        else if (Bc%bc .eq. BC_Symmetry .or. (Bc%bc .eq. BC_Wall .and. If_viscous .eq. 0)) then
+          call boundary_Symmetry_or_SlideWall(nMesh, mBlock, ksub)        ! å¯¹ç§°è¾¹ç•Œæ¡ä»¶æˆ–æ»‘ç§»å›ºå£
+        else if (Bc%bc .eq. BC_Extrapolate) then
+          call boundary_Extrapolate(nMesh, mBlock, ksub)
+        else if (Bc%bc >= 900) then     ! ç”¨æˆ·è‡ªå®šä¹‰è¾¹ç•Œæ¡ä»¶
+          call boundary_USER(nMesh, mBlock, ksub)
+        else
+          print *, "The boundary condition is not supported!!!"
+          print *, "Block_no is ", B%block_no, "bc=", Bc%bc
+          stop
+        end if
+      else   ! å¶è½®æœºæ¨¡å¼  ï¼ˆä»…å…¥å£ã€å‡ºå£æ¡ä»¶æœ‰åŒºåˆ«ï¼‰
+        if (Bc%bc .eq. BC_Wall .and. If_viscous .eq. 1) then   ! (ç²˜æ€§) å£é¢è¾¹ç•Œæ¡ä»¶
+          call boundary_wall(nMesh, mBlock, ksub)      !  å£é¢ç›¸å¯¹é€Ÿåº¦ä¸º0  ï¼ˆå®é™…ä¸ºæ—‹è½¬ï¼Œå¦‚è½®æ¯‚ï¼‰
+        else if (Bc%bc .eq. BC_Wall_Turbo .and. If_viscous .eq. 1) then
+          call boundary_wall_Turbo(nMesh, mBlock, ksub)       ! å£é¢ç»å¯¹é€Ÿåº¦ä¸º0  ï¼ˆå¦‚æœºåŒ£ï¼‰
+        else if (Bc%bc .eq. BC_Inflow) then
+          call boundary_BC_Inflow_Turbo(nMesh, mBlock, ksub)
+        else if (Bc%bc .eq. BC_outflow) then
+          call boundary_BC_Outflow_Turbo(nMesh, mBlock, ksub)
+        else if (Bc%bc .eq. BC_Farfield) then
+          call boundary_Farfield(nMesh, mBlock, ksub, 0)            ! è¿œåœºè¾¹ç•Œæ¡ä»¶ ï¼ˆå¯è‡ªåŠ¨è¯†åˆ«å‡ºå£ï¼‰
+        else if (Bc%bc .eq. BC_Symmetry .or. (Bc%bc .eq. BC_Wall .and. If_viscous .eq. 0)) then
+          call boundary_Symmetry_or_SlideWall(nMesh, mBlock, ksub)        ! å¯¹ç§°è¾¹ç•Œæ¡ä»¶æˆ–æ»‘ç§»å›ºå£
+        else if (Bc%bc .eq. BC_Extrapolate) then
+          call boundary_Extrapolate(nMesh, mBlock, ksub)
+        else if (Bc%bc >= 900) then      ! ç”¨æˆ·è‡ªå®šä¹‰è¾¹ç•Œæ¡ä»¶
+          call boundary_USER(nMesh, mBlock, ksub)
+        else
+          print *, "The boundary condition is not supported  in TurboMachinary model!"
+          print *, "Block_no is ", B%block_no, "bc=", Bc%bc
+          stop
+        end if
+
+      end if
+    end do
+  end do
+
+end subroutine Boundary_condition_onemesh
 
 !------------------------------------------------------------
-!-------------------------------------------------------------------  
-! Wall boundary 
-! Éè¶¨Á½²ãĞéÍø¸ñ(Ghost Cell) 
+!-------------------------------------------------------------------
+! Wall boundary
+! è®¾å®šä¸¤å±‚è™šç½‘æ ¼(Ghost Cell)
 
-    subroutine boundary_wall(nMesh,mBlock,ksub)
-     Use Global_Var
-     implicit none
-     Type (Block_TYPE),pointer:: B
-     Type (BC_MSG_TYPE),pointer:: Bc
-     real(PRE_EC):: d1,u1,v1,w1,p1,T1,d2,u2,v2,w2,p2,T2
-     integer:: mBlock,ksub,ib,ie,jb,je,kb,ke,i,j,k,nMesh,NVAR1
-     real(PRE_EC),parameter:: beta1_SST=0.075d0
-     
-     NVAR1=Mesh(nMesh)%NVAR
-     B => Mesh(nMesh)%Block(mBlock)
-     Bc => B%bc_msg(ksub)
-     ib=Bc%ib; ie=Bc%ie; jb=Bc%jb; je=Bc%je ; kb=Bc%kb; ke=Bc%ke      
+subroutine boundary_wall(nMesh, mBlock, ksub)
+  Use Global_Var
+  implicit none
+  Type(Block_TYPE), pointer:: B
+  Type(BC_MSG_TYPE), pointer:: Bc
+  real(PRE_EC):: d1, u1, v1, w1, p1, T1, d2, u2, v2, w2, p2, T2
+  integer:: mBlock, ksub, ib, ie, jb, je, kb, ke, i, j, k, nMesh, NVAR1
+  real(PRE_EC), parameter:: beta1_SST = 0.075d0
 
+  NVAR1 = Mesh(nMesh)%NVAR
+  B => Mesh(nMesh)%Block(mBlock)
+  Bc => B%bc_msg(ksub)
+  ib = Bc%ib; ie = Bc%ie; jb = Bc%jb; je = Bc%je; kb = Bc%kb; ke = Bc%ke
 
-    if(Bc%face .eq. 1 ) then   ! i- 
-       do k=kb,ke-1
-       do j=jb,je-1
-		                          !   inner-cell             ! Ghost Cell
-	    call wall_bound(NVAR1,B%U(:,1,j,k),B%U(:,0,j,k),Ma,gamma,Twall,B%mu(1,j,k),B%dw(1,j,k),Re)
-	   enddo
-       enddo
-     
-	 else if (Bc%face .eq. 4 ) then   ! i+
-       do k=kb,ke-1
-       do j=jb,je-1
-	   	call wall_bound(NVAR1,B%U(:,ie-1,j,k),B%U(:,ie,j,k),Ma,gamma,Twall,B%mu(ie-1,j,k),B%dw(ie-1,j,k),Re)
-	   enddo
-       enddo
-     
-	 else if(Bc%face .eq. 2 ) then   !j-
-       do k=kb,ke-1
-       do i=ib,ie-1
-	    call wall_bound(NVAR1,B%U(:,i,1,k),B%U(:,i,0,k),Ma,gamma,Twall,B%mu(i,1,k),B%dw(i,1,k),Re)
-	   enddo
-       enddo
-     
-	 else if(Bc%face .eq. 5 ) then   !j+
-       do k=kb,ke-1
-       do i=ib,ie-1
-  	    call wall_bound(NVAR1,B%U(:,i,je-1,k),B%U(:,i,je,k),Ma,gamma,Twall,B%mu(i,je-1,k),B%dw(i,je-1,k),Re)
-       enddo
-       enddo
-     
-	 else if(Bc%face .eq. 3 ) then   !k-
-       do j=jb,je-1
-       do i=ib,ie-1
-  	   	call wall_bound(NVAR1,B%U(:,i,j,1),B%U(:,i,j,0),Ma,gamma,Twall,B%mu(i,j,1),B%dw(i,j,1),Re)
-       enddo
-       enddo
-    
-	 else if(Bc%face .eq. 6 ) then   !k+
-       do j=jb,je-1
-       do i=ib,ie-1
-  	    call wall_bound(NVAR1,B%U(:,i,j,ke-1),B%U(:,i,j,ke),Ma,gamma,Twall,B%mu(i,j,ke-1),B%dw(i,j,ke-1),Re)
-       enddo
-       enddo
- 	 endif
+  if (Bc%face .eq. 1) then   ! i-
+    do k = kb, ke-1
+    do j = jb, je-1
+      !   inner-cell             ! Ghost Cell
+      call wall_bound(NVAR1, B%U(:, 1, j, k), B%U(:, 0, j, k), Ma, gamma, Twall, B%mu(1, j, k), B%dw(1, j, k), Re)
+    end do
+    end do
 
-         
-    end subroutine boundary_wall
+  else if (Bc%face .eq. 4) then   ! i+
+    do k = kb, ke-1
+    do j = jb, je-1
+      call wall_bound(NVAR1, B%U(:, ie-1, j, k), B%U(:, ie, j, k), Ma, gamma, Twall, B%mu(ie-1, j, k), B%dw(ie-1, j, k), Re)
+    end do
+    end do
+
+  else if (Bc%face .eq. 2) then   !j-
+    do k = kb, ke-1
+    do i = ib, ie-1
+      call wall_bound(NVAR1, B%U(:, i, 1, k), B%U(:, i, 0, k), Ma, gamma, Twall, B%mu(i, 1, k), B%dw(i, 1, k), Re)
+    end do
+    end do
+
+  else if (Bc%face .eq. 5) then   !j+
+    do k = kb, ke-1
+    do i = ib, ie-1
+      call wall_bound(NVAR1, B%U(:, i, je-1, k), B%U(:, i, je, k), Ma, gamma, Twall, B%mu(i, je-1, k), B%dw(i, je-1, k), Re)
+    end do
+    end do
+
+  else if (Bc%face .eq. 3) then   !k-
+    do j = jb, je-1
+    do i = ib, ie-1
+      call wall_bound(NVAR1, B%U(:, i, j, 1), B%U(:, i, j, 0), Ma, gamma, Twall, B%mu(i, j, 1), B%dw(i, j, 1), Re)
+    end do
+    end do
+
+  else if (Bc%face .eq. 6) then   !k+
+    do j = jb, je-1
+    do i = ib, ie-1
+      call wall_bound(NVAR1, B%U(:, i, j, ke-1), B%U(:, i, j, ke), Ma, gamma, Twall, B%mu(i, j, ke-1), B%dw(i, j, ke-1), Re)
+    end do
+    end do
+  end if
+
+end subroutine boundary_wall
 !-----------------------------------------------------
 !-----------------------------------------------------
-! Ô¶³¡±ß½çÌõ¼ş £¨Çø·ÖÑÇ¡¢³¬ÉùËÙ¼°³ö¿Ú¡¢Èë¿Ú£© 
+! è¿œåœºè¾¹ç•Œæ¡ä»¶ ï¼ˆåŒºåˆ†äºšã€è¶…å£°é€ŸåŠå‡ºå£ã€å…¥å£ï¼‰
 ! Ref. J. Blazek et al. "CFD principles and applications", P281-283
-    subroutine boundary_Farfield(nMesh,mBlock,ksub,Flag)
-     Use Global_Var
-     implicit none
-     Type (Block_TYPE),pointer:: B
-     Type (BC_MSG_TYPE),pointer:: Bc
+subroutine boundary_Farfield(nMesh, mBlock, ksub, Flag)
+  Use Global_Var
+  implicit none
+  Type(Block_TYPE), pointer:: B
+  Type(BC_MSG_TYPE), pointer:: Bc
 
-     integer:: mBlock,ksub,ib,ie,jb,je,kb,ke,i,j,k,nMesh,Flag,NVAR1
-     integer:: i1,j1,k1,i2,j2,k2,m
-	 real(PRE_EC):: d_inf,u_inf,v_inf,w_inf,p_inf,n1,n2,n3 
-     real(PRE_EC):: d1,u1,v1,w1,p1,c1,d2,u2,v2,w2,p2,pb,db,ub,vb,wb,Ma_n
-     integer,parameter:: FLAG_OUTLET=1 , FLAG_INLET=2
+  integer:: mBlock, ksub, ib, ie, jb, je, kb, ke, i, j, k, nMesh, Flag, NVAR1
+  integer:: i1, j1, k1, i2, j2, k2, m
+  real(PRE_EC):: d_inf, u_inf, v_inf, w_inf, p_inf, n1, n2, n3
+  real(PRE_EC):: d1, u1, v1, w1, p1, c1, d2, u2, v2, w2, p2, pb, db, ub, vb, wb, Ma_n
+  integer, parameter:: FLAG_OUTLET = 1, FLAG_INLET = 2
 
-!  ±¾Èí¼şÄ¿Ç°ÓÃÀ´¼ÆËãÄÚÁ÷£¬¸ø¶¨ÎŞÇîÔ¶Ìõ¼ş
-!  A_alfa,A_beta  ¹¥½Ç¼°²à»¬½Ç £¨¸ù¾İ×ø±ê·½ÏòÈ·¶¨£©£»  A_alfa  (x-y)Æ½ÃæÄÚµÄÇã½Ç£» A_beta (x-z)Æ½ÃæÄÚµÄÇã½Ç 
-     d_inf=1.d0
-     u_inf=cos(A_alfa)*cos(A_beta)
-     v_inf=sin(A_alfa)*cos(A_beta) 
-     w_inf=sin(A_beta)
-     p_inf=1.d0/(gamma*Ma*Ma)
-     NVAR1=Mesh(nMesh)%NVAR
-     B => Mesh(nMesh)%Block(mBlock)
-     Bc => B%bc_msg(ksub)
+!  æœ¬è½¯ä»¶ç›®å‰ç”¨æ¥è®¡ç®—å†…æµï¼Œç»™å®šæ— ç©·è¿œæ¡ä»¶
+!  A_alfa,A_beta  æ”»è§’åŠä¾§æ»‘è§’ ï¼ˆæ ¹æ®åæ ‡æ–¹å‘ç¡®å®šï¼‰ï¼›  A_alfa  (x-y)å¹³é¢å†…çš„å€¾è§’ï¼› A_beta (x-z)å¹³é¢å†…çš„å€¾è§’
+  d_inf = 1.d0
+  u_inf = cos(A_alfa)*cos(A_beta)
+  v_inf = sin(A_alfa)*cos(A_beta)
+  w_inf = sin(A_beta)
+  p_inf = 1.d0/(gamma*Ma*Ma)
+  NVAR1 = Mesh(nMesh)%NVAR
+  B => Mesh(nMesh)%Block(mBlock)
+  Bc => B%bc_msg(ksub)
 
-     ib=Bc%ib; ie=Bc%ie; jb=Bc%jb; je=Bc%je  ; kb=Bc%kb; ke=Bc%ke    
+  ib = Bc%ib; ie = Bc%ie; jb = Bc%jb; je = Bc%je; kb = Bc%kb; ke = Bc%ke
 
-       do k=kb,ke
-         do j=jb,je
-           do i=ib,ie
+  do k = kb, ke
+    do j = jb, je
+      do i = ib, ie
 !-----------------------------------------------------------------
 
- !  (i1,j1,k1) ÊÇ¿¿½ü±ß½çµÄÄÚµã£¬ (i2,j2,k2)  ÊÇ±ß½çÍâµÄ1²ã Ghost Cellµã    
- ! (n1,n2,n3)ÎªÍâ·¨Ïß·½Ïò
+        !  (i1,j1,k1) æ˜¯é è¿‘è¾¹ç•Œçš„å†…ç‚¹ï¼Œ (i2,j2,k2)  æ˜¯è¾¹ç•Œå¤–çš„1å±‚ Ghost Cellç‚¹
+        ! (n1,n2,n3)ä¸ºå¤–æ³•çº¿æ–¹å‘
 
-             if(Bc%face .eq. 1) then                 ! i- Ãæ
-               i1=i; j1=j; k1=k; i2=i-1 ; j2=j ; k2=k 
-               n1=-B%ni1(i,j,k) ; n2=-B%ni2(i,j,k); n3=-B%ni3(i,j,k)   ! Íâ·¨Ïß  
-		     else if(Bc%face .eq. 2) then
-               i1=i; j1=j; k1=k; i2=i;  j2=j-1 ; k2=k 
-               n1=-B%nj1(i,j,k) ; n2=-B%nj2(i,j,k); n3=-B%nj3(i,j,k)     
-             else if(Bc%face .eq. 3) then             
-               i1=i; j1=j; k1=k; i2=i;  j2=j ; k2=k-1 
-               n1=-B%nk1(i,j,k) ; n2=-B%nk2(i,j,k); n3=-B%nk3(i,j,k)     
-             else if(Bc%face .eq. 4) then             ! i+ Ãæ (i=ibegin=iend=nx), i1=i-1 ÊÇÄÚµã, i2=i=nxÊÇGhost Cell
-               i1=i-1; j1=j; k1=k;  i2=i; j2=j ; k2=k 
-               n1=B%ni1(i,j,k) ; n2=B%ni2(i,j,k); n3=B%ni3(i,j,k)   ! Íâ·¨Ïß  
-             else if(Bc%face .eq. 5) then
-               i1=i; j1=j-1; k1=k;  i2=i; j2=j ; k2=k 
-               n1=B%nj1(i,j,k) ; n2=B%nj2(i,j,k); n3=B%nj3(i,j,k)     
-		     else if(Bc%face .eq. 6) then
-               i1=i; j1=j; k1=k-1;  i2=i; j2=j ; k2=k 
-               n1=B%nk1(i,j,k) ; n2=B%nk2(i,j,k); n3=B%nk3(i,j,k)     
-		     endif
+        if (Bc%face .eq. 1) then                 ! i- é¢
+          i1 = i; j1 = j; k1 = k; i2 = i-1; j2 = j; k2 = k
+          n1 = -B%ni1(i, j, k); n2 = -B%ni2(i, j, k); n3 = -B%ni3(i, j, k)   ! å¤–æ³•çº¿
+        else if (Bc%face .eq. 2) then
+          i1 = i; j1 = j; k1 = k; i2 = i; j2 = j-1; k2 = k
+          n1 = -B%nj1(i, j, k); n2 = -B%nj2(i, j, k); n3 = -B%nj3(i, j, k)
+        else if (Bc%face .eq. 3) then
+          i1 = i; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k-1
+          n1 = -B%nk1(i, j, k); n2 = -B%nk2(i, j, k); n3 = -B%nk3(i, j, k)
+        else if (Bc%face .eq. 4) then             ! i+ é¢ (i=ibegin=iend=nx), i1=i-1 æ˜¯å†…ç‚¹, i2=i=nxæ˜¯Ghost Cell
+          i1 = i-1; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k
+          n1 = B%ni1(i, j, k); n2 = B%ni2(i, j, k); n3 = B%ni3(i, j, k)   ! å¤–æ³•çº¿
+        else if (Bc%face .eq. 5) then
+          i1 = i; j1 = j-1; k1 = k; i2 = i; j2 = j; k2 = k
+          n1 = B%nj1(i, j, k); n2 = B%nj2(i, j, k); n3 = B%nj3(i, j, k)
+        else if (Bc%face .eq. 6) then
+          i1 = i; j1 = j; k1 = k-1; i2 = i; j2 = j; k2 = k
+          n1 = B%nk1(i, j, k); n2 = B%nk2(i, j, k); n3 = B%nk3(i, j, k)
+        end if
 
-            d1=B%U(1,i1,j1,k1); u1=B%U(2,i1,j1,k1)/d1; v1=B%U(3,i1,j1,k1)/d1; w1=B%U(4,i1,j1,k1)/d1
-            p1=(B%U(5,i1,j1,k1)-0.5d0*d1*(u1*u1+v1*v1+w1*w1))*(gamma-1.d0)              ! ÄÚµã´¦µÄÖµ
-            c1=sqrt(gamma*p1/d1) 
-!                   
-          if(Flag .eq. FLAG_OUTLET) then   ! Ç¿ÖÆÎª(³¬ÉùËÙ)³ö¿Ú
-              d2=d1 ; u2=u1 ; v2=v1 ; w2=w1; p2=p1
-		  else if(Flag .eq.  FLAG_INLET) then   ! Ç¿ÖÆÎª(³¬ÉùËÙ)Èë¿Ú
-	          d2=d_inf; u2=u_inf; v2=v_inf; w2=w_inf; p2=p_inf  
-	  
+        d1 = B%U(1, i1, j1, k1); u1 = B%U(2, i1, j1, k1)/d1; v1 = B%U(3, i1, j1, k1)/d1; w1 = B%U(4, i1, j1, k1)/d1
+        p1 = (B%U(5, i1, j1, k1)-0.5d0*d1*(u1*u1+v1*v1+w1*w1))*(gamma-1.d0)              ! å†…ç‚¹å¤„çš„å€¼
+        c1 = sqrt(gamma*p1/d1)
+!
+        if (Flag .eq. FLAG_OUTLET) then   ! å¼ºåˆ¶ä¸º(è¶…å£°é€Ÿ)å‡ºå£
+          d2 = d1; u2 = u1; v2 = v1; w2 = w1; p2 = p1
+        else if (Flag .eq. FLAG_INLET) then   ! å¼ºåˆ¶ä¸º(è¶…å£°é€Ÿ)å…¥å£
+          d2 = d_inf; u2 = u_inf; v2 = v_inf; w2 = w_inf; p2 = p_inf
+
 !------------------------------------------------------------------------------
-		  else                ! ÆÕÍ¨Ô¶³¡±ß½çÌõ¼ş
+        else                ! æ™®é€šè¿œåœºè¾¹ç•Œæ¡ä»¶
 
+!   ä¿®æ”¹2012-5-21ï¼š ä»¥æ¥æµ (è€Œä¸æ˜¯å½“åœ°) Machæ•°åˆ¤æ–­ï¼Œè®¡ç®—å¤–æµæ•ˆæœå¥½ï¼› è®¡ç®—å†…æµå°šå¾…ç ”ç©¶
+          if (P_OUTLET <= -1.d0) then            ! å¼ºåˆ¶æŒ‰ç…§æ¥æµå®šä¹‰
+            Ma_n = (u_inf*n1+v_inf*n2+w_inf*n3)*Ma   ! æ³•å‘Machæ•°ï¼Œ å¼ºåˆ¶ä»¥æ¥æµæ–¹å‘å®šä¹‰
+          else
+            Ma_n = (u1*n1+v1*n2+w1*n3)/c1    ! æ³•å‘Machæ•°ï¼Œ ä»¥å†…ç‚¹å€¼å®šä¹‰ ï¼ˆåœ¨è¾¹ç•Œå±‚å‡ºå£å¤„æ•ˆæœä¸å¥½ï¼‰
+          end if
 
-!   ĞŞ¸Ä2012-5-21£º ÒÔÀ´Á÷ (¶ø²»ÊÇµ±µØ) MachÊıÅĞ¶Ï£¬¼ÆËãÍâÁ÷Ğ§¹ûºÃ£» ¼ÆËãÄÚÁ÷ÉĞ´ıÑĞ¾¿
-            if( P_OUTLET <= -1.d0 ) then            ! Ç¿ÖÆ°´ÕÕÀ´Á÷¶¨Òå 
-			 Ma_n=(u_inf*n1+v_inf*n2+w_inf*n3)*Ma   ! ·¨ÏòMachÊı£¬ Ç¿ÖÆÒÔÀ´Á÷·½Ïò¶¨Òå
+          if (Ma_n > 1.d0) then   ! è¶…å£°é€Ÿå‡ºå£
+            d2 = d1; u2 = u1; v2 = v1; w2 = w1; p2 = p1
+            !           else if (Ma_n .gt. 0.d0) then  !  äºšå£°é€Ÿå‡ºå£
+          else if (Ma_n > -1.d-6) then  !  äºšå£°é€Ÿå‡ºå£  ( -1.d-6 ä¸ºå°é‡ï¼› è€ƒè™‘åˆ°å¹³è¡Œäºæ¥æµçš„è¿œåœºè¾¹ç•Œï¼ŒæŒ‰ç…§å‡ºå£å¤„ç†æ›´å¥½ï¼‰
+            if (P_OUTLET > 0.d0) then
+              pb = P_OUTLET
+              db = d1+(pb-p1)/(c1*c1)
+              ub = u1+(p1-pb)/(d1*c1)*n1
+              vb = v1+(p1-pb)/(d1*c1)*n2
+              wb = w1+(p1-pb)/(d1*c1)*n3
+              p2 = 2.d0*pb-p1; d2 = 2.d0*db-d1; u2 = 2.d0*ub-u1; v2 = 2.d0*vb-v1; w2 = 2.d0*wb-w1  !ubç•Œé¢å€¼ï¼Œu2ä¸ºGhost Cellå€¼  ub=(u1+u2)/2
             else
-	         Ma_n=(u1*n1+v1*n2+w1*n3)/c1    ! ·¨ÏòMachÊı£¬ ÒÔÄÚµãÖµ¶¨Òå £¨ÔÚ±ß½ç²ã³ö¿Ú´¦Ğ§¹û²»ºÃ£©
-		    endif
-			      
-		   if(Ma_n > 1.d0) then   ! ³¬ÉùËÙ³ö¿Ú  
-              d2=d1 ; u2=u1 ; v2=v1 ; w2=w1; p2=p1
- !           else if (Ma_n .gt. 0.d0) then  !  ÑÇÉùËÙ³ö¿Ú
-           else if (Ma_n > -1.d-6) then  !  ÑÇÉùËÙ³ö¿Ú  ( -1.d-6 ÎªĞ¡Á¿£» ¿¼ÂÇµ½Æ½ĞĞÓÚÀ´Á÷µÄÔ¶³¡±ß½ç£¬°´ÕÕ³ö¿Ú´¦Àí¸üºÃ£©
-		     if(P_OUTLET > 0.d0) then 
-              pb=P_OUTLET 
-              db=d1+(pb-p1)/(c1*c1)
-              ub=u1+(p1-pb)/(d1*c1)*n1
-              vb=v1+(p1-pb)/(d1*c1)*n2
-              wb=w1+(p1-pb)/(d1*c1)*n3
-              p2=2.d0*pb-p1; d2=2.d0*db-d1; u2=2.d0*ub-u1; v2=2.d0*vb-v1; w2=2.d0*wb-w1  !ub½çÃæÖµ£¬u2ÎªGhost CellÖµ  ub=(u1+u2)/2 
-             else
-               d2=d1 ; u2=u1 ; v2=v1 ; w2=w1; p2=p1   ! ÍâÍÆ
-			 endif 
-			else if (Ma_n > -1.d0) then  ! ÑÇÉùËÙÈë¿Ú 
-              pb=0.5d0*(p1+p_inf-d1*c1*((u_inf-u1)*n1+(v_inf-v1)*n2+(w_inf-w1)*n3 ))
-              db=d_inf+(pb-p_inf)/(c1*c1)
-              ub=u_inf-(p_inf-pb)/(d1*c1)*n1
-              vb=v_inf-(p_inf-pb)/(d1*c1)*n2
-              wb=w_inf-(p_inf-pb)/(d1*c1)*n3
-              p2=2.d0*pb-p1 ; d2=2.d0*db-d1 ; u2=2.d0*ub-u1 ; v2=2.d0*vb-v1 ; w2=2.d0*wb-w1
-            else   ! ³¬ÉùËÙÈë¿Ú
-              d2=d_inf; u2=u_inf; v2=v_inf; w2=w_inf; p2=p_inf  
-            endif  
-          endif
-			 
-            B%U(1,i2,j2,k2)=d2
-            B%U(2,i2,j2,k2)=d2*u2
-            B%U(3,i2,j2,k2)=d2*v2
-            B%U(4,i2,j2,k2)=d2*w2
-            B%U(5,i2,j2,k2)=p2/(gamma-1.d0)+0.5d0*d2*(u2*u2+v2*v2+w2*w2)
- 
-    
-!    ±êÁ¿£¨SA, SST£©µÄ±ß½çÌõ¼ş
-            if(Ma_n .gt. 0.d0 .or. Flag .eq. FLAG_OUTLET) then
-			  if(NVAR1 .eq. 6)  then
-			    B%U(6,i2,j2,k2)=B%U(6,i1,j1,k1)           ! vt
-              else if(NVAR1 .eq. 7) then
-			    B%U(6,i2,j2,k2)=B%U(6,i1,j1,k1)           
-			    B%U(7,i2,j2,k2)=B%U(7,i1,j1,k1)           
-			  endif   
-            else
-			  if(NVAR1 .eq. 6)  then
+              d2 = d1; u2 = u1; v2 = v1; w2 = w1; p2 = p1   ! å¤–æ¨
+            end if
+          else if (Ma_n > -1.d0) then  ! äºšå£°é€Ÿå…¥å£
+            pb = 0.5d0*(p1+p_inf-d1*c1*((u_inf-u1)*n1+(v_inf-v1)*n2+(w_inf-w1)*n3))
+            db = d_inf+(pb-p_inf)/(c1*c1)
+            ub = u_inf-(p_inf-pb)/(d1*c1)*n1
+            vb = v_inf-(p_inf-pb)/(d1*c1)*n2
+            wb = w_inf-(p_inf-pb)/(d1*c1)*n3
+            p2 = 2.d0*pb-p1; d2 = 2.d0*db-d1; u2 = 2.d0*ub-u1; v2 = 2.d0*vb-v1; w2 = 2.d0*wb-w1
+          else   ! è¶…å£°é€Ÿå…¥å£
+            d2 = d_inf; u2 = u_inf; v2 = v_inf; w2 = w_inf; p2 = p_inf
+          end if
+        end if
+
+        B%U(1, i2, j2, k2) = d2
+        B%U(2, i2, j2, k2) = d2*u2
+        B%U(3, i2, j2, k2) = d2*v2
+        B%U(4, i2, j2, k2) = d2*w2
+        B%U(5, i2, j2, k2) = p2/(gamma-1.d0)+0.5d0*d2*(u2*u2+v2*v2+w2*w2)
+
+!    æ ‡é‡ï¼ˆSA, SSTï¼‰çš„è¾¹ç•Œæ¡ä»¶
+        if (Ma_n .gt. 0.d0 .or. Flag .eq. FLAG_OUTLET) then
+          if (NVAR1 .eq. 6) then
+            B%U(6, i2, j2, k2) = B%U(6, i1, j1, k1)           ! vt
+          else if (NVAR1 .eq. 7) then
+            B%U(6, i2, j2, k2) = B%U(6, i1, j1, k1)
+            B%U(7, i2, j2, k2) = B%U(7, i1, j1, k1)
+          end if
+        else
+          if (NVAR1 .eq. 6) then
 ! see:             http://turbmodels.larc.nasa.gov/spalart.html
-! 		 	    B%U(6,i2,j2,k2)=0.1d0/Re           ! vt
-!		 	    B%U(6,i2,j2,k2)=5.d0/Re            ! vt Éè¶¨Îª²ãÁ÷Õ³ĞÔÏµÊıµÄ5±¶
-		 	    B%U(6,i2,j2,k2)=5.d0               ! vt Éè¶¨Îª²ãÁ÷Õ³ĞÔÏµÊıµÄ5±¶ £¨0.98cÒÔºó°æ±¾)
-              
-			  else if(NVAR1 .eq. 7) then
-			    B%U(6,i2,j2,k2)=d_inf*Kt_inf          ! ÍÄ¶¯ÄÜÀ´Á÷Öµ 
-			    B%U(7,i2,j2,k2)=d_inf*Wt_inf          ! ÍÄÄÜ±ÈºÄÉ¢ÂÊ 
-			  endif   
-			endif
+!                              B%U(6,i2,j2,k2)=0.1d0/Re           ! vt
+!                             B%U(6,i2,j2,k2)=5.d0/Re            ! vt è®¾å®šä¸ºå±‚æµç²˜æ€§ç³»æ•°çš„5å€
+            B%U(6, i2, j2, k2) = 5.d0               ! vt è®¾å®šä¸ºå±‚æµç²˜æ€§ç³»æ•°çš„5å€ ï¼ˆ0.98cä»¥åç‰ˆæœ¬)
 
-	      enddo
-        enddo 
-      enddo
+          else if (NVAR1 .eq. 7) then
+            B%U(6, i2, j2, k2) = d_inf*Kt_inf          ! æ¹åŠ¨èƒ½æ¥æµå€¼
+            B%U(7, i2, j2, k2) = d_inf*Wt_inf          ! æ¹èƒ½æ¯”è€—æ•£ç‡
+          end if
+        end if
 
-    end subroutine boundary_Farfield
+      end do
+    end do
+  end do
+
+end subroutine boundary_Farfield
 !----------------------------------------------------------------------------------------
 
-!-------------------------------------------------------------------  
-! ¶Ô³Æ»ò»¬ÒÆ±ÚÃæÌõ¼ş
+!-------------------------------------------------------------------
+! å¯¹ç§°æˆ–æ»‘ç§»å£é¢æ¡ä»¶
 ! Symmetry boundary condition or slide wall boundary condition
-! ½öÊÊÓÃ1²ãĞéÍø¸ñ
+! ä»…é€‚ç”¨1å±‚è™šç½‘æ ¼
 
-    subroutine boundary_Symmetry_or_SlideWall(nMesh,mBlock,ksub)
-     Use Global_Var
-     implicit none
-     Type (Block_TYPE),pointer:: B
-     Type (BC_MSG_TYPE),pointer:: Bc
-     integer:: mBlock,ksub,ib,ie,jb,je,kb,ke,i,j,k,m,nMesh,NVAR1
-     integer:: i1,j1,k1,i2,j2,k2
-     real(PRE_EC):: n1,n2,n3,Vn
+subroutine boundary_Symmetry_or_SlideWall(nMesh, mBlock, ksub)
+  Use Global_Var
+  implicit none
+  Type(Block_TYPE), pointer:: B
+  Type(BC_MSG_TYPE), pointer:: Bc
+  integer:: mBlock, ksub, ib, ie, jb, je, kb, ke, i, j, k, m, nMesh, NVAR1
+  integer:: i1, j1, k1, i2, j2, k2
+  real(PRE_EC):: n1, n2, n3, Vn
 
-     NVAR1=Mesh(nMesh)%NVAR
-     B => Mesh(nMesh)%Block(mBlock)
-     Bc => B%bc_msg(ksub)
-     ib=Bc%ib; ie=Bc%ie; jb=Bc%jb; je=Bc%je ; kb=Bc%kb; ke=Bc%ke      
+  NVAR1 = Mesh(nMesh)%NVAR
+  B => Mesh(nMesh)%Block(mBlock)
+  Bc => B%bc_msg(ksub)
+  ib = Bc%ib; ie = Bc%ie; jb = Bc%jb; je = Bc%je; kb = Bc%kb; ke = Bc%ke
 
-!   i2,i3 : 2²ãGhost Cell;  i1,i4 2²ãÄÚµã
-     if(Bc%face .eq. 1 .or. Bc%face .eq. 4) then   ! i- or i+
-       if(Bc%face .eq. 1) then
-         i=ib; i1=ib; i2=ib-1
-       else
-         i=ie; i1=ie-1; i2=ie 
-       endif
+!   i2,i3 : 2å±‚Ghost Cell;  i1,i4 2å±‚å†…ç‚¹
+  if (Bc%face .eq. 1 .or. Bc%face .eq. 4) then   ! i- or i+
+    if (Bc%face .eq. 1) then
+      i = ib; i1 = ib; i2 = ib-1
+    else
+      i = ie; i1 = ie-1; i2 = ie
+    end if
 
-       do k=kb,ke-1
-         do j=jb,je-1
-          do m=1,NVAR1
-		    B%U(m,i2,j,k)=B%U(m,i1,j,k)
-          enddo
-           
-		   n1=B%ni1(i,j,k) ; n2=B%ni2(i,j,k); n3=B%ni3(i,j,k)   ! ¹éÒ»»¯·¨·½Ïò  
-		   Vn=B%U(2,i1,j,k)*n1+B%U(3,i1,j,k)*n2+B%U(4,i1,j,k)*n3   ! ·¨Ïò¶¯Á¿
-!  ¶Ô³Æ±ß½çÌõ¼ş£¬±êÁ¿±£³Ö²»±ä£»´¹Ö±±ÚÃæµÄËÙ¶È·ÖÁ¿±äºÅ£»Æ½ĞĞ±ÚÃæµÄËÙ¶È·ÖÁ¿²»±ä
-           B%U(2,i2,j,k)= B%U(2,i2,j,k)-2.d0*Vn*n1 
-           B%U(3,i2,j,k)= B%U(3,i2,j,k)-2.d0*Vn*n2       
-           B%U(4,i2,j,k)= B%U(4,i2,j,k)-2.d0*Vn*n3       
-		 enddo
-       enddo
+    do k = kb, ke-1
+      do j = jb, je-1
+        do m = 1, NVAR1
+          B%U(m, i2, j, k) = B%U(m, i1, j, k)
+        end do
 
-     else if(Bc%face .eq. 2  .or. Bc%face .eq. 5) then   ! j- or j+
-       if(Bc%face .eq. 2) then
-         j=jb; j1=jb; j2=jb-1 
-       else
-         j=je; j1=je-1; j2=je 
-       endif
+        n1 = B%ni1(i, j, k); n2 = B%ni2(i, j, k); n3 = B%ni3(i, j, k)      ! å½’ä¸€åŒ–æ³•æ–¹å‘
+        Vn = B%U(2, i1, j, k)*n1+B%U(3, i1, j, k)*n2+B%U(4, i1, j, k)*n3   ! æ³•å‘åŠ¨é‡
+        ! å¯¹ç§°è¾¹ç•Œæ¡ä»¶ï¼Œæ ‡é‡ä¿æŒä¸å˜ï¼›å‚ç›´å£é¢çš„é€Ÿåº¦åˆ†é‡å˜å·ï¼›å¹³è¡Œå£é¢çš„é€Ÿåº¦åˆ†é‡ä¸å˜
+        B%U(2, i2, j, k) = B%U(2, i2, j, k)-2.d0*Vn*n1
+        B%U(3, i2, j, k) = B%U(3, i2, j, k)-2.d0*Vn*n2
+        B%U(4, i2, j, k) = B%U(4, i2, j, k)-2.d0*Vn*n3
+      end do
+    end do
 
-       do k=kb,ke-1
-         do i=ib,ie-1
-           do m=1,NVAR1
-		    B%U(m,i,j2,k)=B%U(m,i,j1,k)
-           enddo
+  else if (Bc%face .eq. 2 .or. Bc%face .eq. 5) then   ! j- or j+
+    if (Bc%face .eq. 2) then
+      j = jb; j1 = jb; j2 = jb-1
+    else
+      j = je; j1 = je-1; j2 = je
+    end if
 
-           n1=B%nj1(i,j,k) ; n2=B%nj2(i,j,k); n3=B%nj3(i,j,k)     
-           Vn=B%U(2,i,j1,k)*n1+B%U(3,i,j1,k)*n2+B%U(4,i,j1,k)*n3
-           B%U(2,i,j2,k)=  B%U(2,i,j2,k)-2.d0*Vn*n1
-           B%U(3,i,j2,k)=  B%U(3,i,j2,k)-2.d0*Vn*n2
-           B%U(4,i,j2,k)=  B%U(4,i,j2,k)-2.d0*Vn*n3
+    do k = kb, ke-1
+      do i = ib, ie-1
+        do m = 1, NVAR1
+          B%U(m, i, j2, k) = B%U(m, i, j1, k)
+        end do
 
-         enddo
-       enddo
+        n1 = B%nj1(i, j, k); n2 = B%nj2(i, j, k); n3 = B%nj3(i, j, k)
+        Vn = B%U(2, i, j1, k)*n1+B%U(3, i, j1, k)*n2+B%U(4, i, j1, k)*n3
+        B%U(2, i, j2, k) = B%U(2, i, j2, k)-2.d0*Vn*n1
+        B%U(3, i, j2, k) = B%U(3, i, j2, k)-2.d0*Vn*n2
+        B%U(4, i, j2, k) = B%U(4, i, j2, k)-2.d0*Vn*n3
 
-     else if(Bc%face .eq. 3 .or. Bc%face .eq. 6) then   ! k- or k+
-       if(Bc%face .eq. 3) then
-         k=kb; k1=kb; k2=kb-1 
-       else
-         k=ke; k1=ke-1; k2=ke
-       endif
+      end do
+    end do
 
-       do j=jb,je-1
-         do i=ib,ie-1
-           do m=1,NVAR1
-		    B%U(m,i,j,k2)=B%U(m,i,j,k1)
-           enddo
-          
-		   n1=B%nk1(i,j,k) ; n2=B%nk2(i,j,k); n3=B%nk3(i,j,k)     
-		   Vn=B%U(2,i,j,k1)*n1+B%U(3,i,j,k1)*n2+B%U(4,i,j,k1)*n3
-           B%U(2,i,j,k2)=  B%U(2,i,j,k2)-2.d0*Vn*n1      
-           B%U(3,i,j,k2)=  B%U(3,i,j,k2)-2.d0*Vn*n2       
-           B%U(4,i,j,k2)=  B%U(4,i,j,k2)-2.d0*Vn*n3       
-		 enddo
-       enddo
+  else if (Bc%face .eq. 3 .or. Bc%face .eq. 6) then   ! k- or k+
+    if (Bc%face .eq. 3) then
+      k = kb; k1 = kb; k2 = kb-1
+    else
+      k = ke; k1 = ke-1; k2 = ke
+    end if
 
-     endif
-        
-    end subroutine boundary_Symmetry_or_SlideWall
+    do j = jb, je-1
+      do i = ib, ie-1
+        do m = 1, NVAR1
+          B%U(m, i, j, k2) = B%U(m, i, j, k1)
+        end do
+
+        n1 = B%nk1(i, j, k); n2 = B%nk2(i, j, k); n3 = B%nk3(i, j, k)
+        Vn = B%U(2, i, j, k1)*n1+B%U(3, i, j, k1)*n2+B%U(4, i, j, k1)*n3
+        B%U(2, i, j, k2) = B%U(2, i, j, k2)-2.d0*Vn*n1
+        B%U(3, i, j, k2) = B%U(3, i, j, k2)-2.d0*Vn*n2
+        B%U(4, i, j, k2) = B%U(4, i, j, k2)-2.d0*Vn*n3
+      end do
+    end do
+
+  end if
+
+end subroutine boundary_Symmetry_or_SlideWall
 
 !-------------------------------------------------------------
-   subroutine comput_origin_var(U1,U2,U3,U4,U5,d,u,v,w,p,T,Ma,gamma)    ! ¸ù¾İÊØºã±äÁ¿£¬¼ÆËã»ù±¾±äÁ¿
-   use   precision_EC
-   implicit none
-   real(PRE_EC):: U1,U2,U3,U4,U5,d,u,v,w,T,p,Ma,gamma
-    d=U1
-    u=U2/d
-    v=U3/d
-    w=U4/d
-    p=(U5-0.5d0*d*(u*u+v*v+w*w))*(gamma-1.d0)             
-    T=gamma*Ma*Ma*p/d 
-   end
+subroutine comput_origin_var(U1, U2, U3, U4, U5, d, u, v, w, p, T, Ma, gamma)    ! æ ¹æ®å®ˆæ’å˜é‡ï¼Œè®¡ç®—åŸºæœ¬å˜é‡
+  use precision_EC
+  implicit none
+  real(PRE_EC):: U1, U2, U3, U4, U5, d, u, v, w, T, p, Ma, gamma
+  d = U1
+  u = U2/d
+  v = U3/d
+  w = U4/d
+  p = (U5-0.5d0*d*(u*u+v*v+w*w))*(gamma-1.d0)
+  T = gamma*Ma*Ma*p/d
+end
 !--------------------------------------------------------------
-   subroutine comput_conser_var(U1,U2,U3,U4,U5,d,u,v,w,p,Ma,gamma)    ! ¸ù¾İ»ù±¾±äÁ¿,¼ÆËãÊØºã±äÁ¿
-   use   precision_EC
-   implicit none
-   real(PRE_EC):: U1,U2,U3,U4,U5,d,u,v,w,p,Ma,gamma
-    U1=d
-    U2=d*u
-    U3=d*v
-    U4=d*w
-    U5=p/(gamma-1.d0)+0.5d0*d*(u*u+v*v+w*w)
-   end
+subroutine comput_conser_var(U1, U2, U3, U4, U5, d, u, v, w, p, Ma, gamma)    ! æ ¹æ®åŸºæœ¬å˜é‡,è®¡ç®—å®ˆæ’å˜é‡
+  use precision_EC
+  implicit none
+  real(PRE_EC):: U1, U2, U3, U4, U5, d, u, v, w, p, Ma, gamma
+  U1 = d
+  U2 = d*u
+  U3 = d*v
+  U4 = d*w
+  U5 = p/(gamma-1.d0)+0.5d0*d*(u*u+v*v+w*w)
+end
 
+!  ç»çƒ­æˆ–ç­‰æ¸©è¾¹ç•Œæ¡ä»¶
+!  è®¾å®šä¸¤å±‚Ghost Cell
+!  U1: å†…ç‚¹ (i=1); Ug1: Ghostç‚¹ (i=0)
+subroutine wall_bound(NVAR, U1, Ug1, Ma, gamma, Twall, mu1, dw, Re)
+  use precision_EC
+  implicit none
+  integer:: NVAR
+  real(PRE_EC):: U1(NVAR), Ug1(NVAR)
+  real(PRE_EC):: d1, uu1, v1, w1, T1, p1, d2, uu2, v2, w2, T2, p2, Ma, gamma, Twall, mu1, dw, wt, Re
+  real(PRE_EC), parameter:: beta1_SST = 0.075d0
 
+!    U1 å†…ç‚¹(i=1)ï¼› Ug1 Ghostè¾¹ç•Œç‚¹(i=0)
+  if (Twall .gt. 0.d0) then
+    d1 = U1(1)
+    uu1 = U1(2)/d1
+    v1 = U1(3)/d1
+    w1 = U1(4)/d1
+    p1 = (U1(5)-0.5d0*d1*(uu1*uu1+v1*v1+w1*w1))*(gamma-1.d0)
+    T1 = gamma*Ma*Ma*p1/d1
+    p2 = p1               ! è¾¹ç•Œå±‚å‡è®¾ï¼Œå£é¢å¤„æ³•å‘å‹åŠ›æ¢¯åº¦ä¸º0
+    T2 = 2.d0*Twall-T1    ! ç­‰æ¸©å£ï¼Œæ¸©åº¦å¤–æ’    0.5*(T1+T2)=Twall
+    if (T2 .lt. 0.5*T1) T2 = 0.5*T1         !!! 2012-2-1  é˜²æ­¢è™šç½‘æ ¼ä¸Šçš„æ¸©åº¦è¿‡ä½
+    uu2 = -uu1              ! æ— æ»‘ç§»å£    (u1+u2)*0.5=0
+    v2 = -v1
+    w2 = -w1
+    d2 = gamma*Ma*Ma*p2/T2
 
+    Ug1(1) = d2
+    Ug1(2) = d2*uu2
+    Ug1(3) = d2*v2
+    Ug1(4) = d2*w2
+    Ug1(5) = p2/(gamma-1.d0)+0.5d0*d2*(uu2*uu2+v2*v2+w2*w2)
+  else
+    Ug1(1) = U1(1)
+    Ug1(2) = -U1(2)
+    Ug1(3) = -U1(3)
+    Ug1(4) = -U1(4)
+    Ug1(5) = U1(5)
+  end if
 
-!  ¾øÈÈ»òµÈÎÂ±ß½çÌõ¼ş
-!  Éè¶¨Á½²ãGhost Cell
-!  U1: ÄÚµã (i=1); Ug1: Ghostµã (i=0)
-	 subroutine wall_bound(NVAR,U1,Ug1,Ma,gamma,Twall,mu1,dw,Re)
-	 use   precision_EC
-	 implicit none
-	 integer:: NVAR
-	 real(PRE_EC):: U1(NVAR),Ug1(NVAR)
-	 real(PRE_EC):: d1,uu1,v1,w1,T1,p1,d2,uu2,v2,w2,T2,p2,Ma,gamma,Twall,mu1,dw,wt,Re
-     real(PRE_EC),parameter:: beta1_SST=0.075d0
+  if (NVAR .eq. 6) then
+    Ug1(6) = 0.d0                 ! vt for SA model
+  else if (NVAR .eq. 7) then
+!                 Ug1(6)=0.d0                              ! K for SST model
+!                 Ug1(7)=60.d0*mu1/(beta1_SST*dw**2)       ! W for SST model
+    wt = 60.d0*mu1/(U1(1)*beta1_SST*dw**2*Re)
+    Ug1(6) = -U1(6)
+    Ug1(7) = (U1(1)+Ug1(1))*wt-U1(7)
 
-!    U1 ÄÚµã(i=1)£» Ug1 Ghost±ß½çµã(i=0)
-     if(Twall .gt. 0.d0) then
-       d1=U1(1)
-       uu1=U1(2)/d1
-       v1=U1(3)/d1
-       w1=U1(4)/d1
-       p1=(U1(5)-0.5d0*d1*(uu1*uu1+v1*v1+w1*w1))*(gamma-1.d0)             
-       T1=gamma*Ma*Ma*p1/d1 
-       p2=p1               ! ±ß½ç²ã¼ÙÉè£¬±ÚÃæ´¦·¨ÏòÑ¹Á¦Ìİ¶ÈÎª0
-       T2=2.d0*Twall-T1    ! µÈÎÂ±Ú£¬ÎÂ¶ÈÍâ²å    0.5*(T1+T2)=Twall
-       if( T2 .lt. 0.5*T1) T2=0.5*T1         !!! 2012-2-1  ·ÀÖ¹ĞéÍø¸ñÉÏµÄÎÂ¶È¹ıµÍ
-  	   uu2=-uu1              ! ÎŞ»¬ÒÆ±Ú    (u1+u2)*0.5=0
-	   v2=-v1
-	   w2=-w1
-	   d2=gamma*Ma*Ma*p2/T2 
+  end if
 
-       Ug1(1)=d2
-       Ug1(2)=d2*uu2
-       Ug1(3)=d2*v2
-       Ug1(4)=d2*w2
-       Ug1(5)=p2/(gamma-1.d0)+0.5d0*d2*(uu2*uu2+v2*v2+w2*w2)
-  	  else
-	    Ug1(1)=U1(1)
-		Ug1(2)=-U1(2)
-		Ug1(3)=-U1(3)
-		Ug1(4)=-U1(4)
-		Ug1(5)=U1(5)
-      endif
-
-
-		if(NVAR .eq. 6) then
-		 Ug1(6)=0.d0                 ! vt for SA model
-		else if(NVAR .eq. 7) then
-!		 Ug1(6)=0.d0                              ! K for SST model
-!		 Ug1(7)=60.d0*mu1/(beta1_SST*dw**2)       ! W for SST model
-         wt=60.d0*mu1/(U1(1)*beta1_SST*dw**2*Re)
-		 Ug1(6)=-U1(6)
-         Ug1(7)=(U1(1)+Ug1(1))*wt-U1(7)
-
-		endif
-  
-	 end
+end
 
 !-----------------------------------------------------
-! Íâ²å±ß½çÌõ¼ş 
-    subroutine boundary_Extrapolate(nMesh,mBlock,ksub)
-     Use Global_Var
-     implicit none
-     Type (Block_TYPE),pointer:: B
-     Type (BC_MSG_TYPE),pointer:: Bc
+! å¤–æ’è¾¹ç•Œæ¡ä»¶
+subroutine boundary_Extrapolate(nMesh, mBlock, ksub)
+  Use Global_Var
+  implicit none
+  Type(Block_TYPE), pointer:: B
+  Type(BC_MSG_TYPE), pointer:: Bc
 
-     integer:: mBlock,ksub,ib,ie,jb,je,kb,ke,i,j,k,nMesh,NVAR1
-     integer:: i1,j1,k1,i2,j2,k2,m
+  integer:: mBlock, ksub, ib, ie, jb, je, kb, ke, i, j, k, nMesh, NVAR1
+  integer:: i1, j1, k1, i2, j2, k2, m
 
-!  ±¾Èí¼şÄ¿Ç°ÓÃÀ´¼ÆËãÄÚÁ÷£¬¸ø¶¨ÎŞÇîÔ¶Ìõ¼ş
+!  æœ¬è½¯ä»¶ç›®å‰ç”¨æ¥è®¡ç®—å†…æµï¼Œç»™å®šæ— ç©·è¿œæ¡ä»¶
 
-     NVAR1=Mesh(nMesh)%NVAR
-     B => Mesh(nMesh)%Block(mBlock)
-     Bc => B%bc_msg(ksub)
+  NVAR1 = Mesh(nMesh)%NVAR
+  B => Mesh(nMesh)%Block(mBlock)
+  Bc => B%bc_msg(ksub)
 
-     ib=Bc%ib; ie=Bc%ie; jb=Bc%jb; je=Bc%je  ; kb=Bc%kb; ke=Bc%ke    
+  ib = Bc%ib; ie = Bc%ie; jb = Bc%jb; je = Bc%je; kb = Bc%kb; ke = Bc%ke
 
-       do k=kb,ke
-         do j=jb,je
-           do i=ib,ie
+  do k = kb, ke
+    do j = jb, je
+      do i = ib, ie
 !-----------------------------------------------------------------
 
- !  (i1,j1,k1) ÊÇ¿¿½ü±ß½çµÄÄÚµã£¬ (i2,j2,k2)  ÊÇ±ß½çÍâµÄ1²ã Ghost Cellµã    
+        !  (i1,j1,k1) æ˜¯é è¿‘è¾¹ç•Œçš„å†…ç‚¹ï¼Œ (i2,j2,k2)  æ˜¯è¾¹ç•Œå¤–çš„1å±‚ Ghost Cellç‚¹
 
-             if(Bc%face .eq. 1) then                 ! i- Ãæ
-               i1=i; j1=j; k1=k; i2=i-1 ; j2=j ; k2=k 
-             else if(Bc%face .eq. 2) then
-               i1=i; j1=j; k1=k; i2=i;  j2=j-1 ; k2=k 
-             else if(Bc%face .eq. 3) then             
-               i1=i; j1=j; k1=k; i2=i;  j2=j ; k2=k-1 
-             else if(Bc%face .eq. 4) then             ! i+ Ãæ (i=ibegin=iend=nx), i1=i-1 ÊÇÄÚµã, i2=i=nxÊÇGhost Cell
-               i1=i-1; j1=j; k1=k;  i2=i; j2=j ; k2=k 
-             else if(Bc%face .eq. 5) then
-               i1=i; j1=j-1; k1=k;  i2=i; j2=j ; k2=k 
-             else if(Bc%face .eq. 6) then
-               i1=i; j1=j; k1=k-1;  i2=i; j2=j ; k2=k 
-             endif
+        if (Bc%face .eq. 1) then                 ! i- é¢
+          i1 = i; j1 = j; k1 = k; i2 = i-1; j2 = j; k2 = k
+        else if (Bc%face .eq. 2) then
+          i1 = i; j1 = j; k1 = k; i2 = i; j2 = j-1; k2 = k
+        else if (Bc%face .eq. 3) then
+          i1 = i; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k-1
+        else if (Bc%face .eq. 4) then             ! i+ é¢ (i=ibegin=iend=nx), i1=i-1 æ˜¯å†…ç‚¹, i2=i=nxæ˜¯Ghost Cell
+          i1 = i-1; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k
+        else if (Bc%face .eq. 5) then
+          i1 = i; j1 = j-1; k1 = k; i2 = i; j2 = j; k2 = k
+        else if (Bc%face .eq. 6) then
+          i1 = i; j1 = j; k1 = k-1; i2 = i; j2 = j; k2 = k
+        end if
 
-            do m=1,NVAR1
-              B%U(m,i2,j2,k2)=B%U(m,i1,j1,k1)         ! ¼òµ¥ÍâÍÆ (1½×)
-			enddo
+        do m = 1, NVAR1
+          B%U(m, i2, j2, k2) = B%U(m, i1, j1, k1)         ! ç®€å•å¤–æ¨ (1é˜¶)
+        end do
 
-	      enddo
-        enddo 
-      enddo
+      end do
+    end do
+  end do
 
-    end subroutine boundary_Extrapolate
+end subroutine boundary_Extrapolate
 !----------------------------------------------------------------------------------------
-! Ò¶ÂÖ»úÄ£Ê½ Èë¿Ú±ß½çÌõ¼ş  £¨¸ø¶¨×ÜÎÂ¡¢×ÜÑ¹£¬¼ÙÉèÖáÏò½øÆø£» ÍâÍÆ¾²Ñ¹£©
-!    
-	 subroutine boundary_BC_Inflow_Turbo(nMesh,mBlock,ksub )
-     Use Global_Var
-     implicit none
-     Type (Block_TYPE),pointer:: B
-     Type (BC_MSG_TYPE),pointer:: Bc
+! å¶è½®æœºæ¨¡å¼ å…¥å£è¾¹ç•Œæ¡ä»¶  ï¼ˆç»™å®šæ€»æ¸©ã€æ€»å‹ï¼Œå‡è®¾è½´å‘è¿›æ°”ï¼› å¤–æ¨é™å‹ï¼‰
+!
+subroutine boundary_BC_Inflow_Turbo(nMesh, mBlock, ksub)
+  Use Global_Var
+  implicit none
+  Type(Block_TYPE), pointer:: B
+  Type(BC_MSG_TYPE), pointer:: Bc
 
-     integer:: mBlock,ksub,ib,ie,jb,je,kb,ke,i,j,k,nMesh,NVAR1
-     integer:: i1,j1,k1,i2,j2,k2,m
-	 real(PRE_EC):: din,pin,Tin, p00,vx,vy,vz,d1,u1,v1,w1,p1,d2,u2,v2,w2,p2, P0, d0, T0
+  integer:: mBlock, ksub, ib, ie, jb, je, kb, ke, i, j, k, nMesh, NVAR1
+  integer:: i1, j1, k1, i2, j2, k2, m
+  real(PRE_EC):: din, pin, Tin, p00, vx, vy, vz, d1, u1, v1, w1, p1, d2, u2, v2, w2, p2, P0, d0, T0
 
-      p00=1.d0/(gamma*Ma*Ma)
-      d0=1.d0
-	  T0=1.d0        ! ×ÜÎÂ 
-	  p0=p00*d0*T0   ! ×ÜÑ¹   
+  p00 = 1.d0/(gamma*Ma*Ma)
+  d0 = 1.d0
+  T0 = 1.d0        ! æ€»æ¸©
+  p0 = p00*d0*T0   ! æ€»å‹
 
-!	  p0=1.d0   !!! ÓĞÎÊÌâ   Bug !
- 
- 
-     NVAR1=Mesh(nMesh)%NVAR
-     B => Mesh(nMesh)%Block(mBlock)
-     Bc => B%bc_msg(ksub)
+!          p0=1.d0   !!! æœ‰é—®é¢˜   Bug !
 
-     ib=Bc%ib; ie=Bc%ie; jb=Bc%jb; je=Bc%je  ; kb=Bc%kb; ke=Bc%ke    
+  NVAR1 = Mesh(nMesh)%NVAR
+  B => Mesh(nMesh)%Block(mBlock)
+  Bc => B%bc_msg(ksub)
 
-       do k=kb,ke
-         do j=jb,je
-           do i=ib,ie
+  ib = Bc%ib; ie = Bc%ie; jb = Bc%jb; je = Bc%je; kb = Bc%kb; ke = Bc%ke
+
+  do k = kb, ke
+    do j = jb, je
+      do i = ib, ie
 !-----------------------------------------------------------------
 
- !  (i1,j1,k1) ÊÇ¿¿½ü±ß½çµÄÄÚµã£¬ (i2,j2,k2)  ÊÇ±ß½çÍâµÄ1²ã Ghost Cellµã    
+        !  (i1,j1,k1) æ˜¯é è¿‘è¾¹ç•Œçš„å†…ç‚¹ï¼Œ (i2,j2,k2)  æ˜¯è¾¹ç•Œå¤–çš„1å±‚ Ghost Cellç‚¹
 
-             if(Bc%face .eq. 1) then                 ! i- Ãæ
-               i1=i; j1=j; k1=k; i2=i-1 ; j2=j ; k2=k 
-             else if(Bc%face .eq. 2) then
-               i1=i; j1=j; k1=k; i2=i;  j2=j-1 ; k2=k 
-             else if(Bc%face .eq. 3) then             
-               i1=i; j1=j; k1=k; i2=i;  j2=j ; k2=k-1 
-             else if(Bc%face .eq. 4) then             ! i+ Ãæ (i=ibegin=iend=nx), i1=i-1 ÊÇÄÚµã, i2=i=nxÊÇGhost Cell
-               i1=i-1; j1=j; k1=k;  i2=i; j2=j ; k2=k 
-             else if(Bc%face .eq. 5) then
-               i1=i; j1=j-1; k1=k;  i2=i; j2=j ; k2=k 
-             else if(Bc%face .eq. 6) then
-               i1=i; j1=j; k1=k-1;  i2=i; j2=j ; k2=k 
-             endif
+        if (Bc%face .eq. 1) then                 ! i- é¢
+          i1 = i; j1 = j; k1 = k; i2 = i-1; j2 = j; k2 = k
+        else if (Bc%face .eq. 2) then
+          i1 = i; j1 = j; k1 = k; i2 = i; j2 = j-1; k2 = k
+        else if (Bc%face .eq. 3) then
+          i1 = i; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k-1
+        else if (Bc%face .eq. 4) then             ! i+ é¢ (i=ibegin=iend=nx), i1=i-1 æ˜¯å†…ç‚¹, i2=i=nxæ˜¯Ghost Cell
+          i1 = i-1; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k
+        else if (Bc%face .eq. 5) then
+          i1 = i; j1 = j-1; k1 = k; i2 = i; j2 = j; k2 = k
+        else if (Bc%face .eq. 6) then
+          i1 = i; j1 = j; k1 = k-1; i2 = i; j2 = j; k2 = k
+        end if
 
-            d1=B%U(1,i1,j1,k1); u1=B%U(2,i1,j1,k1)/d1; v1=B%U(3,i1,j1,k1)/d1; w1=B%U(4,i1,j1,k1)/d1
-            p1=(B%U(5,i1,j1,k1)-0.5d0*d1*(u1*u1+v1*v1+w1*w1))*(gamma-1.d0)              ! ÄÚµã´¦µÄÖµ
+        d1 = B%U(1, i1, j1, k1); u1 = B%U(2, i1, j1, k1)/d1; v1 = B%U(3, i1, j1, k1)/d1; w1 = B%U(4, i1, j1, k1)/d1
+        p1 = (B%U(5, i1, j1, k1)-0.5d0*d1*(u1*u1+v1*v1+w1*w1))*(gamma-1.d0)              ! å†…ç‚¹å¤„çš„å€¼
 !------------------------------------------------------------------------------
 
-! Éè¶¨×ÜÑ¹=1£¬ ×ÜÎÂ=1   
-              pin= p1   ! Ñ¹Á¦ÍâÍÆ
-			  
-!			  if(pin >= 1.d0) then
+! è®¾å®šæ€»å‹=1ï¼Œ æ€»æ¸©=1
+        pin = p1   ! å‹åŠ›å¤–æ¨
 
-			  if(pin >= p0) then
-!               ÄÚ²¿Ñ¹Á¦¸ßÓÚ×ÜÑ¹
-!			    print*, "Worning ! p_inlet > Total pressure, please check initial or boundary condition "
-!			    stop
-                din=d1
-				vx=u1
+!                          if(pin >= 1.d0) then
 
-			  else
-			  
-!			   Tin= pin**((gamma-1.d0)/gamma)            ! Bug !!!
-			   Tin= T0*(pin/p0)**((gamma-1.d0)/gamma)
-			   din= pin/(p00*Tin)
-               vx=sqrt(2.d0*Cp*(1.d0-Tin))
-			  endif
-! ÖáÏò½øÆø¼ÙÉè 
-			  vy= Turbo_w*B%zc(i1,j1,k1)   ! Ïà¶ÔËÙ¶È £¨ÓÉÓÚĞı×ª£©
-			  vz= -Turbo_w*B%yc(i1,j1,k1)   
-              p2=2.d0*pin-p1 ; d2=2.d0*din-d1 ; u2=2.d0*vx-u1 ; v2=2.d0*vy-v1 ; w2=2.d0*vz-w1
- 			 
-             B%U(1,i2,j2,k2)=d2
-             B%U(2,i2,j2,k2)=d2*u2
-             B%U(3,i2,j2,k2)=d2*v2
-             B%U(4,i2,j2,k2)=d2*w2
-             B%U(5,i2,j2,k2)=p2/(gamma-1.d0)+0.5d0*d2*(u2*u2+v2*v2+w2*w2)
- 
-    
-!    ±êÁ¿£¨SA, SST£©µÄ±ß½çÌõ¼ş
-			  if(NVAR1 .eq. 6)  then
+        if (pin >= p0) then
+!               å†…éƒ¨å‹åŠ›é«˜äºæ€»å‹
+!                            print*, "Worning ! p_inlet > Total pressure, please check initial or boundary condition "
+!                            stop
+          din = d1
+          vx = u1
+
+        else
+
+!                           Tin= pin**((gamma-1.d0)/gamma)            ! Bug !!!
+          Tin = T0*(pin/p0)**((gamma-1.d0)/gamma)
+          din = pin/(p00*Tin)
+          vx = sqrt(2.d0*Cp*(1.d0-Tin))
+        end if
+! è½´å‘è¿›æ°”å‡è®¾
+        vy = Turbo_w*B%zc(i1, j1, k1)   ! ç›¸å¯¹é€Ÿåº¦ ï¼ˆç”±äºæ—‹è½¬ï¼‰
+        vz = -Turbo_w*B%yc(i1, j1, k1)
+        p2 = 2.d0*pin-p1; d2 = 2.d0*din-d1; u2 = 2.d0*vx-u1; v2 = 2.d0*vy-v1; w2 = 2.d0*vz-w1
+
+        B%U(1, i2, j2, k2) = d2
+        B%U(2, i2, j2, k2) = d2*u2
+        B%U(3, i2, j2, k2) = d2*v2
+        B%U(4, i2, j2, k2) = d2*w2
+        B%U(5, i2, j2, k2) = p2/(gamma-1.d0)+0.5d0*d2*(u2*u2+v2*v2+w2*w2)
+
+!    æ ‡é‡ï¼ˆSA, SSTï¼‰çš„è¾¹ç•Œæ¡ä»¶
+        if (NVAR1 .eq. 6) then
 ! see:             http://turbmodels.larc.nasa.gov/spalart.html
-		 	    B%U(6,i2,j2,k2)=5.d0               ! vt Éè¶¨Îª²ãÁ÷Õ³ĞÔÏµÊıµÄ5±¶ £¨0.98cÒÔºó°æ±¾)
+          B%U(6, i2, j2, k2) = 5.d0               ! vt è®¾å®šä¸ºå±‚æµç²˜æ€§ç³»æ•°çš„5å€ ï¼ˆ0.98cä»¥åç‰ˆæœ¬)
 
-			  else if(NVAR1 .eq. 7) then
-			    B%U(6,i2,j2,k2)=din*Kt_inf          ! ÍÄ¶¯ÄÜÀ´Á÷Öµ 
-			    B%U(7,i2,j2,k2)=din*Wt_inf          ! ÍÄÄÜ±ÈºÄÉ¢ÂÊ 
-			  endif   
+        else if (NVAR1 .eq. 7) then
+          B%U(6, i2, j2, k2) = din*Kt_inf          ! æ¹åŠ¨èƒ½æ¥æµå€¼
+          B%U(7, i2, j2, k2) = din*Wt_inf          ! æ¹èƒ½æ¯”è€—æ•£ç‡
+        end if
 
-	      enddo
-        enddo 
-      enddo
+      end do
+    end do
+  end do
 
-    end subroutine boundary_BC_Inflow_Turbo
-
+end subroutine boundary_BC_Inflow_Turbo
 
 !----------------------------------------------------------------------------------------
-! Ò¶ÂÖ»úÄ£Ê½ ³ö¿Ú±ß½çÌõ¼ş  £¨¸ø¶¨±³Ñ¹; ¸ù¾İÖÜÏòËÙ¶È»ı·Ö£©
-! ÄÚÁ÷Ä£Ê½Ò²Ê¹ÓÃ¸Ã±ß½çÌõ¼ş (µ«²»¿¼ÂÇĞı×ª)
-    
-	 subroutine boundary_BC_Outflow_Turbo(nMesh,mBlock,ksub )
-     Use Global_Var
-     implicit none
-     Type (Block_TYPE),pointer:: B
-     Type (BC_MSG_TYPE),pointer:: Bc
+! å¶è½®æœºæ¨¡å¼ å‡ºå£è¾¹ç•Œæ¡ä»¶  ï¼ˆç»™å®šèƒŒå‹; æ ¹æ®å‘¨å‘é€Ÿåº¦ç§¯åˆ†ï¼‰
+! å†…æµæ¨¡å¼ä¹Ÿä½¿ç”¨è¯¥è¾¹ç•Œæ¡ä»¶ (ä½†ä¸è€ƒè™‘æ—‹è½¬)
 
-     integer:: mBlock,ksub,ib,ie,jb,je,kb,ke,i,j,k,nMesh,NVAR1
-     integer:: i1,j1,k1,i2,j2,k2,m,nx,ny,nz
-	 real(PRE_EC):: pb,db,ub,vb,wb, p00,d1,u1,v1,w1,p1,c1,n1,n2,n3,d2,u2,v2,w2,p2,Ma_n
-     real(PRE_EC):: rr,seta,us
-     real(PRE_EC),allocatable,dimension(:):: dps,r0,pout
+subroutine boundary_BC_Outflow_Turbo(nMesh, mBlock, ksub)
+  Use Global_Var
+  implicit none
+  Type(Block_TYPE), pointer:: B
+  Type(BC_MSG_TYPE), pointer:: Bc
 
-!  ³ö¿Ú±ß½çÓ¦µ±ÊÇi+ ½çÃæ (i=B%nx-1), ·ñÔò²»Ö§³Ö
-!  ¼Ù¶¨ jÎªÖÜÏò£» kÎª¾¶Ïò
-!  »ı·Ö dp/dr=d*vs*vs/r 
-  
-!     p0=1.d0  ! ×ÜÑ¹
-! 	  T0=1.d0  ! ×ÜÎÂ
-     p00=1.d0/(gamma*Ma*Ma)
+  integer:: mBlock, ksub, ib, ie, jb, je, kb, ke, i, j, k, nMesh, NVAR1
+  integer:: i1, j1, k1, i2, j2, k2, m, nx, ny, nz
+  real(PRE_EC):: pb, db, ub, vb, wb, p00, d1, u1, v1, w1, p1, c1, n1, n2, n3, d2, u2, v2, w2, p2, Ma_n
+  real(PRE_EC):: rr, seta, us
+  real(PRE_EC), allocatable, dimension(:):: dps, r0, pout
 
- 
-     NVAR1=Mesh(nMesh)%NVAR
-     B => Mesh(nMesh)%Block(mBlock)
-     Bc => B%bc_msg(ksub)
-	 nx=B%nx; ny=B%ny; nz=B%nz
-      if( (Bc%ib .ne. nx) .or. (Bc%ie .ne. nx)  & 
-	   .or. (Bc%jb .ne. 1) .or. (Bc%je .ne. ny)  &
-	   .or. (Bc%kb .ne. 1) .or. (Bc%ke .ne. nz)  &
-	   .or. (Bc%face .ne. 4) ) then
+!  å‡ºå£è¾¹ç•Œåº”å½“æ˜¯i+ ç•Œé¢ (i=B%nx-1), å¦åˆ™ä¸æ”¯æŒ
+!  å‡å®š jä¸ºå‘¨å‘ï¼› kä¸ºå¾„å‘
+!  ç§¯åˆ† dp/dr=d*vs*vs/r
 
-	  print*, " In this version, the OUTLET boundary for Turbo should be i+ plane "
-	  stop
-	 endif
+!     p0=1.d0  ! æ€»å‹
+!           T0=1.d0  ! æ€»æ¸©
+  p00 = 1.d0/(gamma*Ma*Ma)
 
-     allocate(dps(nz),r0(nz),pout(nz))
-    
-	if(	 IF_TurboMachinary ==1 ) then   ! Ò¶ÂÖ»úÄ£Ê½
-	 i=nx-1
-	 do k=1, nz-1
-	 dps(k)=0.d0
-	 r0(k)=0.d0
-	 do j=1, ny-1
-      rr=sqrt(B%yc(i,j,k)**2+B%zc(i,j,k)**2)
-   	  seta=acos(B%yc(i,j,k)/rr)
-	  if(B%zc(i,j,k) < 0) seta=-seta
-      us=(-B%U(3,i,j,k)*sin(seta)+B%U(4,i,j,k)*cos(seta) ) /B%U(1,i,j,k)  + Turbo_w*rr      ! ÖÜÏòËÙ¶È (¾ø¶ÔËÙ¶È) 
-	  dps(k)=dps(k)+B%U(1,i,j,k)*us*us/rr                  ! dp/dr=d*vs*vs/r
-	  r0(k)=r0(k)+rr
-	 enddo
-      dps(k)=dps(k)/(ny-1.d0)
-	  r0(k)=r0(k)/(ny-1.d0)
-     enddo
+  NVAR1 = Mesh(nMesh)%NVAR
+  B => Mesh(nMesh)%Block(mBlock)
+  Bc => B%bc_msg(ksub)
+  nx = B%nx; ny = B%ny; nz = B%nz
+  if ((Bc%ib .ne. nx) .or. (Bc%ie .ne. nx) &
+      .or. (Bc%jb .ne. 1) .or. (Bc%je .ne. ny) &
+      .or. (Bc%kb .ne. 1) .or. (Bc%ke .ne. nz) &
+      .or. (Bc%face .ne. 4)) then
 
-      pout(1)=P_outlet
-	 do k=2,nz-1
-      pout(k)=pout(k-1)+0.5d0*(dps(k)+dps(k-1))*(r0(k)-r0(k-1))
-     enddo
-      pout(nz)=pout(nz-1)
-    else  ! ·ÇÒ¶ÂÖ»úÄ£Ê½ £¨ÄÚÁ÷Ä£Ê½£©
-      do k=1,nz
-	   pout(k)=P_outlet
-	  enddo
-	endif
+    print *, " In this version, the OUTLET boundary for Turbo should be i+ plane "
+    stop
+  end if
 
+  allocate (dps(nz), r0(nz), pout(nz))
 
-        i=nx 
-         do k=1, nz
-         do j=1, ny
+  if (IF_TurboMachinary == 1) then   ! å¶è½®æœºæ¨¡å¼
+    i = nx-1
+    do k = 1, nz-1
+      dps(k) = 0.d0
+      r0(k) = 0.d0
+      do j = 1, ny-1
+        rr = sqrt(B%yc(i, j, k)**2+B%zc(i, j, k)**2)
+        seta = acos(B%yc(i, j, k)/rr)
+        if (B%zc(i, j, k) < 0) seta = -seta
+        us = (-B%U(3, i, j, k)*sin(seta)+B%U(4, i, j, k)*cos(seta))/B%U(1, i, j, k)+Turbo_w*rr      ! å‘¨å‘é€Ÿåº¦ (ç»å¯¹é€Ÿåº¦)
+        dps(k) = dps(k)+B%U(1, i, j, k)*us*us/rr                  ! dp/dr=d*vs*vs/r
+        r0(k) = r0(k)+rr
+      end do
+      dps(k) = dps(k)/(ny-1.d0)
+      r0(k) = r0(k)/(ny-1.d0)
+    end do
+
+    pout(1) = P_outlet
+    do k = 2, nz-1
+      pout(k) = pout(k-1)+0.5d0*(dps(k)+dps(k-1))*(r0(k)-r0(k-1))
+    end do
+    pout(nz) = pout(nz-1)
+  else  ! éå¶è½®æœºæ¨¡å¼ ï¼ˆå†…æµæ¨¡å¼ï¼‰
+    do k = 1, nz
+      pout(k) = P_outlet
+    end do
+  end if
+
+  i = nx
+  do k = 1, nz
+  do j = 1, ny
 !-----------------------------------------------------------------
-             i1=i-1; j1=j; k1=k;  i2=i; j2=j ; k2=k 
+    i1 = i-1; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k
 
- !  (i1,j1,k1) ÊÇ¿¿½ü±ß½çµÄÄÚµã£¬ (i2,j2,k2) ÊÇ±ß½çÍâµÄ1²ã Ghost Cellµã    
- !  (n1,n2,n3) ÎªÍâ·¨Ïß·½Ïò
+    !  (i1,j1,k1) æ˜¯é è¿‘è¾¹ç•Œçš„å†…ç‚¹ï¼Œ (i2,j2,k2) æ˜¯è¾¹ç•Œå¤–çš„1å±‚ Ghost Cellç‚¹
+    !  (n1,n2,n3) ä¸ºå¤–æ³•çº¿æ–¹å‘
 
-               n1=B%ni1(i,j,k) ; n2=B%ni2(i,j,k); n3=B%ni3(i,j,k)   ! Íâ·¨Ïß  
-  
- ! ÄÚµã´¦µÄÎïÀíÁ¿
-            d1=B%U(1,i1,j1,k1); u1=B%U(2,i1,j1,k1)/d1; v1=B%U(3,i1,j1,k1)/d1; w1=B%U(4,i1,j1,k1)/d1
-            p1=(B%U(5,i1,j1,k1)-0.5d0*d1*(u1*u1+v1*v1+w1*w1))*(gamma-1.d0)      
-            c1=sqrt(gamma*p1/d1) 
-     	    Ma_n=(u1*n1+v1*n2+w1*n3)/c1    ! ·¨ÏòMachÊı£¬ ÒÔÄÚµãÖµ¶¨Òå £¨ÔÚ±ß½ç²ã³ö¿Ú´¦Ğ§¹û²»ºÃ£©
-  
+    n1 = B%ni1(i, j, k); n2 = B%ni2(i, j, k); n3 = B%ni3(i, j, k)   ! å¤–æ³•çº¿
+
+    ! å†…ç‚¹å¤„çš„ç‰©ç†é‡
+    d1 = B%U(1, i1, j1, k1); u1 = B%U(2, i1, j1, k1)/d1; v1 = B%U(3, i1, j1, k1)/d1; w1 = B%U(4, i1, j1, k1)/d1
+    p1 = (B%U(5, i1, j1, k1)-0.5d0*d1*(u1*u1+v1*v1+w1*w1))*(gamma-1.d0)
+    c1 = sqrt(gamma*p1/d1)
+    Ma_n = (u1*n1+v1*n2+w1*n3)/c1    ! æ³•å‘Machæ•°ï¼Œ ä»¥å†…ç‚¹å€¼å®šä¹‰ ï¼ˆåœ¨è¾¹ç•Œå±‚å‡ºå£å¤„æ•ˆæœä¸å¥½ï¼‰
+
 !------------------------------------------------------------------------------
-		     if(P_outlet > 0.d0 .and. Ma_n <= 1.d0) then   !  
-              pb=pout(k)               ! pressure
-              p2=2.d0*pb-p1; d2=d1; u2=u1; v2=v1; w2=w1  !ub½çÃæÖµ£¬u2ÎªGhost CellÖµ  ub=(u1+u2)/2 
-			 else
-               d2=d1 ; u2=u1 ; v2=v1 ; w2=w1; p2=p1   ! ÍâÍÆ
-			 endif 
+    if (P_outlet > 0.d0 .and. Ma_n <= 1.d0) then   !
+      pb = pout(k)               ! pressure
+      p2 = 2.d0*pb-p1; d2 = d1; u2 = u1; v2 = v1; w2 = w1  !ubç•Œé¢å€¼ï¼Œu2ä¸ºGhost Cellå€¼  ub=(u1+u2)/2
+    else
+      d2 = d1; u2 = u1; v2 = v1; w2 = w1; p2 = p1   ! å¤–æ¨
+    end if
 
-              p2=2.d0*pb-p1    !ub½çÃæÖµ£¬u2ÎªGhost CellÖµ  ub=(u1+u2)/2 
- 			 
-             B%U(1,i2,j2,k2)=d2
-             B%U(2,i2,j2,k2)=d2*u2
-             B%U(3,i2,j2,k2)=d2*v2
-             B%U(4,i2,j2,k2)=d2*w2
-             B%U(5,i2,j2,k2)=p2/(gamma-1.d0)+0.5d0*d2*(u2*u2+v2*v2+w2*w2)
- 
-    
-			  if(NVAR1 .eq. 6)  then
-			    B%U(6,i2,j2,k2)=B%U(6,i1,j1,k1)           ! vt
-              else if(NVAR1 .eq. 7) then
-			    B%U(6,i2,j2,k2)=B%U(6,i1,j1,k1)           
-			    B%U(7,i2,j2,k2)=B%U(7,i1,j1,k1)           
-			  endif   
- 
-	      enddo
-        enddo 
-     deallocate(dps,r0)
+    p2 = 2.d0*pb-p1    !ubç•Œé¢å€¼ï¼Œu2ä¸ºGhost Cellå€¼  ub=(u1+u2)/2
 
-!----test test---------------------------------     
-!	 open(99,file="pout-test.dat")
-!     write(99,*) "variables= x,y,z,d,u,v,w,p"   
-!     write(99,*) "zone i= ", ny, " j= ",nz		
-!		 i=nx 
+    B%U(1, i2, j2, k2) = d2
+    B%U(2, i2, j2, k2) = d2*u2
+    B%U(3, i2, j2, k2) = d2*v2
+    B%U(4, i2, j2, k2) = d2*w2
+    B%U(5, i2, j2, k2) = p2/(gamma-1.d0)+0.5d0*d2*(u2*u2+v2*v2+w2*w2)
+
+    if (NVAR1 .eq. 6) then
+      B%U(6, i2, j2, k2) = B%U(6, i1, j1, k1)           ! vt
+    else if (NVAR1 .eq. 7) then
+      B%U(6, i2, j2, k2) = B%U(6, i1, j1, k1)
+      B%U(7, i2, j2, k2) = B%U(7, i1, j1, k1)
+    end if
+
+  end do
+  end do
+  deallocate (dps, r0)
+
+!----test test---------------------------------
+!         open(99,file="pout-test.dat")
+!     write(99,*) "variables= x,y,z,d,u,v,w,p"
+!     write(99,*) "zone i= ", ny, " j= ",nz
+!                 i=nx
 !         do k=1, nz
 !         do j=1, ny
 !-----------------------------------------------------------------
-!           i1=i-1; j1=j; k1=k;  i2=i; j2=j ; k2=k 
+!           i1=i-1; j1=j; k1=k;  i2=i; j2=j ; k2=k
 
 !             d2=B%U(1,i2,j2,k2)
 !             u2=B%U(2,i2,j2,k2)/d2
@@ -732,72 +717,70 @@
 !             w2=B%U(4,i2,j2,k2)/d2
 !             p2=(gamma-1.d0)*(B%U(5,i2,j2,k2)-0.5d0*d2*(u2*u2+v2*v2+w2*w2))
 !          write(99,"(8f16.5)") B%xc(i2,j2,k2),B%yc(i2,j2,k2),B%zc(i2,j2,k2),d2,u2,v2,w2,p2
-!		 enddo
-!		 enddo
-!	  close(99)
-!	  stop
+!                 enddo
+!                 enddo
+!          close(99)
+!          stop
 
-    end subroutine boundary_BC_Outflow_Turbo
+end subroutine boundary_BC_Outflow_Turbo
 
+subroutine boundary_wall_Turbo(nMesh, mBlock, ksub)
+  Use Global_Var
+  implicit none
+  Type(Block_TYPE), pointer:: B
+  Type(BC_MSG_TYPE), pointer:: Bc
 
-    
-	 subroutine boundary_wall_Turbo(nMesh,mBlock,ksub )
-     Use Global_Var
-     implicit none
-     Type (Block_TYPE),pointer:: B
-     Type (BC_MSG_TYPE),pointer:: Bc
+  integer:: mBlock, ksub, i, j, k, nMesh, NVAR1
+  integer:: i1, j1, k1, i2, j2, k2, m, nx, ny, nz
+  real(PRE_EC):: d1, u1, v1, w1, p1, d2, u2, v2, w2, p2, uy0, uz0
+  real(PRE_EC), allocatable, dimension(:):: dps, r0, pout
 
-     integer:: mBlock,ksub,i,j,k,nMesh,NVAR1
-     integer:: i1,j1,k1,i2,j2,k2,m,nx,ny,nz
-     real(PRE_EC):: d1,u1,v1,w1,p1,d2,u2,v2,w2,p2,uy0,uz0
-     real(PRE_EC),allocatable,dimension(:):: dps,r0,pout
+!  å¶è½®æœºæ¢°çš„æœºåŒ£è¾¹ç•Œæ¡ä»¶ ï¼ˆç»å¯¹é€Ÿåº¦ä¸º0ï¼‰ï¼Œ ç›¸å¯¹äºæœ¬åæ ‡ç³»æœ‰æ—‹è½¬ï¼›
+!  è¯¥è¾¹ç•Œåº”å½“æ˜¯k+è¾¹ç•Œ;
 
-!  Ò¶ÂÖ»úĞµµÄ»úÏ»±ß½çÌõ¼ş £¨¾ø¶ÔËÙ¶ÈÎª0£©£¬ Ïà¶ÔÓÚ±¾×ø±êÏµÓĞĞı×ª£»
-!  ¸Ã±ß½çÓ¦µ±ÊÇk+±ß½ç;     
+  NVAR1 = Mesh(nMesh)%NVAR
+  B => Mesh(nMesh)%Block(mBlock)
+  Bc => B%bc_msg(ksub)
+  nx = B%nx; ny = B%ny; nz = B%nz
+  if ((Bc%ib .ne. 1) .or. (Bc%ie .ne. nx) &
+      .or. (Bc%jb .ne. 1) .or. (Bc%je .ne. ny) &
+      .or. (Bc%kb .ne. nz) .or. (Bc%ke .ne. nz) &
+      .or. (Bc%face .ne. 6)) then
+    print *, " In this version, the Turbo_Wall boundary for Turbo should be k+ plane "
+    stop
+  end if
 
-     NVAR1=Mesh(nMesh)%NVAR
-     B => Mesh(nMesh)%Block(mBlock)
-     Bc => B%bc_msg(ksub)
-	 nx=B%nx; ny=B%ny; nz=B%nz
-      if( (Bc%ib .ne. 1) .or. (Bc%ie .ne. nx)  & 
-	   .or. (Bc%jb .ne. 1) .or. (Bc%je .ne. ny)  &
-	   .or. (Bc%kb .ne. nz) .or. (Bc%ke .ne. nz)  &
-	   .or. (Bc%face .ne. 6) ) then
-	  print*, " In this version, the Turbo_Wall boundary for Turbo should be k+ plane "
-	  stop
-	 endif
+  k = nz
+  do j = 1, ny
+  do i = 1, nx
+    i1 = i; j1 = j; k1 = k-1; i2 = i; j2 = j; k2 = k
 
-       k=nz 
-         do j=1, ny
-         do i=1, nx
-           i1=i; j1=j; k1=k-1;  i2=i; j2=j ; k2=k 
-           
-           uy0=Turbo_w*(B%zc(i1,j1,k1)+B%zc(i2,j2,k2))*0.5d0       ! »úÏ»µÄÏà¶ÔÔË¶¯ËÙ¶È
-		   uz0=-Turbo_w*(B%yc(i1,j1,k1)+B%yc(i2,j2,k2))*0.5d0
+    uy0 = Turbo_w*(B%zc(i1, j1, k1)+B%zc(i2, j2, k2))*0.5d0       ! æœºåŒ£çš„ç›¸å¯¹è¿åŠ¨é€Ÿåº¦
+    uz0 = -Turbo_w*(B%yc(i1, j1, k1)+B%yc(i2, j2, k2))*0.5d0
 
-		    d1=B%U(1,i1,j1,k1); u1=B%U(2,i1,j1,k1)/d1; v1=B%U(3,i1,j1,k1)/d1; w1=B%U(4,i1,j1,k1)/d1
-            p1=(B%U(5,i1,j1,k1)-0.5d0*d1*(u1*u1+v1*v1+w1*w1))*(gamma-1.d0)      
-          
-		    d2=d1; p2=p1 
-!		    u2=u1           
-            u2=-u1 !  A bug removed,  2015-10-20 
+    d1 = B%U(1, i1, j1, k1); u1 = B%U(2, i1, j1, k1)/d1; v1 = B%U(3, i1, j1, k1)/d1; w1 = B%U(4, i1, j1, k1)/d1
+    p1 = (B%U(5, i1, j1, k1)-0.5d0*d1*(u1*u1+v1*v1+w1*w1))*(gamma-1.d0)
+
+    d2 = d1; p2 = p1
+!                    u2=u1
+    u2 = -u1 !  A bug removed,  2015-10-20
 !           v2=uy0 ; w2=uz0
- 	        v2=2.d0*uy0-v1 ; w2=2.d0*uz0-w1
-						 	     
-           B%U(1,i2,j2,k2)=d2
-		   B%U(2,i2,j2,k2)=d2*u2
-		   B%U(3,i2,j2,k2)=d2*v2
-		   B%U(4,i2,j2,k2)=d2*w2
-		   B%U(5,i2,j2,k2)=p2/(gamma-1.d0)+0.5d0*d2*(u2*u2+v2*v2+w2*w2)
+    v2 = 2.d0*uy0-v1; w2 = 2.d0*uz0-w1
 
-	 	 if(NVAR1 .eq. 6) then
-          B%U(6,i2,j2,k2)=0.d0	
-	     else if(NVAR1 .eq. 7) then
-  	      B%U(6,i2,j2,k2)=B%U(6,i1,j1,k1)    ! ?? ĞèÒª½øÒ»²½ĞŞ¸Ä £¨Ğè°´ÕÕ±ÚÃæ±ß½çÌõ¼ş´¦Àí£©           
-	      B%U(7,i2,j2,k2)=B%U(7,i1,j1,k1)           
-		 endif
-        
-		enddo
-		enddo
+    B%U(1, i2, j2, k2) = d2
+    B%U(2, i2, j2, k2) = d2*u2
+    B%U(3, i2, j2, k2) = d2*v2
+    B%U(4, i2, j2, k2) = d2*w2
+    B%U(5, i2, j2, k2) = p2/(gamma-1.d0)+0.5d0*d2*(u2*u2+v2*v2+w2*w2)
 
-	 end subroutine boundary_wall_Turbo
+    if (NVAR1 .eq. 6) then
+      B%U(6, i2, j2, k2) = 0.d0
+    else if (NVAR1 .eq. 7) then
+      B%U(6, i2, j2, k2) = B%U(6, i1, j1, k1)    ! ?? éœ€è¦è¿›ä¸€æ­¥ä¿®æ”¹ ï¼ˆéœ€æŒ‰ç…§å£é¢è¾¹ç•Œæ¡ä»¶å¤„ç†ï¼‰
+      B%U(7, i2, j2, k2) = B%U(7, i1, j1, k1)
+    end if
+
+  end do
+  end do
+
+end subroutine boundary_wall_Turbo

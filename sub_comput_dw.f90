@@ -1,171 +1,165 @@
 !-----------------------------------------------------
-!  ¼ÆËãµ½±ÚÃæµÄ¾àÀë    
+!  è®¡ç®—åˆ°å£é¢çš„è·ç¦»
 !  Code by Li Xinliang
 
-  module Wall_dist
-   use precision_EC
-   implicit none
-   integer,save:: Npw_total                ! ×Ü±ÚÃæÍø¸ñÊı
-   real(PRE_EC),allocatable,dimension(:,:):: Xw   ! ±ÚÃæµãµÄ×ø±ê
-  end module Wall_dist
+module Wall_dist
+  use precision_EC
+  implicit none
+  integer, save:: Npw_total                ! æ€»å£é¢ç½‘æ ¼æ•°
+  real(PRE_EC), allocatable, dimension(:, :):: Xw   ! å£é¢ç‚¹çš„åæ ‡
+end module Wall_dist
 
- subroutine Comput_dist_wall
-    use  Global_Var
-    use  Wall_dist
-    implicit none
-    logical EXT
-	integer:: Iext,ierr
+subroutine Comput_dist_wall
+  use Global_Var
+  use Wall_dist
+  implicit none
+  logical EXT
+  integer:: Iext, ierr
 
-!  ÅĞ¶Ï 'wall_dist.dat'ÎÄ¼şÊÇ·ñ´æÔÚ£¬ Èç´æÔÚÔò¶ÁÈ¡£» Èç²»´æÔÚ£¬Ôò¼ÆËãµ½±ÚÃæµÄ¾àÀë
+!  åˆ¤æ–­ 'wall_dist.dat'æ–‡ä»¶æ˜¯å¦å­˜åœ¨ï¼Œ å¦‚å­˜åœ¨åˆ™è¯»å–ï¼› å¦‚ä¸å­˜åœ¨ï¼Œåˆ™è®¡ç®—åˆ°å£é¢çš„è·ç¦»
 
-   if(my_id .eq. 0) then
-     Inquire(file="wall_dist.dat",Exist=EXT)
- 	 if(EXT) then
-	   print*, "Find 'wall_dist.dat', read it ..."
-	   Iext=1
-	 else
-	   print*, "Can not find the file 'wall_dist.dat', Comput wall distance ... "
-	   Iext=0
-     endif
-   endif
-   call MPI_Bcast(Iext,1,MPI_Integer,0,MPI_COMM_WORLD,ierr)
+  if (my_id .eq. 0) then
+    Inquire (file="wall_dist.dat", Exist=EXT)
+    if (EXT) then
+      print *, "Find 'wall_dist.dat', read it ..."
+      Iext = 1
+    else
+      print *, "Can not find the file 'wall_dist.dat', Comput wall distance ... "
+      Iext = 0
+    end if
+  end if
+  call MPI_Bcast(Iext, 1, MPI_Integer, 0, MPI_COMM_WORLD, ierr)
 
-   if(Iext .eq. 1) then
-     call read_dw
-   else
-     call wall_point         ! ÊÕ¼¯±ÚÃæÍø¸ñµã
-     call comput_wall_dist          ! ¼ÆËã¸÷µãµ½±ÚÃæµÄ¾àÀë
-     call write_dw           ! Ğ´ÈëÎÄ¼ş
-   endif
+  if (Iext .eq. 1) then
+    call read_dw
+  else
+    call wall_point         ! æ”¶é›†å£é¢ç½‘æ ¼ç‚¹
+    call comput_wall_dist          ! è®¡ç®—å„ç‚¹åˆ°å£é¢çš„è·ç¦»
+    call write_dw           ! å†™å…¥æ–‡ä»¶
+  end if
 
-   end subroutine Comput_dist_wall
-     
-   subroutine comput_wall_dist
-    use  Global_Var
-    use  Wall_dist
-    implicit none
-    integer::  mb,i,j,k,k1,nx,ny,nz,ierr
-	real(PRE_EC),allocatable,dimension(:,:,:):: dis
-	real(PRE_EC):: d1, Dis_max,  Dis_min, Dis_max0,  Dis_min0
-	real(PRE_EC),parameter:: d_init=1.d8
-	Type (Mesh_TYPE),pointer:: MP
-    Type (Block_TYPE),pointer:: B
-    TYPE(BC_MSG_TYPE),pointer:: BC
+end subroutine Comput_dist_wall
 
-     Dis_max=0.d0; Dis_min=d_init
-     MP=>Mesh(1)
-     do mb=1,MP%Num_Block
-       B=>MP%Block(mb)
-	    nx=B%nx; ny=B%ny; nz=B%nz
-        allocate(dis(nx,ny,nz))
+subroutine comput_wall_dist
+  use Global_Var
+  use Wall_dist
+  implicit none
+  integer::  mb, i, j, k, k1, nx, ny, nz, ierr
+  real(PRE_EC), allocatable, dimension(:, :, :):: dis
+  real(PRE_EC):: d1, Dis_max, Dis_min, Dis_max0, Dis_min0
+  real(PRE_EC), parameter:: d_init = 1.d8
+  Type(Mesh_TYPE), pointer:: MP
+  Type(Block_TYPE), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer:: BC
+
+  Dis_max = 0.d0; Dis_min = d_init
+  MP => Mesh(1)
+  do mb = 1, MP%Num_Block
+    B => MP%Block(mb)
+    nx = B%nx; ny = B%ny; nz = B%nz
+    allocate (dis(nx, ny, nz))
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE (i,j,k,k1,d1)
-		 do k=1,nz
-          do j=1,ny
-           do i=1,nx
-		    dis(i,j,k)=d_init
-		    do k1=1,Npw_total 
-             d1=sqrt((B%x(i,j,k)-Xw(1,k1))**2+(B%y(i,j,k)-Xw(2,k1))**2+(B%z(i,j,k)-Xw(3,k1))**2)
-             if(d1 .lt. dis(i,j,k)) dis(i,j,k)=d1
-             enddo
-            enddo
-           enddo
-		  enddo
- !$OMP END PARALLEL DO      
-	   
-     do k=1,nz-1
-      do j=1,ny-1
-       do i=1,nx-1
-        B%dw(i,j,k)=(dis(i,j,k)+dis(i,j+1,k)+dis(i,j,k+1)+dis(i,j+1,k+1)+ &
-            dis(i+1,j,k)+dis(i+1,j+1,k)+dis(i+1,j,k+1)+dis(i+1,j+1,k+1))*0.125    ! ¸ñĞÄµãÉÏµÄÖµ
-        Dis_max=max(Dis_max,B%dw(i,j,k))
-        Dis_min=min(Dis_min,B%dw(i,j,k))
-       enddo
-      enddo
-     enddo
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          dis(i, j, k) = d_init
+          do k1 = 1, Npw_total
+            d1 = sqrt((B%x(i, j, k)-Xw(1, k1))**2+(B%y(i, j, k)-Xw(2, k1))**2+(B%z(i, j, k)-Xw(3, k1))**2)
+            if (d1 .lt. dis(i, j, k)) dis(i, j, k) = d1
+          end do
+        end do
+      end do
+    end do
+    !$OMP END PARALLEL DO
 
-    deallocate(dis)
-   enddo
-    call MPI_ALLREDUCE(Dis_max,Dis_max0,1,OCFD_DATA_TYPE,MPI_MAX,MPI_COMM_WORLD,ierr)
-    call MPI_ALLREDUCE(Dis_min,Dis_min0,1,OCFD_DATA_TYPE,MPI_MIN,MPI_COMM_WORLD,ierr)
-    if(my_id .eq. 0) then
-	  print*, "----------comput wall dist OK ----------------"
-	  print*, "Maximum distance to the wall is :" , Dis_max0
-	  print*, "Minimum distance to the wall is :" , Dis_min0
-	  print*, "----------------------------------------------"
-	endif
+    do k = 1, nz-1
+      do j = 1, ny-1
+        do i = 1, nx-1
+          B%dw(i, j, k) = (dis(i, j, k)+dis(i, j+1, k)+dis(i, j, k+1)+dis(i, j+1, k+1)+ &
+                           dis(i+1, j, k)+dis(i+1, j+1, k)+dis(i+1, j, k+1)+dis(i+1, j+1, k+1))*0.125    ! æ ¼å¿ƒç‚¹ä¸Šçš„å€¼
+          Dis_max = max(Dis_max, B%dw(i, j, k))
+          Dis_min = min(Dis_min, B%dw(i, j, k))
+        end do
+      end do
+    end do
 
-    call MPI_Barrier(MPI_COMM_WORLD,ierr)
-   
+    deallocate (dis)
+  end do
+  call MPI_ALLREDUCE(Dis_max, Dis_max0, 1, OCFD_DATA_TYPE, MPI_MAX, MPI_COMM_WORLD, ierr)
+  call MPI_ALLREDUCE(Dis_min, Dis_min0, 1, OCFD_DATA_TYPE, MPI_MIN, MPI_COMM_WORLD, ierr)
+  if (my_id .eq. 0) then
+    print *, "----------comput wall dist OK ----------------"
+    print *, "Maximum distance to the wall is :", Dis_max0
+    print *, "Minimum distance to the wall is :", Dis_min0
+    print *, "----------------------------------------------"
+  end if
 
-  end subroutine comput_wall_dist
+  call MPI_Barrier(MPI_COMM_WORLD, ierr)
+
+end subroutine comput_wall_dist
 !-----------------------------------------
-  
-  
-   
-   
-! ÊÕ¼¯±ÚÃæÉÏµÄÍø¸ñµã  
-  subroutine wall_point
-    use  Global_Var
-    use  Wall_dist
-    implicit none
-    integer:: Npw1, mb,ksub,i,j,k,m,k0,ierr
-	Type (Mesh_TYPE),pointer:: MP
-    Type (Block_TYPE),pointer:: B
-    TYPE(BC_MSG_TYPE),pointer:: BC
-    integer,allocatable,dimension(:):: Npw,Nc,displs  ! ¸÷½ø³Ì±ÚÃæµãµÄÊıÄ¿
-    real(PRE_EC),allocatable,dimension(:,:):: Xw1  ! ±ÚÃæµã£¨±¾½ø³Ì£©
-    allocate(Npw(0:Total_proc-1),Nc(0:Total_proc-1),displs(0:Total_proc-1))
 
-    MP=> Mesh(1)
-!     Í³¼Æ±ÚÃæÍø¸ñµãµÄÊıÄ¿
-      Npw1=0
-      do mb=1,MP%Num_Block
-          B=>Mp%Block(mb)
-           do ksub=1,B%subface
-             Bc=>B%bc_msg(ksub)
-              if(Bc%bc .eq. BC_Wall) then
-                Npw1=Npw1+(Bc%ie-Bc%ib+1)*(Bc%je-Bc%jb+1)*(Bc%ke-Bc%kb+1)
-              endif
-            enddo
-	   enddo
-       allocate(Xw1(3,Npw1))
+! æ”¶é›†å£é¢ä¸Šçš„ç½‘æ ¼ç‚¹
+subroutine wall_point
+  use Global_Var
+  use Wall_dist
+  implicit none
+  integer:: Npw1, mb, ksub, i, j, k, m, k0, ierr
+  Type(Mesh_TYPE), pointer:: MP
+  Type(Block_TYPE), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer:: BC
+  integer, allocatable, dimension(:):: Npw, Nc, displs  ! å„è¿›ç¨‹å£é¢ç‚¹çš„æ•°ç›®
+  real(PRE_EC), allocatable, dimension(:, :):: Xw1  ! å£é¢ç‚¹ï¼ˆæœ¬è¿›ç¨‹ï¼‰
+  allocate (Npw(0:Total_proc-1), Nc(0:Total_proc-1), displs(0:Total_proc-1))
 
-!    ¶ÁÈë±¾½ø³ÌµÄ±ÚÃæÍø¸ñ×ø±ê
-      k0=1
-      do mb=1,MP%Num_Block
-          B=>Mp%Block(mb)
-           do ksub=1,B%subface
-             Bc=>B%bc_msg(ksub)
-              if(Bc%bc .eq. BC_Wall) then
-                do k=Bc%kb,Bc%ke
-                  do j=Bc%jb,Bc%je
-                    do i=Bc%ib,Bc%ie
-                      Xw1(1,k0)=B%x(i,j,k)
-                      Xw1(2,k0)=B%y(i,j,k)
-                      Xw1(3,k0)=B%z(i,j,k)
-                      k0=k0+1
-                    enddo
-                   enddo
-                 enddo
-              endif
-            enddo
-	   enddo
+  MP => Mesh(1)
+!     ç»Ÿè®¡å£é¢ç½‘æ ¼ç‚¹çš„æ•°ç›®
+  Npw1 = 0
+  do mb = 1, MP%Num_Block
+    B => Mp%Block(mb)
+    do ksub = 1, B%subface
+      Bc => B%bc_msg(ksub)
+      if (Bc%bc .eq. BC_Wall) then
+        Npw1 = Npw1+(Bc%ie-Bc%ib+1)*(Bc%je-Bc%jb+1)*(Bc%ke-Bc%kb+1)
+      end if
+    end do
+  end do
+  allocate (Xw1(3, Npw1))
 
-! È«²¿½ø³ÌµÄ×Ü±ÚÃæÍø¸ñÊı
-       call MPI_ALLREDUCE(Npw1,Npw_Total,1,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,ierr)
-       allocate(Xw(3,Npw_total))
-! ½øĞĞÈ«ËÑ¼¯²Ù×÷£¬µÃµ½È«²¿µÄ±ÚÃæÍø¸ñ×ø±ê
-       call MPI_Allgather(Npw1,1,MPI_Integer,Npw,1,MPI_Integer,MPI_COMM_WORLD,ierr)
-	   Nc(:)=3*Npw(:)   !Êı¾İÁ¿ 
-	   displs(0)=0
-	   do m=1,Total_proc-1
-	     displs(m)=displs(m-1)+Nc(m-1)
-	   enddo
-	   call MPI_Allgatherv(Xw1,3*Npw1,OCFD_DATA_TYPE,Xw,Nc,displs,OCFD_DATA_TYPE,MPI_COMM_WORLD,ierr)
-       deallocate(Xw1,Npw,Nc,displs)
+!    è¯»å…¥æœ¬è¿›ç¨‹çš„å£é¢ç½‘æ ¼åæ ‡
+  k0 = 1
+  do mb = 1, MP%Num_Block
+    B => Mp%Block(mb)
+    do ksub = 1, B%subface
+      Bc => B%bc_msg(ksub)
+      if (Bc%bc .eq. BC_Wall) then
+        do k = Bc%kb, Bc%ke
+          do j = Bc%jb, Bc%je
+            do i = Bc%ib, Bc%ie
+              Xw1(1, k0) = B%x(i, j, k)
+              Xw1(2, k0) = B%y(i, j, k)
+              Xw1(3, k0) = B%z(i, j, k)
+              k0 = k0+1
+            end do
+          end do
+        end do
+      end if
+    end do
+  end do
 
-     end
+! å…¨éƒ¨è¿›ç¨‹çš„æ€»å£é¢ç½‘æ ¼æ•°
+  call MPI_ALLREDUCE(Npw1, Npw_Total, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
+  allocate (Xw(3, Npw_total))
+! è¿›è¡Œå…¨æœé›†æ“ä½œï¼Œå¾—åˆ°å…¨éƒ¨çš„å£é¢ç½‘æ ¼åæ ‡
+  call MPI_Allgather(Npw1, 1, MPI_Integer, Npw, 1, MPI_Integer, MPI_COMM_WORLD, ierr)
+  Nc(:) = 3*Npw(:)   !æ•°æ®é‡
+  displs(0) = 0
+  do m = 1, Total_proc-1
+    displs(m) = displs(m-1)+Nc(m-1)
+  end do
+  call MPI_Allgatherv(Xw1, 3*Npw1, OCFD_DATA_TYPE, Xw, Nc, displs, OCFD_DATA_TYPE, MPI_COMM_WORLD, ierr)
+  deallocate (Xw1, Npw, Nc, displs)
 
-
+end
 

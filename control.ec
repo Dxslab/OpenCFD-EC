@@ -38,9 +38,9 @@ $control_ec
 	t_end=100.d0     ! End time (non-dimensional)
 	Kstep_save=1000  ! Save data per xxx steps
     Iflag_turbulence_model=0   ! turbulence model (0 none, 1 BL, 2 SA, 3 SST)
-	Iflag_init=0  ! 0 ´Ó³õÊ¼Öµ£¨¾ùÔÈÀ´Á÷£©¿ªÊ¼¼ÆËã£» 1  ĞøËã£» -1 ´Ó0 Á÷³¡¿ªÊ¼¼ÆËã
-    If_viscous=1  ! 0 ÎŞÕ³£» 1 ÓĞÕ³
-    Iflag_local_dt=1   ! 0 È«¾Ö²½³¤£»  1 ¾Ö²¿Ê±¼ä²½³¤
+	Iflag_init=0  ! 0 ä»åˆå§‹å€¼ï¼ˆå‡åŒ€æ¥æµï¼‰å¼€å§‹è®¡ç®—ï¼› 1  ç»­ç®—ï¼› -1 ä»0 æµåœºå¼€å§‹è®¡ç®—
+    If_viscous=1  ! 0 æ— ç²˜ï¼› 1 æœ‰ç²˜
+    Iflag_local_dt=1   ! 0 å…¨å±€æ­¥é•¿ï¼›  1 å±€éƒ¨æ—¶é—´æ­¥é•¿
     dt_global=0.01     ! Global time step
     CFL=1.d0           ! CFL number 
     dtmax=10.d0       !Limit of maximum time step 
@@ -71,8 +71,8 @@ $control_ec
     Ref_S=1.d0             ! Ref. area
 	Ref_L=1.d0             ! Ref. length
 	Centroid(1:3)=0.d0  ! Centroid coordinate  
-    Cood_Y_UP=1   !       Ä¬ÈÏYÖá´¹Ö±ÏòÉÏ
-	IFLAG_LIMIT_FLOW=0         ! ÏŞÖÆÁ÷³¡£¨ÃÜ¶È¡¢ËÙ¶È¡¢Ñ¹Á¦£©
+    Cood_Y_UP=1   !       é»˜è®¤Yè½´å‚ç›´å‘ä¸Š
+	IFLAG_LIMIT_FLOW=0         ! é™åˆ¶æµåœºï¼ˆå¯†åº¦ã€é€Ÿåº¦ã€å‹åŠ›ï¼‰
 	Pdebug(1:4)=1
     PrL=0.7d0          ! Linear Prandtl number
 	PrT=0.9d0          ! Turbulent Prandtl number
@@ -84,19 +84,19 @@ $control_ec
 	LSAmax=1000.d0
 	CP1_NSA=0.2d0   ! for New SA
 	CP2_NSA=100.d0
-	Periodic_dX=0.d0   ! ÖÜÆÚ±ß½çµÄ¼¸ºÎÔöÁ¿
+	Periodic_dX=0.d0   ! å‘¨æœŸè¾¹ç•Œçš„å‡ ä½•å¢é‡
 	Periodic_dY=0.d0 
 	Periodic_dZ=0.d0
 
 !----for Turbomachinary solver------------
-    IF_TurboMachinary=0    ! ÆôÓÃÒ¶ÂÖ»ú¼ÆËãÄ£Ê½
-	Ref_medium_usrdef=0    ! ÆôÓÃ×Ô¶¨Òå½éÖÊ £¨ÎªÄ¬ÈÏ¿ÕÆø£©
-    IF_Scheme_Positivity=1     ! ¼ì²é²åÖµ¹ı³ÌÖĞÑ¹Á¦¡¢ÃÜ¶ÈÊÇ·ñ·Ç¸º£¬·ñÔòÊ¹ÓÃ1½×Ó­·ç£»
-    Turbo_P0= 101330.d0    ! ×ÜÑ¹ £¨Ä¬ÈÏÎª1¸ö´óÆøÑ¹£©
-	Turbo_T0= 288.15d0     ! ×ÜÎÂ £¨Ä¬ÈÏ288.15K)
-    Turbo_L0= 1.d0         ! ²Î¿¼³¤¶È £¨Ä¬ÈÏÎª1m)
-    Turbo_w=0.d0           ! ×ªËÙ  ( ×ª/Ãë £¬ Ä¬ÈÏ0)
-    Turbo_Periodic_seta=0.d0   ! ÖÜÆÚ·½Ïò¼ÆËãÓò£¬½Ç
+    IF_TurboMachinary=0    ! å¯ç”¨å¶è½®æœºè®¡ç®—æ¨¡å¼
+	Ref_medium_usrdef=0    ! å¯ç”¨è‡ªå®šä¹‰ä»‹è´¨ ï¼ˆä¸ºé»˜è®¤ç©ºæ°”ï¼‰
+    IF_Scheme_Positivity=1     ! æ£€æŸ¥æ’å€¼è¿‡ç¨‹ä¸­å‹åŠ›ã€å¯†åº¦æ˜¯å¦éè´Ÿï¼Œå¦åˆ™ä½¿ç”¨1é˜¶è¿é£ï¼›
+    Turbo_P0= 101330.d0    ! æ€»å‹ ï¼ˆé»˜è®¤ä¸º1ä¸ªå¤§æ°”å‹ï¼‰
+	Turbo_T0= 288.15d0     ! æ€»æ¸© ï¼ˆé»˜è®¤288.15K)
+    Turbo_L0= 1.d0         ! å‚è€ƒé•¿åº¦ ï¼ˆé»˜è®¤ä¸º1m)
+    Turbo_w=0.d0           ! è½¬é€Ÿ  ( è½¬/ç§’ ï¼Œ é»˜è®¤0)
+    Turbo_Periodic_seta=0.d0   ! å‘¨æœŸæ–¹å‘è®¡ç®—åŸŸï¼Œè§’
 
   
 !==========================================  
