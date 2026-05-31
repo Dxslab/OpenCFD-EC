@@ -15,6 +15,12 @@ module Tecio_Flow_Data
   real(PRE_EC), save :: p00 = 0.0d0
   integer, save :: Num_Block = 0
   integer, save :: Mesh_File_Format = 0
+  logical, save :: Has_SA_Field = .false.
+  logical, save :: Has_SST_Field = .false.
+  logical, save :: Output_mut = .false.
+  logical, save :: Output_vt = .false.
+  logical, save :: Output_Kt = .false.
+  logical, save :: Output_Wt = .false.
   character(len=256), save :: Flow_File = 'flow3d.dat'
   character(len=256), save :: Tecplot_File = 'flow3d-tecio.plt'
 
@@ -94,6 +100,7 @@ contains
     call read_flow_file(trim(Flow_File))
     call read_turbulence_files()
     call compute_value_in_mesh()
+    call detect_optional_output_fields()
   end subroutine init_flow_data
 
   subroutine read_mesh_file()
@@ -246,6 +253,7 @@ contains
     inquire (file='SA3d.dat', exist=exists)
     if (exists) then
       print *, 'Read SA3d.dat ...'
+      Has_SA_Field = .true.
       open (100, file='SA3d.dat', form='unformatted', status='old', action='read')
       do m = 1, Num_Block
         B => Block(m)
@@ -259,6 +267,7 @@ contains
     inquire (file='SST3d.dat', exist=exists)
     if (exists) then
       print *, 'Read SST3d.dat ...'
+      Has_SST_Field = .true.
       open (100, file='SST3d.dat', form='unformatted', status='old', action='read')
       do m = 1, Num_Block
         B => Block(m)
@@ -308,13 +317,62 @@ contains
     end do
   end subroutine compute_value_in_mesh
 
+  subroutine detect_optional_output_fields()
+    implicit none
+
+    Output_mut = has_nonzero_nodal_field('mut')
+    Output_vt = Has_SA_Field .and. has_nonzero_nodal_field('vt')
+    Output_Kt = Has_SST_Field .and. has_nonzero_nodal_field('Kt')
+    Output_Wt = Has_SST_Field .and. has_nonzero_nodal_field('Wt')
+
+    print *, 'Optional output fields:'
+    print *, '  mut = ', Output_mut
+    print *, '  vt  = ', Output_vt
+    print *, '  Kt  = ', Output_Kt
+    print *, '  Wt  = ', Output_Wt
+  end subroutine detect_optional_output_fields
+
+  logical function has_nonzero_nodal_field(field_name)
+    implicit none
+
+    character(len=*), intent(in) :: field_name
+    integer :: m
+    real(PRE_EC), parameter :: eps = 1.0d-300
+
+    has_nonzero_nodal_field = .false.
+    do m = 1, Num_Block
+      select case (trim(field_name))
+      case ('mut')
+        if (maxval(abs(Block(m)%mut1)) > eps) then
+          has_nonzero_nodal_field = .true.
+          return
+        end if
+      case ('vt')
+        if (maxval(abs(Block(m)%vt1)) > eps) then
+          has_nonzero_nodal_field = .true.
+          return
+        end if
+      case ('Kt')
+        if (maxval(abs(Block(m)%Kt1)) > eps) then
+          has_nonzero_nodal_field = .true.
+          return
+        end if
+      case ('Wt')
+        if (maxval(abs(Block(m)%Wt1)) > eps) then
+          has_nonzero_nodal_field = .true.
+          return
+        end if
+      end select
+    end do
+  end function has_nonzero_nodal_field
+
   subroutine write_tecplot_binary()
     implicit none
 
     integer :: m, npts
     real(kind=8), allocatable :: mut_out(:, :, :)
     character(len=128) :: dataset_title
-    character(len=64) :: var_list
+    character(len=256) :: var_list
     character(len=64) :: zone_title
     character(len=256) :: output_name
     character*1 :: NULCHAR
@@ -330,8 +388,14 @@ contains
     pointer (NullPtr, Null)
 
     dataset_title = 'OpenCFD-EC flow field'
-    var_list = 'X Y Z Density U V W Temperature Pressure mut vt Kt Wt'
+    var_list = 'X Y Z Density U V W Temperature Pressure'
+    call append_var_if_enabled(var_list, 'mut', Output_mut)
+    call append_var_if_enabled(var_list, 'vt', Output_vt)
+    call append_var_if_enabled(var_list, 'Kt', Output_Kt)
+    call append_var_if_enabled(var_list, 'Wt', Output_Wt)
     output_name = trim(Tecplot_File)
+
+    print *, 'Tecplot variable list = ', trim(var_list)
 
     Debug = 1
     VIsDouble = 1
@@ -398,16 +462,26 @@ contains
       call check_tecio_status(I_ret, 'TECDATD142 Temperature for '//trim(zone_title))
       I_ret = TECDATD142(III, Block(m)%p)
       call check_tecio_status(I_ret, 'TECDATD142 Pressure for '//trim(zone_title))
-      I_ret = TECDATD142(III, mut_out)
-      call check_tecio_status(I_ret, 'TECDATD142 mut for '//trim(zone_title))
-      I_ret = TECDATD142(III, Block(m)%vt1)
-      call check_tecio_status(I_ret, 'TECDATD142 vt for '//trim(zone_title))
-      I_ret = TECDATD142(III, Block(m)%Kt1)
-      call check_tecio_status(I_ret, 'TECDATD142 Kt for '//trim(zone_title))
-      I_ret = TECDATD142(III, Block(m)%Wt1)
-      call check_tecio_status(I_ret, 'TECDATD142 Wt for '//trim(zone_title))
+      if (Output_mut) then
+        allocate (mut_out(IMax, JMax, KMax))
+        mut_out = Block(m)%mut1*Re
+        I_ret = TECDATD142(III, mut_out)
+        call check_tecio_status(I_ret, 'TECDATD142 mut for '//trim(zone_title))
+        deallocate (mut_out)
+      end if
+      if (Output_vt) then
+        I_ret = TECDATD142(III, Block(m)%vt1)
+        call check_tecio_status(I_ret, 'TECDATD142 vt for '//trim(zone_title))
+      end if
+      if (Output_Kt) then
+        I_ret = TECDATD142(III, Block(m)%Kt1)
+        call check_tecio_status(I_ret, 'TECDATD142 Kt for '//trim(zone_title))
+      end if
+      if (Output_Wt) then
+        I_ret = TECDATD142(III, Block(m)%Wt1)
+        call check_tecio_status(I_ret, 'TECDATD142 Wt for '//trim(zone_title))
+      end if
 
-      deallocate (mut_out)
       npts = III
       print *, '  Wrote ', trim(zone_title), ', points = ', npts
     end do
@@ -429,6 +503,18 @@ contains
       stop 1
     end if
   end subroutine check_tecio_status
+
+  subroutine append_var_if_enabled(var_list, var_name, enabled)
+    implicit none
+
+    character(len=*), intent(inout) :: var_list
+    character(len=*), intent(in) :: var_name
+    logical, intent(in) :: enabled
+
+    if (enabled) then
+      var_list = trim(var_list)//' '//trim(var_name)
+    end if
+  end subroutine append_var_if_enabled
 
   subroutine read_parameter_ec()
     implicit none
