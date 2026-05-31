@@ -39,15 +39,23 @@ set(SOURCES
 )
 
 add_executable(opencfd-ec ${SOURCES})
+add_executable(readflow3d-tecio util/readflow3d-tecio.f90)
 
 # Link MPI and OpenMP to the executable
 target_link_libraries(opencfd-ec PRIVATE MPI::MPI_Fortran OpenMP::OpenMP_Fortran)
+target_include_directories(readflow3d-tecio PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/util/libtecio)
+target_link_libraries(readflow3d-tecio PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/util/libtecio/libtecio.a
+    pthread
+    stdc++
+)
 
 # Enable LTO (Interprocedural Optimization) which corresponds to -flto or -ipo
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ipo_supported OUTPUT error)
 if(ipo_supported)
     set_property(TARGET opencfd-ec PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+    set_property(TARGET readflow3d-tecio PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
 # Compiler specific optimization and flags
@@ -58,9 +66,19 @@ if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
         -march=native
         -ffree-line-length-none # Required because some lines exceed 132 columns
     )
+    target_compile_options(readflow3d-tecio PRIVATE
+        -O3
+        -march=native
+        -ffree-line-length-none # Required because some lines exceed 132 columns
+    )
 elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel" OR CMAKE_Fortran_COMPILER_ID MATCHES "IntelLLVM")
     # For ifort or ifx
     target_compile_options(opencfd-ec PRIVATE
+        -O3
+        -xHost
+        -fp-model precise
+    )
+    target_compile_options(readflow3d-tecio PRIVATE
         -O3
         -xHost
         -fp-model precise

@@ -75,13 +75,13 @@ subroutine read_main_mesh
       tag = m
       call MPI_Recv(Ux, Num_data, OCFD_DATA_TYPE, 0, tag, MPI_COMM_WORLD, Status, ierr)
       do k = 1, nz
-        do j = 1, ny
-        do i = 1, nx
-          B%x(i, j, k) = Ux(i, j, k, 1)
-          B%y(i, j, k) = Ux(i, j, k, 2)
-          B%z(i, j, k) = Ux(i, j, k, 3)
-        end do
-        end do
+      do j = 1, ny
+      do i = 1, nx
+        B%x(i, j, k) = Ux(i, j, k, 1)
+        B%y(i, j, k) = Ux(i, j, k, 2)
+        B%z(i, j, k) = Ux(i, j, k, 3)
+      end do
+      end do
       end do
       deallocate (Ux)
     end do
@@ -146,11 +146,11 @@ subroutine read_dw
       tag = m
       call MPI_Recv(dw, Num_data, OCFD_DATA_TYPE, 0, tag, MPI_COMM_WORLD, Status, ierr)
       do k = 1, nz-1
-        do j = 1, ny-1
-        do i = 1, nx-1
-          B%dw(i, j, k) = dw(i, j, k)
-        end do
-        end do
+      do j = 1, ny-1
+      do i = 1, nx-1
+        B%dw(i, j, k) = dw(i, j, k)
+      end do
+      end do
       end do
       deallocate (dw)
     end do
@@ -207,11 +207,11 @@ subroutine read_flow_data
           read (100) (((U(i, j, k, 6), i=0, nx), j=0, ny), k=0, nz)
         else
           do k = 0, nz
-            do j = 0, ny
-            do i = 0, nx
-              U(i, j, k, 6) = 1.d0/Re
-            end do
-            end do
+          do j = 0, ny
+          do i = 0, nx
+            U(i, j, k, 6) = 1.d0/Re
+          end do
+          end do
           end do
         end if
       end if
@@ -221,12 +221,12 @@ subroutine read_flow_data
         read (101) ((((U(i, j, k, m1), i=0, nx), j=0, ny), k=0, nz), m1=6, 7)
       else
         do k = 0, nz
-          do j = 0, ny
-          do i = 0, nx
-            U(i, j, k, 6) = Kt_Inf
-            U(i, j, k, 7) = Wt_Inf
-          end do
-          end do
+        do j = 0, ny
+        do i = 0, nx
+          U(i, j, k, 6) = Kt_Inf
+          U(i, j, k, 7) = Wt_Inf
+        end do
+        end do
         end do
       end if
       end if
@@ -238,9 +238,9 @@ subroutine read_flow_data
         do k = 0, nz
         do j = 0, ny
         do i = 0, nx
-        do m1 = 1, NVAR1
-          B%U(m1, i, j, k) = U(i, j, k, m1)
-        end do
+          do m1 = 1, NVAR1
+            B%U(m1, i, j, k) = U(i, j, k, m1)
+          end do
         end do
         end do
         end do
@@ -276,9 +276,9 @@ subroutine read_flow_data
       do k = 0, nz
       do j = 0, ny
       do i = 0, nx
-      do m1 = 1, NVAR1
-        B%U(m1, i, j, k) = U(i, j, k, m1)
-      end do
+        do m1 = 1, NVAR1
+          B%U(m1, i, j, k) = U(i, j, k, m1)
+        end do
       end do
       end do
       end do
@@ -392,7 +392,8 @@ subroutine output_flow
           U(i, j, k, 2) = B%U(2, i, j, k)/B%U(1, i, j, k)        ! u
           U(i, j, k, 3) = B%U(3, i, j, k)/B%U(1, i, j, k)        ! v
           U(i, j, k, 4) = B%U(4, i, j, k)/B%U(1, i, j, k)        ! w
-U(i, j, k, 5) = (B%U(5, i, j, k)-0.5d0*U(i, j, k, 1)*(U(i, j, k, 2)**2+U(i, j, k, 3)**2+U(i, j, k, 4)**2))/(Cv*U(i, j, k, 1))    ! T
+          U(i, j, k, 5) = (B%U(5, i, j, k)-0.5d0*U(i, j, k, 1)*(U(i, j, k, 2)**2+ &
+                                                                U(i, j, k, 3)**2+U(i, j, k, 4)**2))/(Cv*U(i, j, k, 1))    ! T
           if (NVAR1 .eq. 6) then
             U(i, j, k, 6) = B%U(6, i, j, k)
           end if
@@ -410,8 +411,7 @@ U(i, j, k, 5) = (B%U(5, i, j, k)-0.5d0*U(i, j, k, 1)*(U(i, j, k, 2)**2+U(i, j, k
         tag = B_n(m)             ! 在该块中的编号
         call MPI_Recv(U, Num_data, OCFD_DATA_TYPE, Recv_from_ID, tag, MPI_COMM_WORLD, Status, ierr)
       end if
-! write Data ....
-
+      ! write Data ....
       write (99) ((((U(i, j, k, m1), i=0, nx), j=0, ny), k=0, nz), m1=1, 5)
 
       if (NVAR1 .eq. 6) then
@@ -444,7 +444,8 @@ U(i, j, k, 5) = (B%U(5, i, j, k)-0.5d0*U(i, j, k, 1)*(U(i, j, k, 2)**2+U(i, j, k
         U(i, j, k, 2) = B%U(2, i, j, k)/B%U(1, i, j, k)
         U(i, j, k, 3) = B%U(3, i, j, k)/B%U(1, i, j, k)
         U(i, j, k, 4) = B%U(4, i, j, k)/B%U(1, i, j, k)
-       U(i, j, k, 5) = (B%U(5, i, j, k)-0.5d0*U(i, j, k, 1)*(U(i, j, k, 2)**2+U(i, j, k, 3)**2+U(i, j, k, 4)**2))/(Cv*U(i, j, k, 1))
+        U(i, j, k, 5) = (B%U(5, i, j, k)-0.5d0*U(i, j, k, 1)*(U(i, j, k, 2)**2+U(i, j, k, 3)**2+ &
+                                                              U(i, j, k, 4)**2))/(Cv*U(i, j, k, 1))
         if (NVAR1 .eq. 6) then
           U(i, j, k, 6) = B%U(6, i, j, k)
         end if
@@ -508,8 +509,7 @@ subroutine output_vt
         tag = B_n(m)             ! 在该块中的编号
         call MPI_Recv(U, Num_data, OCFD_DATA_TYPE, Recv_from_ID, tag, MPI_COMM_WORLD, Status, ierr)
       end if
-! write Data ....
-
+      ! write Data ....
       write (99) (((U(i, j, k), i=0, nx), j=0, ny), k=0, nz)
 
       deallocate (U)
@@ -587,7 +587,7 @@ subroutine write_dw
         tag = B_n(m)             ! 在该块中的编号
         call MPI_Recv(U, Num_data, OCFD_DATA_TYPE, Recv_from_ID, tag, MPI_COMM_WORLD, Status, ierr)
       end if
-! write Data ....
+      ! write Data ....
       write (99) (((U(i, j, k), i=1, nx-1), j=1, ny-1), k=1, nz-1)
       deallocate (U)
     end do

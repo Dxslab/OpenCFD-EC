@@ -42,6 +42,9 @@
 
 
 后处理方法： 运行 readflow3d-ver1.7.f90； 该程序将以tecplot格式输出壁面及对称面上的二维场，以及全流场的三维场。 
+          如需直接将 `Mesh3d.dat` + `flow3d.dat`/`flow3d_average.dat` 生成为 Tecplot 二进制 `plt` 文件，可编译并运行 `readflow3d-tecio`：
+          `cmake --build build --target readflow3d-tecio`
+          `./build/readflow3d-tecio [flow3d.dat|flow3d_average.dat] [output.plt]`
 
 CGNS网格处理方法：
       本版通过转换器本支持CGNS网格，具体方法：
