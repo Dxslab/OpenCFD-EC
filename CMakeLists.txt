@@ -69,6 +69,7 @@ if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
     target_compile_options(readflow3d-tecio PRIVATE
         -O3
         -march=native
+        -fcray-pointer
         -ffree-line-length-none # Required because some lines exceed 132 columns
     )
 elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel" OR CMAKE_Fortran_COMPILER_ID MATCHES "IntelLLVM")

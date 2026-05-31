@@ -324,8 +324,10 @@ contains
     integer*4 :: NFConns, FNMode, TotalNumFaceNodes
     integer*4 :: TotalNumBndryFaces, TotalNumBndryConnections, ShrConn
     integer*4 :: StrandID, ParentZn, III
-    integer*4 :: ZeroList(1)
+    integer*8 :: NullPtr
+    integer*4 :: Null(*)
     real*8 :: SolTime
+    pointer (NullPtr, Null)
 
     dataset_title = 'OpenCFD-EC flow field'
     var_list = 'X Y Z Density U V W Temperature Pressure mut vt Kt Wt'
@@ -336,7 +338,7 @@ contains
     FileType = 0
     FileFormat = 0
     NULCHAR = CHAR(0)
-    ZeroList = 0
+    NullPtr = 0
 
     I_ret = TECINI142(trim(dataset_title)//NULCHAR, &
                       trim(var_list)//NULCHAR, &
@@ -371,7 +373,7 @@ contains
                         SolTime, StrandID, ParentZn, IsBlock, &
                         NFConns, FNMode, &
                         TotalNumFaceNodes, TotalNumBndryFaces, TotalNumBndryConnections, &
-                        ZeroList, ZeroList, ZeroList, ShrConn)
+                        Null, Null, Null, ShrConn)
       call check_tecio_status(I_ret, 'TECZNE142 for '//trim(zone_title))
 
       III = IMax*JMax*KMax
