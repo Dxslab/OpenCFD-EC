@@ -441,9 +441,6 @@ contains
       call check_tecio_status(I_ret, 'TECZNE142 for '//trim(zone_title))
 
       III = IMax*JMax*KMax
-      allocate (mut_out(IMax, JMax, KMax))
-      mut_out = Block(m)%mut1*Re
-
       I_ret = TECDATD142(III, Block(m)%x)
       call check_tecio_status(I_ret, 'TECDATD142 X for '//trim(zone_title))
       I_ret = TECDATD142(III, Block(m)%y)
