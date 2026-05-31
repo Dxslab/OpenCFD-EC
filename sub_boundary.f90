@@ -77,18 +77,13 @@ subroutine Boundary_condition_onemesh(nMesh)
   end do
 
 end subroutine Boundary_condition_onemesh
-
-!------------------------------------------------------------
-!-------------------------------------------------------------------
 ! Wall boundary
 ! 设定两层虚网格(Ghost Cell)
-
 subroutine boundary_wall(nMesh, mBlock, ksub)
   Use Global_Var
   implicit none
   Type(Block_TYPE), pointer:: B
   Type(BC_MSG_TYPE), pointer:: Bc
-  real(PRE_EC):: d1, u1, v1, w1, p1, T1, d2, u2, v2, w2, p2, T2
   integer:: mBlock, ksub, ib, ie, jb, je, kb, ke, i, j, k, nMesh, NVAR1
   real(PRE_EC), parameter:: beta1_SST = 0.075d0
 
@@ -153,7 +148,7 @@ subroutine boundary_Farfield(nMesh, mBlock, ksub, Flag)
   Type(BC_MSG_TYPE), pointer:: Bc
 
   integer:: mBlock, ksub, ib, ie, jb, je, kb, ke, i, j, k, nMesh, Flag, NVAR1
-  integer:: i1, j1, k1, i2, j2, k2, m
+  integer:: i1, j1, k1, i2, j2, k2
   real(PRE_EC):: d_inf, u_inf, v_inf, w_inf, p_inf, n1, n2, n3
   real(PRE_EC):: d1, u1, v1, w1, p1, c1, d2, u2, v2, w2, p2, pb, db, ub, vb, wb, Ma_n
   integer, parameter:: FLAG_OUTLET = 1, FLAG_INLET = 2
@@ -172,117 +167,108 @@ subroutine boundary_Farfield(nMesh, mBlock, ksub, Flag)
   ib = Bc%ib; ie = Bc%ie; jb = Bc%jb; je = Bc%je; kb = Bc%kb; ke = Bc%ke
 
   do k = kb, ke
-    do j = jb, je
-      do i = ib, ie
-!-----------------------------------------------------------------
+  do j = jb, je
+  do i = ib, ie
+    ! (i1,j1,k1) 是靠近边界的内点， (i2,j2,k2)  是边界外的1层 Ghost Cell点
+    ! (n1,n2,n3)为外法线方向
+    if (Bc%face .eq. 1) then                 ! i- 面
+      i1 = i; j1 = j; k1 = k; i2 = i-1; j2 = j; k2 = k
+      n1 = -B%ni1(i, j, k); n2 = -B%ni2(i, j, k); n3 = -B%ni3(i, j, k)   ! 外法线
+    else if (Bc%face .eq. 2) then
+      i1 = i; j1 = j; k1 = k; i2 = i; j2 = j-1; k2 = k
+      n1 = -B%nj1(i, j, k); n2 = -B%nj2(i, j, k); n3 = -B%nj3(i, j, k)
+    else if (Bc%face .eq. 3) then
+      i1 = i; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k-1
+      n1 = -B%nk1(i, j, k); n2 = -B%nk2(i, j, k); n3 = -B%nk3(i, j, k)
+    else if (Bc%face .eq. 4) then             ! i+ 面 (i=ibegin=iend=nx), i1=i-1 是内点, i2=i=nx是Ghost Cell
+      i1 = i-1; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k
+      n1 = B%ni1(i, j, k); n2 = B%ni2(i, j, k); n3 = B%ni3(i, j, k)   ! 外法线
+    else if (Bc%face .eq. 5) then
+      i1 = i; j1 = j-1; k1 = k; i2 = i; j2 = j; k2 = k
+      n1 = B%nj1(i, j, k); n2 = B%nj2(i, j, k); n3 = B%nj3(i, j, k)
+    else if (Bc%face .eq. 6) then
+      i1 = i; j1 = j; k1 = k-1; i2 = i; j2 = j; k2 = k
+      n1 = B%nk1(i, j, k); n2 = B%nk2(i, j, k); n3 = B%nk3(i, j, k)
+    end if
 
-        !  (i1,j1,k1) 是靠近边界的内点， (i2,j2,k2)  是边界外的1层 Ghost Cell点
-        ! (n1,n2,n3)为外法线方向
+    d1 = B%U(1, i1, j1, k1)
+    u1 = B%U(2, i1, j1, k1)/d1
+    v1 = B%U(3, i1, j1, k1)/d1
+    w1 = B%U(4, i1, j1, k1)/d1
+    p1 = (B%U(5, i1, j1, k1)-0.5d0*d1*(u1*u1+v1*v1+w1*w1))*(gamma-1.d0)
+    c1 = sqrt(gamma*p1/d1)
+    !
+    if (Flag .eq. FLAG_OUTLET) then   ! 强制为(超声速)出口
+      d2 = d1; u2 = u1; v2 = v1; w2 = w1; p2 = p1
+    else if (Flag .eq. FLAG_INLET) then   ! 强制为(超声速)入口
+      d2 = d_inf; u2 = u_inf; v2 = v_inf; w2 = w_inf; p2 = p_inf
+    else                ! 普通远场边界条件
+      ! 修改2012-5-21： 以来流 (而不是当地) Mach数判断，计算外流效果好； 计算内流尚待研究
+      if (P_OUTLET <= -1.d0) then            ! 强制按照来流定义
+        Ma_n = (u_inf*n1+v_inf*n2+w_inf*n3)*Ma   ! 法向Mach数， 强制以来流方向定义
+      else
+        Ma_n = (u1*n1+v1*n2+w1*n3)/c1    ! 法向Mach数， 以内点值定义 （在边界层出口处效果不好）
+      end if
 
-        if (Bc%face .eq. 1) then                 ! i- 面
-          i1 = i; j1 = j; k1 = k; i2 = i-1; j2 = j; k2 = k
-          n1 = -B%ni1(i, j, k); n2 = -B%ni2(i, j, k); n3 = -B%ni3(i, j, k)   ! 外法线
-        else if (Bc%face .eq. 2) then
-          i1 = i; j1 = j; k1 = k; i2 = i; j2 = j-1; k2 = k
-          n1 = -B%nj1(i, j, k); n2 = -B%nj2(i, j, k); n3 = -B%nj3(i, j, k)
-        else if (Bc%face .eq. 3) then
-          i1 = i; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k-1
-          n1 = -B%nk1(i, j, k); n2 = -B%nk2(i, j, k); n3 = -B%nk3(i, j, k)
-        else if (Bc%face .eq. 4) then             ! i+ 面 (i=ibegin=iend=nx), i1=i-1 是内点, i2=i=nx是Ghost Cell
-          i1 = i-1; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k
-          n1 = B%ni1(i, j, k); n2 = B%ni2(i, j, k); n3 = B%ni3(i, j, k)   ! 外法线
-        else if (Bc%face .eq. 5) then
-          i1 = i; j1 = j-1; k1 = k; i2 = i; j2 = j; k2 = k
-          n1 = B%nj1(i, j, k); n2 = B%nj2(i, j, k); n3 = B%nj3(i, j, k)
-        else if (Bc%face .eq. 6) then
-          i1 = i; j1 = j; k1 = k-1; i2 = i; j2 = j; k2 = k
-          n1 = B%nk1(i, j, k); n2 = B%nk2(i, j, k); n3 = B%nk3(i, j, k)
-        end if
-
-        d1 = B%U(1, i1, j1, k1); u1 = B%U(2, i1, j1, k1)/d1; v1 = B%U(3, i1, j1, k1)/d1; w1 = B%U(4, i1, j1, k1)/d1
-        p1 = (B%U(5, i1, j1, k1)-0.5d0*d1*(u1*u1+v1*v1+w1*w1))*(gamma-1.d0)              ! 内点处的值
-        c1 = sqrt(gamma*p1/d1)
-!
-        if (Flag .eq. FLAG_OUTLET) then   ! 强制为(超声速)出口
-          d2 = d1; u2 = u1; v2 = v1; w2 = w1; p2 = p1
-        else if (Flag .eq. FLAG_INLET) then   ! 强制为(超声速)入口
-          d2 = d_inf; u2 = u_inf; v2 = v_inf; w2 = w_inf; p2 = p_inf
-
-!------------------------------------------------------------------------------
-        else                ! 普通远场边界条件
-
-!   修改2012-5-21： 以来流 (而不是当地) Mach数判断，计算外流效果好； 计算内流尚待研究
-          if (P_OUTLET <= -1.d0) then            ! 强制按照来流定义
-            Ma_n = (u_inf*n1+v_inf*n2+w_inf*n3)*Ma   ! 法向Mach数， 强制以来流方向定义
-          else
-            Ma_n = (u1*n1+v1*n2+w1*n3)/c1    ! 法向Mach数， 以内点值定义 （在边界层出口处效果不好）
-          end if
-
-          if (Ma_n > 1.d0) then   ! 超声速出口
-            d2 = d1; u2 = u1; v2 = v1; w2 = w1; p2 = p1
-            !           else if (Ma_n .gt. 0.d0) then  !  亚声速出口
-          else if (Ma_n > -1.d-6) then  !  亚声速出口  ( -1.d-6 为小量； 考虑到平行于来流的远场边界，按照出口处理更好）
-            if (P_OUTLET > 0.d0) then
-              pb = P_OUTLET
-              db = d1+(pb-p1)/(c1*c1)
-              ub = u1+(p1-pb)/(d1*c1)*n1
-              vb = v1+(p1-pb)/(d1*c1)*n2
-              wb = w1+(p1-pb)/(d1*c1)*n3
-              p2 = 2.d0*pb-p1; d2 = 2.d0*db-d1; u2 = 2.d0*ub-u1; v2 = 2.d0*vb-v1; w2 = 2.d0*wb-w1  !ub界面值，u2为Ghost Cell值  ub=(u1+u2)/2
-            else
-              d2 = d1; u2 = u1; v2 = v1; w2 = w1; p2 = p1   ! 外推
-            end if
-          else if (Ma_n > -1.d0) then  ! 亚声速入口
-            pb = 0.5d0*(p1+p_inf-d1*c1*((u_inf-u1)*n1+(v_inf-v1)*n2+(w_inf-w1)*n3))
-            db = d_inf+(pb-p_inf)/(c1*c1)
-            ub = u_inf-(p_inf-pb)/(d1*c1)*n1
-            vb = v_inf-(p_inf-pb)/(d1*c1)*n2
-            wb = w_inf-(p_inf-pb)/(d1*c1)*n3
-            p2 = 2.d0*pb-p1; d2 = 2.d0*db-d1; u2 = 2.d0*ub-u1; v2 = 2.d0*vb-v1; w2 = 2.d0*wb-w1
-          else   ! 超声速入口
-            d2 = d_inf; u2 = u_inf; v2 = v_inf; w2 = w_inf; p2 = p_inf
-          end if
-        end if
-
-        B%U(1, i2, j2, k2) = d2
-        B%U(2, i2, j2, k2) = d2*u2
-        B%U(3, i2, j2, k2) = d2*v2
-        B%U(4, i2, j2, k2) = d2*w2
-        B%U(5, i2, j2, k2) = p2/(gamma-1.d0)+0.5d0*d2*(u2*u2+v2*v2+w2*w2)
-
-!    标量（SA, SST）的边界条件
-        if (Ma_n .gt. 0.d0 .or. Flag .eq. FLAG_OUTLET) then
-          if (NVAR1 .eq. 6) then
-            B%U(6, i2, j2, k2) = B%U(6, i1, j1, k1)           ! vt
-          else if (NVAR1 .eq. 7) then
-            B%U(6, i2, j2, k2) = B%U(6, i1, j1, k1)
-            B%U(7, i2, j2, k2) = B%U(7, i1, j1, k1)
-          end if
+      if (Ma_n > 1.d0) then   ! 超声速出口
+        d2 = d1; u2 = u1; v2 = v1; w2 = w1; p2 = p1
+        ! else if (Ma_n .gt. 0.d0) then  !  亚声速出口
+      else if (Ma_n > -1.d-6) then  !  亚声速出口  ( -1.d-6 为小量； 考虑到平行于来流的远场边界，按照出口处理更好）
+        if (P_OUTLET > 0.d0) then
+          pb = P_OUTLET
+          db = d1+(pb-p1)/(c1*c1)
+          ub = u1+(p1-pb)/(d1*c1)*n1
+          vb = v1+(p1-pb)/(d1*c1)*n2
+          wb = w1+(p1-pb)/(d1*c1)*n3
+          p2 = 2.d0*pb-p1; d2 = 2.d0*db-d1; u2 = 2.d0*ub-u1; v2 = 2.d0*vb-v1; w2 = 2.d0*wb-w1  !ub界面值，u2为Ghost Cell值  ub=(u1+u2)/2
         else
-          if (NVAR1 .eq. 6) then
-! see:             http://turbmodels.larc.nasa.gov/spalart.html
-!                              B%U(6,i2,j2,k2)=0.1d0/Re           ! vt
-!                             B%U(6,i2,j2,k2)=5.d0/Re            ! vt 设定为层流粘性系数的5倍
-            B%U(6, i2, j2, k2) = 5.d0               ! vt 设定为层流粘性系数的5倍 （0.98c以后版本)
-
-          else if (NVAR1 .eq. 7) then
-            B%U(6, i2, j2, k2) = d_inf*Kt_inf          ! 湍动能来流值
-            B%U(7, i2, j2, k2) = d_inf*Wt_inf          ! 湍能比耗散率
-          end if
+          d2 = d1; u2 = u1; v2 = v1; w2 = w1; p2 = p1   ! 外推
         end if
+      else if (Ma_n > -1.d0) then  ! 亚声速入口
+        pb = 0.5d0*(p1+p_inf-d1*c1*((u_inf-u1)*n1+(v_inf-v1)*n2+(w_inf-w1)*n3))
+        db = d_inf+(pb-p_inf)/(c1*c1)
+        ub = u_inf-(p_inf-pb)/(d1*c1)*n1
+        vb = v_inf-(p_inf-pb)/(d1*c1)*n2
+        wb = w_inf-(p_inf-pb)/(d1*c1)*n3
+        p2 = 2.d0*pb-p1; d2 = 2.d0*db-d1; u2 = 2.d0*ub-u1; v2 = 2.d0*vb-v1; w2 = 2.d0*wb-w1
+      else   ! 超声速入口
+        d2 = d_inf; u2 = u_inf; v2 = v_inf; w2 = w_inf; p2 = p_inf
+      end if
+    end if
 
-      end do
-    end do
+    B%U(1, i2, j2, k2) = d2
+    B%U(2, i2, j2, k2) = d2*u2
+    B%U(3, i2, j2, k2) = d2*v2
+    B%U(4, i2, j2, k2) = d2*w2
+    B%U(5, i2, j2, k2) = p2/(gamma-1.d0)+0.5d0*d2*(u2*u2+v2*v2+w2*w2)
+    ! 标量（SA, SST）的边界条件
+    if (Ma_n .gt. 0.d0 .or. Flag .eq. FLAG_OUTLET) then
+      if (NVAR1 .eq. 6) then
+        B%U(6, i2, j2, k2) = B%U(6, i1, j1, k1)           ! vt
+      else if (NVAR1 .eq. 7) then
+        B%U(6, i2, j2, k2) = B%U(6, i1, j1, k1)
+        B%U(7, i2, j2, k2) = B%U(7, i1, j1, k1)
+      end if
+    else
+      if (NVAR1 .eq. 6) then
+        ! see:             http://turbmodels.larc.nasa.gov/spalart.html
+        ! B%U(6,i2,j2,k2)=0.1d0/Re           ! vt
+        ! B%U(6,i2,j2,k2)=5.d0/Re            ! vt 设定为层流粘性系数的5倍
+        B%U(6, i2, j2, k2) = 5.d0               ! vt 设定为层流粘性系数的5倍 （0.98c以后版本)
+      else if (NVAR1 .eq. 7) then
+        B%U(6, i2, j2, k2) = d_inf*Kt_inf          ! 湍动能来流值
+        B%U(7, i2, j2, k2) = d_inf*Wt_inf          ! 湍能比耗散率
+      end if
+    end if
+
+  end do
+  end do
   end do
 
 end subroutine boundary_Farfield
-!----------------------------------------------------------------------------------------
-
-!-------------------------------------------------------------------
 ! 对称或滑移壁面条件
 ! Symmetry boundary condition or slide wall boundary condition
 ! 仅适用1层虚网格
-
 subroutine boundary_Symmetry_or_SlideWall(nMesh, mBlock, ksub)
   Use Global_Var
   implicit none
@@ -297,7 +283,7 @@ subroutine boundary_Symmetry_or_SlideWall(nMesh, mBlock, ksub)
   Bc => B%bc_msg(ksub)
   ib = Bc%ib; ie = Bc%ie; jb = Bc%jb; je = Bc%je; kb = Bc%kb; ke = Bc%ke
 
-!   i2,i3 : 2层Ghost Cell;  i1,i4 2层内点
+  ! i2,i3 : 2层Ghost Cell;  i1,i4 2层内点
   if (Bc%face .eq. 1 .or. Bc%face .eq. 4) then   ! i- or i+
     if (Bc%face .eq. 1) then
       i = ib; i1 = ib; i2 = ib-1
@@ -306,18 +292,18 @@ subroutine boundary_Symmetry_or_SlideWall(nMesh, mBlock, ksub)
     end if
 
     do k = kb, ke-1
-      do j = jb, je-1
-        do m = 1, NVAR1
-          B%U(m, i2, j, k) = B%U(m, i1, j, k)
-        end do
-
-        n1 = B%ni1(i, j, k); n2 = B%ni2(i, j, k); n3 = B%ni3(i, j, k)      ! 归一化法方向
-        Vn = B%U(2, i1, j, k)*n1+B%U(3, i1, j, k)*n2+B%U(4, i1, j, k)*n3   ! 法向动量
-        ! 对称边界条件，标量保持不变；垂直壁面的速度分量变号；平行壁面的速度分量不变
-        B%U(2, i2, j, k) = B%U(2, i2, j, k)-2.d0*Vn*n1
-        B%U(3, i2, j, k) = B%U(3, i2, j, k)-2.d0*Vn*n2
-        B%U(4, i2, j, k) = B%U(4, i2, j, k)-2.d0*Vn*n3
+    do j = jb, je-1
+      do m = 1, NVAR1
+        B%U(m, i2, j, k) = B%U(m, i1, j, k)
       end do
+
+      n1 = B%ni1(i, j, k); n2 = B%ni2(i, j, k); n3 = B%ni3(i, j, k)      ! 归一化法方向
+      Vn = B%U(2, i1, j, k)*n1+B%U(3, i1, j, k)*n2+B%U(4, i1, j, k)*n3   ! 法向动量
+      ! 对称边界条件，标量保持不变；垂直壁面的速度分量变号；平行壁面的速度分量不变
+      B%U(2, i2, j, k) = B%U(2, i2, j, k)-2.d0*Vn*n1
+      B%U(3, i2, j, k) = B%U(3, i2, j, k)-2.d0*Vn*n2
+      B%U(4, i2, j, k) = B%U(4, i2, j, k)-2.d0*Vn*n3
+    end do
     end do
 
   else if (Bc%face .eq. 2 .or. Bc%face .eq. 5) then   ! j- or j+
@@ -328,18 +314,18 @@ subroutine boundary_Symmetry_or_SlideWall(nMesh, mBlock, ksub)
     end if
 
     do k = kb, ke-1
-      do i = ib, ie-1
-        do m = 1, NVAR1
-          B%U(m, i, j2, k) = B%U(m, i, j1, k)
-        end do
-
-        n1 = B%nj1(i, j, k); n2 = B%nj2(i, j, k); n3 = B%nj3(i, j, k)
-        Vn = B%U(2, i, j1, k)*n1+B%U(3, i, j1, k)*n2+B%U(4, i, j1, k)*n3
-        B%U(2, i, j2, k) = B%U(2, i, j2, k)-2.d0*Vn*n1
-        B%U(3, i, j2, k) = B%U(3, i, j2, k)-2.d0*Vn*n2
-        B%U(4, i, j2, k) = B%U(4, i, j2, k)-2.d0*Vn*n3
-
+    do i = ib, ie-1
+      do m = 1, NVAR1
+        B%U(m, i, j2, k) = B%U(m, i, j1, k)
       end do
+
+      n1 = B%nj1(i, j, k); n2 = B%nj2(i, j, k); n3 = B%nj3(i, j, k)
+      Vn = B%U(2, i, j1, k)*n1+B%U(3, i, j1, k)*n2+B%U(4, i, j1, k)*n3
+      B%U(2, i, j2, k) = B%U(2, i, j2, k)-2.d0*Vn*n1
+      B%U(3, i, j2, k) = B%U(3, i, j2, k)-2.d0*Vn*n2
+      B%U(4, i, j2, k) = B%U(4, i, j2, k)-2.d0*Vn*n3
+
+    end do
     end do
 
   else if (Bc%face .eq. 3 .or. Bc%face .eq. 6) then   ! k- or k+
@@ -350,24 +336,23 @@ subroutine boundary_Symmetry_or_SlideWall(nMesh, mBlock, ksub)
     end if
 
     do j = jb, je-1
-      do i = ib, ie-1
-        do m = 1, NVAR1
-          B%U(m, i, j, k2) = B%U(m, i, j, k1)
-        end do
-
-        n1 = B%nk1(i, j, k); n2 = B%nk2(i, j, k); n3 = B%nk3(i, j, k)
-        Vn = B%U(2, i, j, k1)*n1+B%U(3, i, j, k1)*n2+B%U(4, i, j, k1)*n3
-        B%U(2, i, j, k2) = B%U(2, i, j, k2)-2.d0*Vn*n1
-        B%U(3, i, j, k2) = B%U(3, i, j, k2)-2.d0*Vn*n2
-        B%U(4, i, j, k2) = B%U(4, i, j, k2)-2.d0*Vn*n3
+    do i = ib, ie-1
+      do m = 1, NVAR1
+        B%U(m, i, j, k2) = B%U(m, i, j, k1)
       end do
+
+      n1 = B%nk1(i, j, k); n2 = B%nk2(i, j, k); n3 = B%nk3(i, j, k)
+      Vn = B%U(2, i, j, k1)*n1+B%U(3, i, j, k1)*n2+B%U(4, i, j, k1)*n3
+      B%U(2, i, j, k2) = B%U(2, i, j, k2)-2.d0*Vn*n1
+      B%U(3, i, j, k2) = B%U(3, i, j, k2)-2.d0*Vn*n2
+      B%U(4, i, j, k2) = B%U(4, i, j, k2)-2.d0*Vn*n3
+    end do
     end do
 
   end if
 
 end subroutine boundary_Symmetry_or_SlideWall
 
-!-------------------------------------------------------------
 subroutine comput_origin_var(U1, U2, U3, U4, U5, d, u, v, w, p, T, Ma, gamma)    ! 根据守恒变量，计算基本变量
   use precision_EC
   implicit none
@@ -379,7 +364,7 @@ subroutine comput_origin_var(U1, U2, U3, U4, U5, d, u, v, w, p, T, Ma, gamma)   
   p = (U5-0.5d0*d*(u*u+v*v+w*w))*(gamma-1.d0)
   T = gamma*Ma*Ma*p/d
 end
-!--------------------------------------------------------------
+
 subroutine comput_conser_var(U1, U2, U3, U4, U5, d, u, v, w, p, Ma, gamma)    ! 根据基本变量,计算守恒变量
   use precision_EC
   implicit none
@@ -390,7 +375,6 @@ subroutine comput_conser_var(U1, U2, U3, U4, U5, d, u, v, w, p, Ma, gamma)    ! 
   U4 = d*w
   U5 = p/(gamma-1.d0)+0.5d0*d*(u*u+v*v+w*w)
 end
-
 !  绝热或等温边界条件
 !  设定两层Ghost Cell
 !  U1: 内点 (i=1); Ug1: Ghost点 (i=0)
@@ -401,8 +385,7 @@ subroutine wall_bound(NVAR, U1, Ug1, Ma, gamma, Twall, mu1, dw, Re)
   real(PRE_EC):: U1(NVAR), Ug1(NVAR)
   real(PRE_EC):: d1, uu1, v1, w1, T1, p1, d2, uu2, v2, w2, T2, p2, Ma, gamma, Twall, mu1, dw, wt, Re
   real(PRE_EC), parameter:: beta1_SST = 0.075d0
-
-!    U1 内点(i=1)； Ug1 Ghost边界点(i=0)
+  ! U1 内点(i=1)； Ug1 Ghost边界点(i=0)
   if (Twall .gt. 0.d0) then
     d1 = U1(1)
     uu1 = U1(2)/d1
@@ -434,8 +417,8 @@ subroutine wall_bound(NVAR, U1, Ug1, Ma, gamma, Twall, mu1, dw, Re)
   if (NVAR .eq. 6) then
     Ug1(6) = 0.d0                 ! vt for SA model
   else if (NVAR .eq. 7) then
-!                 Ug1(6)=0.d0                              ! K for SST model
-!                 Ug1(7)=60.d0*mu1/(beta1_SST*dw**2)       ! W for SST model
+    ! Ug1(6)=0.d0                              ! K for SST model
+    ! Ug1(7)=60.d0*mu1/(beta1_SST*dw**2)       ! W for SST model
     wt = 60.d0*mu1/(U1(1)*beta1_SST*dw**2*Re)
     Ug1(6) = -U1(6)
     Ug1(7) = (U1(1)+Ug1(1))*wt-U1(7)
@@ -455,7 +438,7 @@ subroutine boundary_Extrapolate(nMesh, mBlock, ksub)
   integer:: mBlock, ksub, ib, ie, jb, je, kb, ke, i, j, k, nMesh, NVAR1
   integer:: i1, j1, k1, i2, j2, k2, m
 
-!  本软件目前用来计算内流，给定无穷远条件
+  !  本软件目前用来计算内流，给定无穷远条件
 
   NVAR1 = Mesh(nMesh)%NVAR
   B => Mesh(nMesh)%Block(mBlock)
@@ -464,38 +447,34 @@ subroutine boundary_Extrapolate(nMesh, mBlock, ksub)
   ib = Bc%ib; ie = Bc%ie; jb = Bc%jb; je = Bc%je; kb = Bc%kb; ke = Bc%ke
 
   do k = kb, ke
-    do j = jb, je
-      do i = ib, ie
-!-----------------------------------------------------------------
+  do j = jb, je
+  do i = ib, ie
+    !  (i1,j1,k1) 是靠近边界的内点， (i2,j2,k2)  是边界外的1层 Ghost Cell点
+    if (Bc%face .eq. 1) then                 ! i- 面
+      i1 = i; j1 = j; k1 = k; i2 = i-1; j2 = j; k2 = k
+    else if (Bc%face .eq. 2) then
+      i1 = i; j1 = j; k1 = k; i2 = i; j2 = j-1; k2 = k
+    else if (Bc%face .eq. 3) then
+      i1 = i; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k-1
+    else if (Bc%face .eq. 4) then             ! i+ 面 (i=ibegin=iend=nx), i1=i-1 是内点, i2=i=nx是Ghost Cell
+      i1 = i-1; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k
+    else if (Bc%face .eq. 5) then
+      i1 = i; j1 = j-1; k1 = k; i2 = i; j2 = j; k2 = k
+    else if (Bc%face .eq. 6) then
+      i1 = i; j1 = j; k1 = k-1; i2 = i; j2 = j; k2 = k
+    end if
 
-        !  (i1,j1,k1) 是靠近边界的内点， (i2,j2,k2)  是边界外的1层 Ghost Cell点
-
-        if (Bc%face .eq. 1) then                 ! i- 面
-          i1 = i; j1 = j; k1 = k; i2 = i-1; j2 = j; k2 = k
-        else if (Bc%face .eq. 2) then
-          i1 = i; j1 = j; k1 = k; i2 = i; j2 = j-1; k2 = k
-        else if (Bc%face .eq. 3) then
-          i1 = i; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k-1
-        else if (Bc%face .eq. 4) then             ! i+ 面 (i=ibegin=iend=nx), i1=i-1 是内点, i2=i=nx是Ghost Cell
-          i1 = i-1; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k
-        else if (Bc%face .eq. 5) then
-          i1 = i; j1 = j-1; k1 = k; i2 = i; j2 = j; k2 = k
-        else if (Bc%face .eq. 6) then
-          i1 = i; j1 = j; k1 = k-1; i2 = i; j2 = j; k2 = k
-        end if
-
-        do m = 1, NVAR1
-          B%U(m, i2, j2, k2) = B%U(m, i1, j1, k1)         ! 简单外推 (1阶)
-        end do
-
-      end do
+    do m = 1, NVAR1
+      B%U(m, i2, j2, k2) = B%U(m, i1, j1, k1)         ! 简单外推 (1阶)
     end do
+  end do
+  end do
   end do
 
 end subroutine boundary_Extrapolate
-!----------------------------------------------------------------------------------------
+
 ! 叶轮机模式 入口边界条件  （给定总温、总压，假设轴向进气； 外推静压）
-!
+
 subroutine boundary_BC_Inflow_Turbo(nMesh, mBlock, ksub)
   Use Global_Var
   implicit none
@@ -503,15 +482,14 @@ subroutine boundary_BC_Inflow_Turbo(nMesh, mBlock, ksub)
   Type(BC_MSG_TYPE), pointer:: Bc
 
   integer:: mBlock, ksub, ib, ie, jb, je, kb, ke, i, j, k, nMesh, NVAR1
-  integer:: i1, j1, k1, i2, j2, k2, m
+  integer:: i1, j1, k1, i2, j2, k2
   real(PRE_EC):: din, pin, Tin, p00, vx, vy, vz, d1, u1, v1, w1, p1, d2, u2, v2, w2, p2, P0, d0, T0
 
   p00 = 1.d0/(gamma*Ma*Ma)
   d0 = 1.d0
   T0 = 1.d0        ! 总温
   p0 = p00*d0*T0   ! 总压
-
-!          p0=1.d0   !!! 有问题   Bug !
+  ! p0=1.d0   !!! 有问题   Bug !
 
   NVAR1 = Mesh(nMesh)%NVAR
   B => Mesh(nMesh)%Block(mBlock)
@@ -520,98 +498,86 @@ subroutine boundary_BC_Inflow_Turbo(nMesh, mBlock, ksub)
   ib = Bc%ib; ie = Bc%ie; jb = Bc%jb; je = Bc%je; kb = Bc%kb; ke = Bc%ke
 
   do k = kb, ke
-    do j = jb, je
-      do i = ib, ie
-!-----------------------------------------------------------------
+  do j = jb, je
+  do i = ib, ie
+    !  (i1,j1,k1) 是靠近边界的内点， (i2,j2,k2)  是边界外的1层 Ghost Cell点
+    if (Bc%face .eq. 1) then                 ! i- 面
+      i1 = i; j1 = j; k1 = k; i2 = i-1; j2 = j; k2 = k
+    else if (Bc%face .eq. 2) then
+      i1 = i; j1 = j; k1 = k; i2 = i; j2 = j-1; k2 = k
+    else if (Bc%face .eq. 3) then
+      i1 = i; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k-1
+    else if (Bc%face .eq. 4) then             ! i+ 面 (i=ibegin=iend=nx), i1=i-1 是内点, i2=i=nx是Ghost Cell
+      i1 = i-1; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k
+    else if (Bc%face .eq. 5) then
+      i1 = i; j1 = j-1; k1 = k; i2 = i; j2 = j; k2 = k
+    else if (Bc%face .eq. 6) then
+      i1 = i; j1 = j; k1 = k-1; i2 = i; j2 = j; k2 = k
+    end if
 
-        !  (i1,j1,k1) 是靠近边界的内点， (i2,j2,k2)  是边界外的1层 Ghost Cell点
+    d1 = B%U(1, i1, j1, k1); u1 = B%U(2, i1, j1, k1)/d1; v1 = B%U(3, i1, j1, k1)/d1; w1 = B%U(4, i1, j1, k1)/d1
+    p1 = (B%U(5, i1, j1, k1)-0.5d0*d1*(u1*u1+v1*v1+w1*w1))*(gamma-1.d0)              ! 内点处的值
+    ! 设定总压=1， 总温=1
+    pin = p1   ! 压力外推
+    ! if(pin >= 1.d0) then
+    if (pin >= p0) then
+      ! print*, "Worning ! p_inlet > Total pressure, please check initial or boundary condition "
+      ! stop
+      din = d1
+      vx = u1
+    else
+      ! Tin= pin**((gamma-1.d0)/gamma)            ! Bug !!!
+      Tin = T0*(pin/p0)**((gamma-1.d0)/gamma)
+      din = pin/(p00*Tin)
+      vx = sqrt(2.d0*Cp*(1.d0-Tin))
+    end if
+    ! 轴向进气假设
+    vy = Turbo_w*B%zc(i1, j1, k1)   ! 相对速度 （由于旋转）
+    vz = -Turbo_w*B%yc(i1, j1, k1)
+    p2 = 2.d0*pin-p1; d2 = 2.d0*din-d1; u2 = 2.d0*vx-u1; v2 = 2.d0*vy-v1; w2 = 2.d0*vz-w1
 
-        if (Bc%face .eq. 1) then                 ! i- 面
-          i1 = i; j1 = j; k1 = k; i2 = i-1; j2 = j; k2 = k
-        else if (Bc%face .eq. 2) then
-          i1 = i; j1 = j; k1 = k; i2 = i; j2 = j-1; k2 = k
-        else if (Bc%face .eq. 3) then
-          i1 = i; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k-1
-        else if (Bc%face .eq. 4) then             ! i+ 面 (i=ibegin=iend=nx), i1=i-1 是内点, i2=i=nx是Ghost Cell
-          i1 = i-1; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k
-        else if (Bc%face .eq. 5) then
-          i1 = i; j1 = j-1; k1 = k; i2 = i; j2 = j; k2 = k
-        else if (Bc%face .eq. 6) then
-          i1 = i; j1 = j; k1 = k-1; i2 = i; j2 = j; k2 = k
-        end if
+    B%U(1, i2, j2, k2) = d2
+    B%U(2, i2, j2, k2) = d2*u2
+    B%U(3, i2, j2, k2) = d2*v2
+    B%U(4, i2, j2, k2) = d2*w2
+    B%U(5, i2, j2, k2) = p2/(gamma-1.d0)+0.5d0*d2*(u2*u2+v2*v2+w2*w2)
 
-        d1 = B%U(1, i1, j1, k1); u1 = B%U(2, i1, j1, k1)/d1; v1 = B%U(3, i1, j1, k1)/d1; w1 = B%U(4, i1, j1, k1)/d1
-        p1 = (B%U(5, i1, j1, k1)-0.5d0*d1*(u1*u1+v1*v1+w1*w1))*(gamma-1.d0)              ! 内点处的值
-!------------------------------------------------------------------------------
+    ! 标量（SA, SST）的边界条件
+    if (NVAR1 .eq. 6) then
+      ! see: http://turbmodels.larc.nasa.gov/spalart.html
+      B%U(6, i2, j2, k2) = 5.d0               ! vt 设定为层流粘性系数的5倍 （0.98c以后版本)
 
-! 设定总压=1， 总温=1
-        pin = p1   ! 压力外推
+    else if (NVAR1 .eq. 7) then
+      B%U(6, i2, j2, k2) = din*Kt_inf          ! 湍动能来流值
+      B%U(7, i2, j2, k2) = din*Wt_inf          ! 湍能比耗散率
+    end if
 
-!                          if(pin >= 1.d0) then
-
-        if (pin >= p0) then
-!               内部压力高于总压
-!                            print*, "Worning ! p_inlet > Total pressure, please check initial or boundary condition "
-!                            stop
-          din = d1
-          vx = u1
-
-        else
-
-!                           Tin= pin**((gamma-1.d0)/gamma)            ! Bug !!!
-          Tin = T0*(pin/p0)**((gamma-1.d0)/gamma)
-          din = pin/(p00*Tin)
-          vx = sqrt(2.d0*Cp*(1.d0-Tin))
-        end if
-! 轴向进气假设
-        vy = Turbo_w*B%zc(i1, j1, k1)   ! 相对速度 （由于旋转）
-        vz = -Turbo_w*B%yc(i1, j1, k1)
-        p2 = 2.d0*pin-p1; d2 = 2.d0*din-d1; u2 = 2.d0*vx-u1; v2 = 2.d0*vy-v1; w2 = 2.d0*vz-w1
-
-        B%U(1, i2, j2, k2) = d2
-        B%U(2, i2, j2, k2) = d2*u2
-        B%U(3, i2, j2, k2) = d2*v2
-        B%U(4, i2, j2, k2) = d2*w2
-        B%U(5, i2, j2, k2) = p2/(gamma-1.d0)+0.5d0*d2*(u2*u2+v2*v2+w2*w2)
-
-!    标量（SA, SST）的边界条件
-        if (NVAR1 .eq. 6) then
-! see:             http://turbmodels.larc.nasa.gov/spalart.html
-          B%U(6, i2, j2, k2) = 5.d0               ! vt 设定为层流粘性系数的5倍 （0.98c以后版本)
-
-        else if (NVAR1 .eq. 7) then
-          B%U(6, i2, j2, k2) = din*Kt_inf          ! 湍动能来流值
-          B%U(7, i2, j2, k2) = din*Wt_inf          ! 湍能比耗散率
-        end if
-
-      end do
-    end do
+  end do
+  end do
   end do
 
 end subroutine boundary_BC_Inflow_Turbo
-
 !----------------------------------------------------------------------------------------
 ! 叶轮机模式 出口边界条件  （给定背压; 根据周向速度积分）
 ! 内流模式也使用该边界条件 (但不考虑旋转)
-
 subroutine boundary_BC_Outflow_Turbo(nMesh, mBlock, ksub)
   Use Global_Var
   implicit none
   Type(Block_TYPE), pointer:: B
   Type(BC_MSG_TYPE), pointer:: Bc
 
-  integer:: mBlock, ksub, ib, ie, jb, je, kb, ke, i, j, k, nMesh, NVAR1
-  integer:: i1, j1, k1, i2, j2, k2, m, nx, ny, nz
-  real(PRE_EC):: pb, db, ub, vb, wb, p00, d1, u1, v1, w1, p1, c1, n1, n2, n3, d2, u2, v2, w2, p2, Ma_n
+  integer:: mBlock, ksub, i, j, k, nMesh, NVAR1
+  integer:: i1, j1, k1, i2, j2, k2, nx, ny, nz
+  real(PRE_EC):: pb, p00, d1, u1, v1, w1, p1, c1, n1, n2, n3, d2, u2, v2, w2, p2, Ma_n
   real(PRE_EC):: rr, seta, us
   real(PRE_EC), allocatable, dimension(:):: dps, r0, pout
 
-!  出口边界应当是i+ 界面 (i=B%nx-1), 否则不支持
-!  假定 j为周向； k为径向
-!  积分 dp/dr=d*vs*vs/r
+  ! 出口边界应当是i+ 界面 (i=B%nx-1), 否则不支持
+  ! 假定 j为周向； k为径向
+  ! 积分 dp/dr=d*vs*vs/r
 
-!     p0=1.d0  ! 总压
-!           T0=1.d0  ! 总温
+  ! p0=1.d0  ! 总压
+  ! T0=1.d0  ! 总温
   p00 = 1.d0/(gamma*Ma*Ma)
 
   NVAR1 = Mesh(nMesh)%NVAR
@@ -660,7 +626,7 @@ subroutine boundary_BC_Outflow_Turbo(nMesh, mBlock, ksub)
   i = nx
   do k = 1, nz
   do j = 1, ny
-!-----------------------------------------------------------------
+    !-----------------------------------------------------------------
     i1 = i-1; j1 = j; k1 = k; i2 = i; j2 = j; k2 = k
 
     !  (i1,j1,k1) 是靠近边界的内点， (i2,j2,k2) 是边界外的1层 Ghost Cell点
@@ -674,7 +640,6 @@ subroutine boundary_BC_Outflow_Turbo(nMesh, mBlock, ksub)
     c1 = sqrt(gamma*p1/d1)
     Ma_n = (u1*n1+v1*n2+w1*n3)/c1    ! 法向Mach数， 以内点值定义 （在边界层出口处效果不好）
 
-!------------------------------------------------------------------------------
     if (P_outlet > 0.d0 .and. Ma_n <= 1.d0) then   !
       pb = pout(k)               ! pressure
       p2 = 2.d0*pb-p1; d2 = d1; u2 = u1; v2 = v1; w2 = w1  !ub界面值，u2为Ghost Cell值  ub=(u1+u2)/2
@@ -731,12 +696,12 @@ subroutine boundary_wall_Turbo(nMesh, mBlock, ksub)
   Type(BC_MSG_TYPE), pointer:: Bc
 
   integer:: mBlock, ksub, i, j, k, nMesh, NVAR1
-  integer:: i1, j1, k1, i2, j2, k2, m, nx, ny, nz
+  integer:: i1, j1, k1, i2, j2, k2, nx, ny, nz
   real(PRE_EC):: d1, u1, v1, w1, p1, d2, u2, v2, w2, p2, uy0, uz0
-  real(PRE_EC), allocatable, dimension(:):: dps, r0, pout
+  ! real(PRE_EC), allocatable, dimension(:):: dps, r0, pout
 
-!  叶轮机械的机匣边界条件 （绝对速度为0）， 相对于本坐标系有旋转；
-!  该边界应当是k+边界;
+  ! 叶轮机械的机匣边界条件 （绝对速度为0）， 相对于本坐标系有旋转；
+  ! 该边界应当是k+边界;
 
   NVAR1 = Mesh(nMesh)%NVAR
   B => Mesh(nMesh)%Block(mBlock)
@@ -762,9 +727,9 @@ subroutine boundary_wall_Turbo(nMesh, mBlock, ksub)
     p1 = (B%U(5, i1, j1, k1)-0.5d0*d1*(u1*u1+v1*v1+w1*w1))*(gamma-1.d0)
 
     d2 = d1; p2 = p1
-!                    u2=u1
+    ! u2=u1
     u2 = -u1 !  A bug removed,  2015-10-20
-!           v2=uy0 ; w2=uz0
+    ! v2=uy0 ; w2=uz0
     v2 = 2.d0*uy0-v1; w2 = 2.d0*uz0-w1
 
     B%U(1, i2, j2, k2) = d2

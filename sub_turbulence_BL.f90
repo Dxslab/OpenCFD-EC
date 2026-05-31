@@ -29,13 +29,10 @@ subroutine turbulence_model_BL(nMesh, mBlock)
   flag1 = 0
 
 !----- get Omiga (vorticity)  omiga=sqrt(omigax**2+omigay**2+omigaz**2) at the cell's center ------
-! �������Ĳ�����
 !$OMP PARALLEL DO DEFAULT(PRIVATE) SHARED (nx,ny,nz,uu,v,w,omiga,B)
   do k = 1, nz-1
   do j = 1, ny-1
   do i = 1, nx-1
-
-! ���������ڼ������꣨�±꣩�ĵ���
 
     ui = uu(i+1, j, k)-uu(i-1, j, k)
     vi = v(i+1, j, k)-v(i-1, j, k)
@@ -51,7 +48,6 @@ subroutine turbulence_model_BL(nMesh, mBlock)
     jx = B%jx0(i, j, k); jy = B%jy0(i, j, k); jz = B%jz0(i, j, k)
     kx = B%kx0(i, j, k); ky = B%ky0(i, j, k); kz = B%kz0(i, j, k)
 
-!----�����������ƫ����----------------------------------------------
     ux = ui*ix+uj*jx+uk*kx
     vx = vi*ix+vj*jx+vk*kx
     wx = wi*ix+wj*jx+wk*kx
@@ -73,10 +69,9 @@ subroutine turbulence_model_BL(nMesh, mBlock)
     Bc => B%bc_msg(ksub)
 
     if (Bc%bc .eq. BC_WALL) then   ! Wall boundary
-! ��������һά���������������ߴ�ֱ���棩---------------------------------------
       if (Bc%face .eq. 1 .or. Bc%face .eq. 4) then   ! i+ or i-
         allocate (yy(nx), Amu1d(nx), Amut1d(nx), d1d(nx), u1d(nx), omiga1d(nx))
-        Amut1d = 0.d0; Amu1d = 0.d0  ! ��ʼ��
+        Amut1d = 0.d0; Amu1d = 0.d0  
 
         if (Bc%face .eq. 1) then
           i1 = 1; i2 = 0
@@ -103,11 +98,10 @@ subroutine turbulence_model_BL(nMesh, mBlock)
           omiga1d(i0) = omiga(i, j, k)
           Amu1d(i0) = B%mu(i, j, k)
           end do
-!  BLģ�ͣ�һά��
+
           call BL_model_1d(nx-1, yy, Amu1d, Amut1d, d1d, u1d, omiga1d)
 
           do i = 1, nx-1
-! ���һ���㴦�ڶ������ϣ�ȡճ��ϵ����С��ֵ
             if (Bc%face .eq. 1) then
               i0 = i
             else
@@ -126,9 +120,8 @@ subroutine turbulence_model_BL(nMesh, mBlock)
         end do
         deallocate (yy, Amu1d, Amut1d, d1d, u1d, omiga1d)
 
-! !!! To set Amu_t=0 in the wall      ������������ϵ�mut(-1)=-mut(1), �Ա�֤������mut=0 (mut=0.5*(mut(-1)+mut(1))
+! !!! To set Amu_t=0 in the wall
 
-!  ���ñ����1�������ϵ�����ճ��ϵ��Ϊ0
         if (Bc%face .eq. 1) then
           B%mu_t(0, Bc%jb:Bc%je-1, Bc%kb:Bc%ke-1) = 0.d0
           B%mu_t(1, Bc%jb:Bc%je-1, Bc%kb:Bc%ke-1) = 0.d0
@@ -165,11 +158,9 @@ subroutine turbulence_model_BL(nMesh, mBlock)
           omiga1d(j0) = omiga(i, j, k)
           Amu1d(j0) = B%mu(i, j, k)
           end do
-!  BLģ�ͣ�һά��
           call BL_model_1d(ny-1, yy, Amu1d, Amut1d, d1d, u1d, omiga1d)
 
           do j = 1, ny-1
-! ���һ���㴦�ڶ������ϣ�ȡճ��ϵ����С��ֵ
             if (Bc%face .eq. 2) then
               j0 = j
             else
@@ -197,7 +188,7 @@ subroutine turbulence_model_BL(nMesh, mBlock)
 
       else if (Bc%face .eq. 3 .or. Bc%face .eq. 6) then   ! face of k- or k+
         allocate (yy(nz), Amu1d(nz), Amut1d(nz), d1d(nz), u1d(nz), omiga1d(nz))
-        Amut1d = 0.d0; Amu1d = 0.d0  ! ��ʼ��
+        Amut1d = 0.d0; Amu1d = 0.d0 
 
         if (Bc%face .eq. 3) then
           k1 = 1; k2 = 0
@@ -223,11 +214,9 @@ subroutine turbulence_model_BL(nMesh, mBlock)
           omiga1d(k0) = omiga(i, j, k)
           Amu1d(k0) = B%mu(i, j, k)
           end do
-!  BLģ�ͣ�һά��
           call BL_model_1d(nz-1, yy, Amu1d, Amut1d, d1d, u1d, omiga1d)
 
           do k = 1, nz-1
-! ���һ���㴦�ڶ������ϣ�ȡճ��ϵ����С��ֵ
             if (Bc%face .eq. 3) then
               k0 = k
             else
@@ -299,7 +288,7 @@ subroutine BL_model_1d(ny, yy, Amu, Amu_t, d, u, omiga)
 !             Fmax=FF
 !             etamax=yy(j)
 !            else
-!             goto 100    ! Find the first peak of F(y)   ! ֻҪ��1����ֵ
+!             goto 100    ! Find the first peak of F(y)
 !            endif
 
   end do

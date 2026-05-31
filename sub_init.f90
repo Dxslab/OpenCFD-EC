@@ -7,18 +7,13 @@
 subroutine init
   use Global_var
   implicit none
-  integer :: i, j, k, m, nx1, ny1, nz1, Num_Block1, ksub, Kmax_grid
-  real(PRE_EC), allocatable, dimension(:, :, :):: xc, yc, zc
-  integer, allocatable, dimension(:):: NI, NJ, NK
-  Type(Block_TYPE), pointer:: B
-  TYPE(BC_MSG_TYPE), pointer:: Bc
+  integer :: m
 !--------------------------------------------------------------------
 ! initial of const variables
   Ralfa(1) = 1.d0; Ralfa(2) = 3.d0/4.d0; Ralfa(3) = 1.d0/3.d0
   Rbeta(1) = 1.d0; Rbeta(2) = 1.d0/4.d0; Rbeta(3) = 2.d0/3.d0
   Rgamma(1) = 0.d0; Rgamma(2) = 1.d0/4.d0; Rgamma(3) = 2.d0/3.d0
   Cv = 1.d0/(gamma*(gamma-1.d0)*Ma*Ma)
-!---------------------------------------------------------------------
 !-----------------------------------------------------------------------------------------
   call partation                         ! 区域分割 （确定每块所属的进程）
   allocate (Mesh(Num_Mesh))             ! 主数据结构： “网格” （其成员是“网格块”）。 Mesh(1)为多重网格中最细的网格，Mesh(2),Mesh(3)为粗、更粗的网格。
@@ -293,7 +288,7 @@ end subroutine Init_flow
 subroutine init_flow_zero
   use Global_var
   implicit none
-  real(PRE_EC):: d0, u0, v0, w0, p0, T0, vx, tmp, pin0
+  real(PRE_EC):: d0, u0, v0, w0, p0, T0, vx, pin0
   integer:: i, j, k, m, step, nMesh, n
   Type(Mesh_TYPE), pointer:: MP
   Type(Block_TYPE), pointer:: B
@@ -527,7 +522,7 @@ subroutine set_BcK(nm)
   implicit none
   Type(Block_TYPE), pointer:: B
   TYPE(BC_MSG_TYPE), pointer:: Bc
-  integer :: i, j, k, m, nm, ksub
+  integer :: m, nm, ksub
   integer:: ib, ie, jb, je, kb, ke
   do m = 1, Mesh(nm)%Num_Block
     B => Mesh(nm)%Block(m)

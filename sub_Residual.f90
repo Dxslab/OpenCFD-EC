@@ -23,17 +23,17 @@ Subroutine Comput_Residual_one_mesh(nMesh)
 
 !---------------------------------------------
   if (Time_Method .eq. Time_Dual_LU_SGS) then
-  if (Iflag1 .eq. 0) then
-    Iflag1 = 1
-    Sfac = 1.d0/(3.d0*dt_global)  ! 第一个时间步， Un=U(n-1), 时间精度1阶
-    Sfac1 = 1.d0/dt_global
+    if (Iflag1 .eq. 0) then
+      Iflag1 = 1
+      Sfac = 1.d0/(3.d0*dt_global)  ! 第一个时间步， Un=U(n-1), 时间精度1阶
+      Sfac1 = 1.d0/dt_global
+    else
+      Sfac = 1.d0/(2.d0*dt_global)
+      Sfac1 = 3.d0/(2.d0*dt_global)
+    end if
   else
-    Sfac = 1.d0/(2.d0*dt_global)
-    Sfac1 = 3.d0/(2.d0*dt_global)
-  end if
-  else
-  Sfac = 0.d0
-  Sfac1 = 0.d0
+    Sfac = 0.d0
+    Sfac1 = 0.d0
   end if
 
 !-----------------------------------------------
@@ -77,9 +77,12 @@ Subroutine Comput_Residual_one_mesh(nMesh)
       do k = 1, nz-1
       do j = 1, ny-1
       do i = 1, nx-1
-        B%Res(3, i, j, k) = B%Res(3, i, j, k)+B%vol(i, j, k)*d(i, j, k)*(Turbo_w**2*B%yc(i, j, k)+2.d0*Turbo_w*w(i, j, k))
-        B%Res(4, i, j, k) = B%Res(4, i, j, k)+B%vol(i, j, k)*d(i, j, k)*(Turbo_w**2*B%zc(i, j, k)-2.d0*Turbo_w*v(i, j, k))
-      B%Res(5, i, j, k) = B%Res(5, i, j, k)+B%vol(i, j, k)*d(i, j, k)*Turbo_w**2*(v(i, j, k)*B%yc(i, j, k)+w(i, j, k)*B%zc(i, j, k))
+        B%Res(3, i, j, k) = B%Res(3, i, j, k)+ &
+                            B%vol(i, j, k)*d(i, j, k)*(Turbo_w**2*B%yc(i, j, k)+2.d0*Turbo_w*w(i, j, k))
+        B%Res(4, i, j, k) = B%Res(4, i, j, k)+ &
+                            B%vol(i, j, k)*d(i, j, k)*(Turbo_w**2*B%zc(i, j, k)-2.d0*Turbo_w*v(i, j, k))
+        B%Res(5, i, j, k) = B%Res(5, i, j, k)+ &
+                            B%vol(i, j, k)*d(i, j, k)*Turbo_w**2*(v(i, j, k)*B%yc(i, j, k)+w(i, j, k)*B%zc(i, j, k))
       end do
       end do
       end do

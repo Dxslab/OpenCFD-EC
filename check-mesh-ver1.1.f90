@@ -130,7 +130,7 @@ subroutine plot_bc
 
   do kt = 1, Nbt
     bct = boundtype(kt)
-    write (filename, "('bc-'I3.3)") bct
+    write (filename, "('bc-',I3.3)") bct
     open (100, file=filename)
     write (100, *) "variables=x,y,z"
 
@@ -158,7 +158,7 @@ end subroutine plot_bc
 subroutine read_mesh
   use Global_Variables
   implicit none
-  integer:: Mesh_File_Format, m, i, j, k, tmp, nx, ny, nz
+  integer:: Mesh_File_Format, m, i, j, k, nx, ny, nz
   integer, allocatable, dimension(:):: NI, NJ, NK
   Type(Block_TYPE), pointer:: B
   print *, "please input the format of Mesh3d.dat, 0 for unformatted, 1 for formatted"

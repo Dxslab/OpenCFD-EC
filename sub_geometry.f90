@@ -1,12 +1,10 @@
-!-----------------------------------------------------
 !   计算几何量：控制体体积和中心点坐标，Jocabian系数
 !   2013-4-26:  可处理退化线 （面积为0的面）
 !   2013-5-3: 修改粘性项Jocabian系数计算方法，与物理量导数方法一致
-
 subroutine Comput_Goemetric_var(nMesh)
   use Global_Var
   implicit none
-  integer :: i, j, k, m, nx, ny, nz, nMesh
+  integer :: i, j, k, m, nMesh
   real(PRE_EC):: t1x, t1y, t1z, t2x, t2y, t2z, s1x, s1y, s1z, xa, ya, za, ss
   real(PRE_EC):: xi, yi, zi, xj, yj, zj, xk, yk, zk, Jac, Jac1
   real(PRE_EC):: xi1, xi2, yi1, yi2, zi1, zi2, xj1, xj2, yj1, yj2, zj1, zj2, xk1, xk2, yk1, yk2, zk1, zk2
@@ -531,7 +529,7 @@ subroutine check_mesh_multigrid
   use Global_var
   implicit none
   integer, allocatable, dimension(:):: NI, NJ, NK
-  integer:: NB, NST, m, k, NN, Km, Km_grid, N_Cell, Ntmp, Bsub, Ksub
+  integer:: NB, m, NN, Km, Km_grid, N_Cell, Bsub, Ksub
   integer:: ib, ie, jb, je, kb, ke, bc, ist, iend, jst, jend, kst, kend
   print *, "Check if Multi-Grid can be used ..."
 
