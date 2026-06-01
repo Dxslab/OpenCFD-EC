@@ -9,11 +9,10 @@
 ! 2011-3-21: A bug in Flux_Roe_1D() is removed
 ! 2011-10-8: A bug in AUSM-PW() is removed
 !--------------------------------------------------
-
 subroutine Flux_HLL_HLLC_1D(QL, QR, Flux, gamma, Iflag_flux)
   use const_var
   implicit none
-  integer:: Iflag_flux, IFlag_Reconstruction
+  integer:: Iflag_flux
   real(PRE_EC):: QL(5), QR(5), UL(5), UR(5), Flux(5), gamma
   real(PRE_EC):: dl, uul, vvl, wwl, pl, al, dr, uur, vvr, wwr, pr, ar    ! uu,vv,ww velocity
   real(PRE_EC):: p_pvrs, p_star, qql, qqr, Sl, Sr, Fl(5), Fr(5), S_star, tmpl, tmpr, tmp, F_starl(5), F_starr(5)
@@ -64,23 +63,9 @@ subroutine Flux_HLL_HLLC_1D(QL, QR, Flux, gamma, Iflag_flux)
     F_starr(1) = Fr(1)+Sr*(tmpr-UR(1))
     F_starr(2) = Fr(2)+Sr*(tmpr*S_star-UR(2))
     F_starr(3) = Fr(3)+Sr*(tmpr*vvr-UR(3))
-    F_starr(4) = Fr(4)+Sr*(tmpr*vvr-UR(4))
+    F_starr(4) = Fr(4)+Sr*(tmpr*wwr-UR(4))
     tmp = UR(5)/dr+(S_star-uur)*(S_star+pr/(dr*(Sr-uur)))
     F_starr(5) = Fr(5)+Sr*(tmpr*tmp-UR(5))
-
-! Revised by Leng Yan
-!     S_star=(pr-pl+dl*uul*(Sl-uul)-dr*uur*(Sr-uur))/(dl*(Sl-uul)-dr*(Sr-uur))
-!     F_starl(1)=S_star*(Sl*UL(1)-Fl(1))/(Sl-S_star)
-!     F_starl(2)=(S_star*(Sl*UL(2)-Fl(2))+Sl*(pl+dl*(Sl-uul)*(S_star-uul)))/(Sl-S_star)
-!     F_starl(3)=S_star*(Sl*UL(3)-Fl(3))/(Sl-S_star)
-!     F_starl(4)=S_star*(Sl*UL(4)-Fl(4))/(Sl-S_star)
-!     F_starl(5)=(S_star*(Sl*UL(5)-Fl(5))+Sl*(pl+dl*(Sl-uul)*(S_star-uul))*S_star)/(Sl-S_star)
-
-!     F_starr(1)=S_star*(Sr*UR(1)-Fr(1))/(Sr-S_star)
-!     F_starr(2)=(S_star*(Sr*UR(2)-Fr(2))+Sr*(pr+dr*(Sr-uur)*(S_star-uur)))/(Sr-S_star)
-!     F_starr(3)=S_star*(Sr*UR(3)-Fr(3))/(Sr-S_star)
-!     F_starr(4)=S_star*(Sr*UR(4)-Fr(4))/(Sr-S_star)
-!     F_starr(5)=(S_star*(Sr*UR(5)-Fr(5))+Sr*(pr+dr*(Sr-uur)*(S_star-uur))*S_star)/(Sr-S_star)
 
     if (Sl .ge. 0) then
       Flux = Fl
@@ -93,19 +78,16 @@ subroutine Flux_HLL_HLLC_1D(QL, QR, Flux, gamma, Iflag_flux)
     end if
   end if
 end
-
 !c========================================================
 ! Developed By Li Xinliang
 !-------Extend 1D steger_warming FLux for finite volume method
 ! F=F+ (uL) + F- (uR)
-
 subroutine Flux_steger_warming_1Da(QL, QR, Flux, gamma)
   use const_var
   implicit none
-  integer:: IFlag_Reconstruction
   real(PRE_EC):: QL(5), QR(5), Flux(5), gamma
-  real(PRE_EC):: dl, uul, vvl, wwl, pl, al, dr, uur, vvr, wwr, pr, ar, pr1   ! uu velocity
-  real(PRE_EC):: tmp0, tmp1, tmp2, tmp3, E1P, E2P, E3P, E1M, E2M, E3M, fp(5), fm(5)
+  real(PRE_EC):: dl, uul, vvl, wwl, pl, al, dr, uur, vvr, wwr, pr, ar   ! uu velocity
+  real(PRE_EC):: tmp0, tmp1, tmp3, E1P, E2P, E3P, E1M, E2M, E3M, fp(5), fm(5)
 
   dl = QL(1); uul = QL(2); vvl = QL(3); wwl = QL(4); pl = QL(5)
   dr = QR(1); uur = QR(2); vvr = QR(3); wwr = QR(4); pr = QR(5)
@@ -138,7 +120,6 @@ subroutine Flux_steger_warming_1Da(QL, QR, Flux, gamma)
                 +E3M*((uur+ar)**2+vvr*vvr+wwr*wwr)*0.5d0+tmp3*ar*ar*(E2M+E3M))
   Flux = fp+fm
 end
-!-----------------------------------------------------------
 !-----------------------------------------------------------
 ! Flux by using Roe approximate Riemann slover
 ! 代码由冷岩开发
@@ -206,12 +187,10 @@ subroutine Flux_Roe_1D(QL, QR, Flux, gamma)
                                        +lamda(2)*arr(4)*0.5d0*(avu*avu+avv*avv+avw*avw)+lamda(3)*arr(5)*(avh+avu*ava))
 
 end
-
 !c========================================================
 ! Van Leer 流通矢量分裂 （代码由冷岩开发）
 !-------Extend 1D Van Leer FLux for finite volume method
 ! F=F+ (uL) + F- (uR)
-
 subroutine Flux_Van_Leer_1Da(QL, QR, Flux, gamma)
   use const_var
   implicit none
@@ -271,12 +250,10 @@ subroutine Flux_Van_Leer_1Da(QL, QR, Flux, gamma)
   Flux = fp+fm
 
 end
-
 !------------------------------------------------------------------------------------------------
 ! AUSM+ 通量分裂 （代码由冷岩开发）
 !-------Extend 1D Ausm FLux for finite volume method
 ! F=F+ (uL) + F- (uR)
-
 subroutine Flux_Ausm_1Da(QL, QR, Flux, gamma)
   use const_var
   implicit none

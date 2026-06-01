@@ -40,7 +40,7 @@ module const_var
   integer, parameter::  BC_Zero = 0       ! 无边界条件
 
 !                 用户自定义的边界条件，要求代码 >=900
-  integer, parameter::  BC_USER_FixedInlet = 901, BC_USER_Inlet_time = 902       !给定入口流动； 给定入口时间序列
+  integer, parameter:: BC_USER_FixedInlet = 901, BC_USER_Inlet_time = 902       !给定入口流动； 给定入口时间序列
   integer, parameter:: BC_USER_Blow_Suction_Wall = 903    ! 吹吸扰动壁面
 
   integer, parameter:: Time_Euler1 = 1, Time_RK3 = 3, Time_LU_SGS = 0, Time_dual_LU_SGS = -1
@@ -147,7 +147,7 @@ module Global_Var
   TYPE(Mesh_TYPE), pointer, dimension(:):: Mesh                          ! 主数据 “网格”
   integer, save:: Num_Mesh, NVAR, Total_block, Num_block                      ! 网格的套数 ，变量数， 总网格块数, 本mpi进程的网格块数
   integer, pointer, dimension(:):: bNi, bNj, bNk                            ! 各块的维数（全局）， bNi(k)为（全局）第k块的nx
-  integer, save::  Kstep_save, Iflag_turbulence_model, Iflag_init, &
+  integer, save:: Kstep_save, Iflag_turbulence_model, Iflag_init, &
                   Iflag_Scheme, IFlag_flux, Iflag_local_dt, IFlag_Reconstruction, Time_Method, &
                   Kstep_show, If_viscous, If_Residual_smoothing, Mesh_File_Format, IF_Debug, &
                   Kstep_smooth, Kstep_init_smooth, NUM_THREADS, If_dtime_mesh, Step_Inner_Limit, &
