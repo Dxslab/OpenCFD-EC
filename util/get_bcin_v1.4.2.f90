@@ -1,99 +1,98 @@
-! ¹¹½¨¶à¿é½á¹¹Íø¸ñÁ¬½ÓĞÅÏ¢ bc_inÎÄ¼ş
+! æ„å»ºå¤šå—ç»“æ„ç½‘æ ¼è¿æ¥ä¿¡æ¯ bc_inæ–‡ä»¶
 ! Copyright by Li Xinliang, Institute of Mechanics, CAS, lixl@imech.ac.cn
 ! Ver 1.0, 2010-11-21
-! Ver 1.1, 2010-12-3  : ¶ÔÓÚ·½ĞÎ¼ÆËãÓò£¬¿É×Ô¶¯Ê¶±ğ¹Ì±Ú¼°Íâ±ß½ç£¬ £¨ÕÒ³ö×îÍâ²àµÄ6¸öÆ½Ãæ£¬Éè¶¨Ô¶³¡»ò¶Ô³Æ±ß½çÌõ¼ş£¬ÆäËûÉèÎª¹Ì±Ú£©
-! Ver 1.2, 2010-12-29: ĞŞÕıÁËÒ»¸öĞ¡Bug, ÎŞÁ¬½ÓµãÒ»ÂÉ°´ÄÚµã´¦Àí
-! Ver 1.3, 2010-1-3:   ²ÉÓÃ¡°¿ì½İÍ¨µÀ·¨¡±£¬Ìá¸ßÁËËÑË÷Ëã·¨µÄĞ§ÂÊ
-! Ver 1.4.1, 2010-1-3:  ²ÉÓÃÊ÷×´¶à¼¶ËÑË÷Ëã·¨£¬Í¨¹ıÇĞ¸îÃæÔª(·ÖÆ¬ËÑË÷)£¬Ìá¸ßÁËËÑË÷Ëã·¨µÄĞ§ÂÊ
-! Ver 1.4.2, 2013-8-13: ½«In2inp,f90 ºÏ²¢µ½±¾³ÌĞòÖĞ£¬¿ÉÉú³É.inÓë.inp¸ñÊ½ÎÄ¼ş
-!------------------------------------------------------------------------------------------------------------------------------ 
-  module Global_Variables
+! Ver 1.1, 2010-12-3  : å¯¹äºæ–¹å½¢è®¡ç®—åŸŸï¼Œå¯è‡ªåŠ¨è¯†åˆ«å›ºå£åŠå¤–è¾¹ç•Œï¼Œ ï¼ˆæ‰¾å‡ºæœ€å¤–ä¾§çš„6ä¸ªå¹³é¢ï¼Œè®¾å®šè¿œåœºæˆ–å¯¹ç§°è¾¹ç•Œæ¡ä»¶ï¼Œå…¶ä»–è®¾ä¸ºå›ºå£ï¼‰
+! Ver 1.2, 2010-12-29: ä¿®æ­£äº†ä¸€ä¸ªå°Bug, æ— è¿æ¥ç‚¹ä¸€å¾‹æŒ‰å†…ç‚¹å¤„ç†
+! Ver 1.3, 2010-1-3:   é‡‡ç”¨â€œå¿«æ·é€šé“æ³•â€ï¼Œæé«˜äº†æœç´¢ç®—æ³•çš„æ•ˆç‡
+! Ver 1.4.1, 2010-1-3:  é‡‡ç”¨æ ‘çŠ¶å¤šçº§æœç´¢ç®—æ³•ï¼Œé€šè¿‡åˆ‡å‰²é¢å…ƒ(åˆ†ç‰‡æœç´¢)ï¼Œæé«˜äº†æœç´¢ç®—æ³•çš„æ•ˆç‡
+! Ver 1.4.2, 2013-8-13: å°†In2inp,f90 åˆå¹¶åˆ°æœ¬ç¨‹åºä¸­ï¼Œå¯ç”Ÿæˆ.inä¸.inpæ ¼å¼æ–‡ä»¶
+!------------------------------------------------------------------------------------------------------------------------------
+module Global_Variables
   implicit none
-  integer,parameter:: Nq=7  ! Ã¿Ò»¸öÃæ·Ö¸î³ÉÈô¸É¸öÃæÔª£¬Ã¿¸öÃæÔªNq*Nq¸öµã£» ÓÃÓÚÊ÷×´¶à¼¶¿ìËÙËÑË÷Ê±Ê¹ÓÃ, ¿ÉÒÔµ÷Õû¸ÃÊı£¨ÍÆ¼öÔÚ5-16Ö®¼ä£©ÒÔ´ïµ½×î¸ßĞ§ÂÊ
-  integer,parameter:: Max_Link=50   ! Ò»¸öµã×î¶àÓĞ50¸öÁ¬½Óµã 
-  integer,parameter:: Max_Subface=100  ! Ò»¸öÃæ×î¶à100¸ö×ÓÃæ
-  integer,parameter:: BC_Wall=-10, BC_Farfield=-20 ,BC_Symmetry=-50   ! ¹Ì±Ú¡¢Ô¶³¡¼°¶Ô³ÆÃæ
-  real*8 :: Dist_limit , Dist_min  ! ×îĞ¡Íø¸ñ¾àÀë 
-  Integer:: Num_Block,Form_mesh
-!------Types ¶¨ÒåÁËµã¡¢ÃæºÍ¿éÈıÖÖÊı¾İ½á¹¹ -------------------------------------------------------------------------------------
-! µã£º ÊôĞÔÓĞ ×ø±ê£¬Á¬½ÓµãµÄ¸öÊı£¬Á¬½ÓµãµÄĞÅÏ¢£¬ ÊÇ·ñÎªÄÚµã±êÖ¾£¬ÊÇ·ñ±»ËÑË÷¹ı±êÖ¾
-! Ãæ£º ÊôĞÔÓĞ ÃæºÅ¡¢Î¬Êı£¬µã
-! ¿é£º ÊôĞÔÓĞ ¿éºÅ¡¢Î¬Êı¡¢Ãæ
+  integer, parameter:: Nq = 7  ! æ¯ä¸€ä¸ªé¢åˆ†å‰²æˆè‹¥å¹²ä¸ªé¢å…ƒï¼Œæ¯ä¸ªé¢å…ƒNq*Nqä¸ªç‚¹ï¼› ç”¨äºæ ‘çŠ¶å¤šçº§å¿«é€Ÿæœç´¢æ—¶ä½¿ç”¨, å¯ä»¥è°ƒæ•´è¯¥æ•°ï¼ˆæ¨èåœ¨5-16ä¹‹é—´ï¼‰ä»¥è¾¾åˆ°æœ€é«˜æ•ˆç‡
+  integer, parameter:: Max_Link = 50   ! ä¸€ä¸ªç‚¹æœ€å¤šæœ‰50ä¸ªè¿æ¥ç‚¹
+  integer, parameter:: Max_Subface = 100  ! ä¸€ä¸ªé¢æœ€å¤š100ä¸ªå­é¢
+  integer, parameter:: BC_Wall = -10, BC_Farfield = -20, BC_Symmetry = -50   ! å›ºå£ã€è¿œåœºåŠå¯¹ç§°é¢
+  real*8 :: Dist_limit, Dist_min  ! æœ€å°ç½‘æ ¼è·ç¦»
+  Integer:: Num_Block, Form_mesh
+!------Types å®šä¹‰äº†ç‚¹ã€é¢å’Œå—ä¸‰ç§æ•°æ®ç»“æ„ -------------------------------------------------------------------------------------
+! ç‚¹ï¼š å±æ€§æœ‰ åæ ‡ï¼Œè¿æ¥ç‚¹çš„ä¸ªæ•°ï¼Œè¿æ¥ç‚¹çš„ä¿¡æ¯ï¼Œ æ˜¯å¦ä¸ºå†…ç‚¹æ ‡å¿—ï¼Œæ˜¯å¦è¢«æœç´¢è¿‡æ ‡å¿—
+! é¢ï¼š å±æ€§æœ‰ é¢å·ã€ç»´æ•°ï¼Œç‚¹
+! å—ï¼š å±æ€§æœ‰ å—å·ã€ç»´æ•°ã€é¢
 !-------------------------------------------------------------------------------------------------------------------------------
-   TYPE Point_Type    ! µã
-   real*8:: x, y, z   ! ×ø±ê
-   integer:: num_link ! Á¬½ÓµãµÄ¸öÊı
-   integer:: search_flag, If_inner, color ! ËÑË÷/È¾É«Ê±Ê¹ÓÃµÄ±ê¼ÇÁ¿    
-   integer,dimension(MAX_Link):: block_link, face_link, n1_link, n2_link  ! Á¬½ÓµãµÄĞÅÏ¢£¨¿éºÅ¡¢ÃæºÅ¡¢ÏÂ±ê£©
-   End TYPE Point_Type
-  
-   TYPE Subface_TYPE  ! ×ÓÃæ
-   integer:: subface_no, face_no, ib,jb,ie,je   ! ×ÓÃæºÅ(ÑÕÉ«)£¬×ÓÃæËùÔÚµÄÃæºÅ£¬ÆğÖ¹Î»ÖÃ
-   integer:: subface_link , block_link , face_link , orient  ! Á¬½ÓµÄ×ÓÃæ , Á¬½ÓµÄ¿é£¬Á¬½ÓµÄÃæ , Á¬½ÓÖ¸ÏòĞÔ£¨1-4£©  
-   END TYPE Subface_TYPE
-   
+  TYPE Point_Type    ! ç‚¹
+    real*8:: x, y, z   ! åæ ‡
+    integer:: num_link ! è¿æ¥ç‚¹çš„ä¸ªæ•°
+    integer:: search_flag, If_inner, color ! æœç´¢/æŸ“è‰²æ—¶ä½¿ç”¨çš„æ ‡è®°é‡
+    integer, dimension(MAX_Link):: block_link, face_link, n1_link, n2_link  ! è¿æ¥ç‚¹çš„ä¿¡æ¯ï¼ˆå—å·ã€é¢å·ã€ä¸‹æ ‡ï¼‰
+  End TYPE Point_Type
 
-   TYPE Face_Type                     ! Ãæ 
-   integer:: face_no,n1,n2   ! ÃæºÅ¡¢Êı×éÎ¬
-   integer:: nk1,nk2   !ÃæÔªµÄÊıÄ¿
-   Type (Point_Type),pointer,dimension(:,:) :: point 
-   integer,pointer,dimension(:):: n1b,n1e,n2b,n2e
-   real*8,pointer,dimension(:,:):: xc,yc,zc,dc  ! ÖĞĞÄ×ø±ê£¬µ½ÖĞĞÄµÄ×î´ó¾àÀë
-   End TYPE Face_Type
-   
-   TYPE Block_TYPE           !  ¿é
-     integer :: Block_no,nx,ny,nz   ! ¿éºÅ¡¢Êı×éÎ¬
-     integer:: color_now, Num_Subface  ! ÕıÔÚÊ¹ÓÃµÄÑÕÉ«£¬ ×ÓÃæÊıÄ¿
-     TYPE(Face_type),dimension(6):: Face
-     TYPE (Subface_TYPE),dimension(Max_subface):: subface   ! ×ÓÃæ £¨´ÓÊôÓÚ¿é£©
-  End TYPE Block_TYPE  
-  
-   TYPE (Block_TYPE), save,dimension(:),allocatable,target:: Block
-  
-  end module Global_Variables
+  TYPE Subface_TYPE  ! å­é¢
+    integer:: subface_no, face_no, ib, jb, ie, je   ! å­é¢å·(é¢œè‰²)ï¼Œå­é¢æ‰€åœ¨çš„é¢å·ï¼Œèµ·æ­¢ä½ç½®
+    integer:: subface_link, block_link, face_link, orient  ! è¿æ¥çš„å­é¢ , è¿æ¥çš„å—ï¼Œè¿æ¥çš„é¢ , è¿æ¥æŒ‡å‘æ€§ï¼ˆ1-4ï¼‰
+  END TYPE Subface_TYPE
+
+  TYPE Face_Type                     ! é¢
+    integer:: face_no, n1, n2   ! é¢å·ã€æ•°ç»„ç»´
+    integer:: nk1, nk2   !é¢å…ƒçš„æ•°ç›®
+    Type(Point_Type), pointer, dimension(:, :) :: point
+    integer, pointer, dimension(:):: n1b, n1e, n2b, n2e
+    real*8, pointer, dimension(:, :):: xc, yc, zc, dc  ! ä¸­å¿ƒåæ ‡ï¼Œåˆ°ä¸­å¿ƒçš„æœ€å¤§è·ç¦»
+  End TYPE Face_Type
+
+  TYPE Block_TYPE           !  å—
+    integer :: Block_no, nx, ny, nz   ! å—å·ã€æ•°ç»„ç»´
+    integer:: color_now, Num_Subface  ! æ­£åœ¨ä½¿ç”¨çš„é¢œè‰²ï¼Œ å­é¢æ•°ç›®
+    TYPE(Face_type), dimension(6):: Face
+    TYPE(Subface_TYPE), dimension(Max_subface):: subface   ! å­é¢ ï¼ˆä»å±äºå—ï¼‰
+  End TYPE Block_TYPE
+
+  TYPE(Block_TYPE), save, dimension(:), allocatable, target:: Block
+
+end module Global_Variables
 
 !---------------------------------------------------------------
-   program get_bcin
-   use Global_Variables
-   implicit none
-   integer:: zone, face,i,j,m,nf,flag1
-   TYPE (Block_Type), Pointer:: B
-   TYPE (Face_Type), Pointer:: F
+program get_bcin
+  use Global_Variables
+  implicit none
+  integer:: zone, face, i, j, m, nf, flag1
+  TYPE(Block_Type), Pointer:: B
+  TYPE(Face_Type), Pointer:: F
 
-   print*, "----------------------------------------------------------------------------"
-   print*, "- This code is used to create the Grid Link file (BXCFD bc_in Format)      -"
-   print*, "-               Ver 1.4.1 , 2010-1-3                                       -"  
-   print*, "- Copyright by Li Xinliang, Institute of Mechanics, CAS, lixl@imech.ac.cn  -"
-   print*, "----------------------------------------------------------------------------"
-   write(*,*)
-   write(*,*)
+  print *, "----------------------------------------------------------------------------"
+  print *, "- This code is used to create the Grid Link file (BXCFD bc_in Format)      -"
+  print *, "-               Ver 1.4.1 , 2010-1-3                                       -"
+  print *, "- Copyright by Li Xinliang, Institute of Mechanics, CAS, lixl@imech.ac.cn  -"
+  print *, "----------------------------------------------------------------------------"
+  write (*, *)
+  write (*, *)
 
-   call read_coordinate    ! ¶ÁÈ¡Íø¸ñ×ø±ê£¬³õÊ¼»¯
+  call read_coordinate    ! è¯»å–ç½‘æ ¼åæ ‡ï¼Œåˆå§‹åŒ–
 
-   call search_link        ! ËÑË÷Á¬½Óµã£¬½¨Á¢¸÷µãÁ¬½ÓĞÅÏ¢ £¨¼ÆËãÁ¿´ó£©
+  call search_link        ! æœç´¢è¿æ¥ç‚¹ï¼Œå»ºç«‹å„ç‚¹è¿æ¥ä¿¡æ¯ ï¼ˆè®¡ç®—é‡å¤§ï¼‰
 
-   call Mark_inner_point   !±ê¼ÇÄÚµã
+  call Mark_inner_point   !æ ‡è®°å†…ç‚¹
 
-   call creat_subface      ! ´´½¨×ÓÃæ £¨ºËĞÄ³ÌĞò£©
+  call creat_subface      ! åˆ›å»ºå­é¢ ï¼ˆæ ¸å¿ƒç¨‹åºï¼‰
 
- !    print*, "Do you want to search the wall and Far field bounary ? (1 for yes, 0 for no)"
- !    read(*,*)  flag1
- !    if( flag1 .eq. 1) then
- !      call search_wall_and_farfield   ! ËÑË÷¹Ì±Ú¡¢Ô¶³¡¼°¶Ô³ÆÃæ
- !    endif
+  !    print*, "Do you want to search the wall and Far field bounary ? (1 for yes, 0 for no)"
+  !    read(*,*)  flag1
+  !    if( flag1 .eq. 1) then
+  !      call search_wall_and_farfield   ! æœç´¢å›ºå£ã€è¿œåœºåŠå¯¹ç§°é¢
+  !    endif
 
-   call write_bcin
-   
-   call Inp2In (Form_Mesh)
+  call write_bcin
 
-   print*, "OK, The link message is written into the file bc.in and bc.inp"   
+  call Inp2In(Form_Mesh)
+
+  print *, "OK, The link message is written into the file bc.in and bc.inp"
 !-----------------------------------
 !    print*, "Write the test file test.dat"
 !    open(99,file="test.dat")
 !    write(99,*) "variables=x,y,z,link,color,inner,blink,flink,i1,i2,block,face"
 !    do m=1,Num_Block
 !      B => Block(m)
-!    do nf=1,6 
+!    do nf=1,6
 !      F=> B%face(nf)
 !     write(99,*) "zone i = ", F%n1, " j= ", F%n2
 !     do j=1, F%n2
@@ -107,376 +106,367 @@
 !    enddo
 !   close(99)
 
-  end
-
-
+end
 
 !---------------------------------------------------------------------------------------------------------------------------
-! ±ê¼Ç×ÓÃæÄÚµã  
-  subroutine Mark_inner_point
-   use Global_Variables
-   implicit none
-   integer:: m,nf,i1,i2,flag1,flag2,flag3,flag4
-   TYPE (Block_Type), Pointer:: B   ! ¿éÖ¸Õë
-   TYPE (Face_Type), Pointer:: F    ! ÃæÖ¸Õë
-   TYPE (Point_Type), Pointer:: P   ! µãÖ¸Õë
+! æ ‡è®°å­é¢å†…ç‚¹
+subroutine Mark_inner_point
+  use Global_Variables
+  implicit none
+  integer:: m, nf, i1, i2, flag1, flag2, flag3, flag4
+  TYPE(Block_Type), Pointer:: B   ! å—æŒ‡é’ˆ
+  TYPE(Face_Type), Pointer:: F    ! é¢æŒ‡é’ˆ
+  TYPE(Point_Type), Pointer:: P   ! ç‚¹æŒ‡é’ˆ
 
-  do m=1,Num_Block
+  do m = 1, Num_Block
     B => Block(m)
-  do nf=1,6 
-    F=> B%face(nf)
+    do nf = 1, 6
+      F => B%face(nf)
 
-!-----±êÊ¾ "×ÓÃæÄÚµã"  £¨ ÖÜÎ§µãµÄÁ¬½Óµã¾ùÔÚÍ¬Ò»¿é¡¢Í¬Ò»Ãæ£©   
-      do i2=2,F%n2-1
-      do i1=2,F%n1-1
-      P=> F%point(i1,i2)
-! ĞŞ¸Ä £¨2010-12-29£©     
-!      if(P%num_link .le. 1) then   ! 1¸ö»ò0¸öÁ¬½Ó  (¶à¸öÁ¬½ÓµÄµã±ØÎª×ÓÃæ±ß½çµã)
+!-----æ ‡ç¤º "å­é¢å†…ç‚¹"  ï¼ˆ å‘¨å›´ç‚¹çš„è¿æ¥ç‚¹å‡åœ¨åŒä¸€å—ã€åŒä¸€é¢ï¼‰
+      do i2 = 2, F%n2-1
+      do i1 = 2, F%n1-1
+        P => F%point(i1, i2)
+! ä¿®æ”¹ ï¼ˆ2010-12-29ï¼‰
+!      if(P%num_link .le. 1) then   ! 1ä¸ªæˆ–0ä¸ªè¿æ¥  (å¤šä¸ªè¿æ¥çš„ç‚¹å¿…ä¸ºå­é¢è¾¹ç•Œç‚¹)
 
-! 0¸öÁ¬½Ó±ØÎªÄÚµã£¬1¸öÁ¬½ÓĞèÒªÅĞ¶Ï£¬¶à¸öÁ¬½Ó±ØÎª±ß½çµã
+! 0ä¸ªè¿æ¥å¿…ä¸ºå†…ç‚¹ï¼Œ1ä¸ªè¿æ¥éœ€è¦åˆ¤æ–­ï¼Œå¤šä¸ªè¿æ¥å¿…ä¸ºè¾¹ç•Œç‚¹
 
-       if(P%num_link .le. 0) then   ! 0¸öÁ¬½Ó±ØÎªÄÚµã
-            P%If_inner=1
-       else if  (P%num_link .eq. 1) then    
-         call compare(m,nf,i1,i2, i1-1,i2, flag1) ! ÅĞ¶ÏÁ½¸öµã µÄÁ¬½ÓµãÊÇ·ñÔÚÍ¬Ò»Ãæ
-         call compare(m,nf,i1,i2, i1+1,i2, flag2) 
-         call compare(m,nf,i1,i2, i1,i2-1, flag3) 
-         call compare(m,nf,i1,i2, i1,i2+1, flag4) 
-         if( flag1*flag2*flag3*flag4 .eq. 1 ) P%If_inner=1   ! ×ÓÃæÄÚµã 
-      endif     
-      enddo
-      enddo
-   enddo
-   enddo
-  print*, "Mark Inner Point OK"
- end subroutine Mark_inner_point
-
+        if (P%num_link .le. 0) then   ! 0ä¸ªè¿æ¥å¿…ä¸ºå†…ç‚¹
+          P%If_inner = 1
+        else if (P%num_link .eq. 1) then
+          call compare(m, nf, i1, i2, i1-1, i2, flag1) ! åˆ¤æ–­ä¸¤ä¸ªç‚¹ çš„è¿æ¥ç‚¹æ˜¯å¦åœ¨åŒä¸€é¢
+          call compare(m, nf, i1, i2, i1+1, i2, flag2)
+          call compare(m, nf, i1, i2, i1, i2-1, flag3)
+          call compare(m, nf, i1, i2, i1, i2+1, flag4)
+          if (flag1*flag2*flag3*flag4 .eq. 1) P%If_inner = 1   ! å­é¢å†…ç‚¹
+        end if
+      end do
+      end do
+    end do
+  end do
+  print *, "Mark Inner Point OK"
+end subroutine Mark_inner_point
 
 !------------------------------------------------------------------------------------------------------------------
-! ½¨Á¢×ÓÃæ £¨ºËĞÄËã·¨£©  
-  subroutine creat_subface
-   use Global_Variables
-   implicit none
-   integer:: m,nf,i1,i2,color_now,ia,ja,ie,je,mt,nft,iat,jat,orient
-   integer:: i1t,j1t,i2t,j2t
-   TYPE (Block_Type), Pointer:: B,Bt
-   TYPE (Face_Type), Pointer:: F,Ft            ! ±äÁ¿ÖĞ´øtµÄÊÇÁ¬½Ó£¨Ãæ¡¢×ÓÃæ¡¢µã£©
-   TYPE (SubFace_Type), Pointer:: SF,SFt
-   TYPE (Point_Type), Pointer:: P,P1
+! å»ºç«‹å­é¢ ï¼ˆæ ¸å¿ƒç®—æ³•ï¼‰
+subroutine creat_subface
+  use Global_Variables
+  implicit none
+  integer:: m, nf, i1, i2, color_now, ia, ja, ie, je, mt, nft, iat, jat, orient
+  integer:: i1t, j1t, i2t, j2t
+  TYPE(Block_Type), Pointer:: B, Bt
+  TYPE(Face_Type), Pointer:: F, Ft            ! å˜é‡ä¸­å¸¦tçš„æ˜¯è¿æ¥ï¼ˆé¢ã€å­é¢ã€ç‚¹ï¼‰
+  TYPE(SubFace_Type), Pointer:: SF, SFt
+  TYPE(Point_Type), Pointer:: P, P1
 
-  do m=1,Num_Block
+  do m = 1, Num_Block
     B => Block(m)
-  do nf=1,6 
-    F=> B%face(nf)
+    do nf = 1, 6
+      F => B%face(nf)
 
- !------------------------------------------------------------------
- 
-    do i2=2,F%n2-1
-    do i1=2,F%n1-1
-   
-    P=> F%point(i1,i2)
-    if(P%If_inner .eq. 1 .and. P%color .eq. 0) then  ! Èç·ÇÄÚµã£¬»òÒÑ±»È¾¹ıÉ«£¬ÔòÌø¹ı
+      !------------------------------------------------------------------
 
-! Í¨¹ıÈ¾É«Ëã·¨£¬ÕÒµ½×Ó¿éµÄÏÂ±ß½ç (ie,je)     (i1,i2)- (ie,je) ¾ÍÊÇ×ÓÃæÄÚµã
-       call find_subface_boundary(m,nf,i1,i2,ie,je)
+      do i2 = 2, F%n2-1
+      do i1 = 2, F%n1-1
 
-!------´´Á¢×ÓÃæ£¬²¢È¾É«--------------------------------------
-       B%color_now=B%color_now+1   ! Éè¶¨µ±Ç°ÑÕÉ« £¨´´Á¢Ò»¸ö×ÓÃæ£¬ĞÂ½¨Ò»ÖÖÑÕÉ«£©
-! ±¾×ÓÃæ¸÷µãÈ¾É«
-        do ja=i2,je
-        do ia=i1,ie
-           F%point(ia,ja)%color=B%Color_now         
-        enddo
-        enddo
+        P => F%point(i1, i2)
+        if (P%If_inner .eq. 1 .and. P%color .eq. 0) then  ! å¦‚éå†…ç‚¹ï¼Œæˆ–å·²è¢«æŸ“è¿‡è‰²ï¼Œåˆ™è·³è¿‡
 
-!  µÇ¼Ç±¾×ÓÃæµÄÊôĞÔ (±àºÅ¡¢ÆğÖ¹µã×ø±ê)
-      SF=>B%subface(B%Color_now)  ! Ö¸Ïò¸Ã×ÓÃæ    
-      SF%subface_no=B%Color_now   ! ±àºÅ £¨ÑÕÉ«£©
-      SF%face_no=nf               ! ¸Ã×ÓÃæËùÔÚµÄÃæºÅ
-      SF%ib=i1-1 ;  SF%jb=i2-1    ! ×ÓÃæµÄ×óÉÏ½Çµã×ø±ê
-      SF%ie=ie+1 ;  SF%je=je+1    ! ×ÓÃæµÄÓÒÏÂ½Çµã×ø±ê
+! é€šè¿‡æŸ“è‰²ç®—æ³•ï¼Œæ‰¾åˆ°å­å—çš„ä¸‹è¾¹ç•Œ (ie,je)     (i1,i2)- (ie,je) å°±æ˜¯å­é¢å†…ç‚¹
+          call find_subface_boundary(m, nf, i1, i2, ie, je)
 
+!------åˆ›ç«‹å­é¢ï¼Œå¹¶æŸ“è‰²--------------------------------------
+          B%color_now = B%color_now+1   ! è®¾å®šå½“å‰é¢œè‰² ï¼ˆåˆ›ç«‹ä¸€ä¸ªå­é¢ï¼Œæ–°å»ºä¸€ç§é¢œè‰²ï¼‰
+! æœ¬å­é¢å„ç‚¹æŸ“è‰²
+          do ja = i2, je
+          do ia = i1, ie
+            F%point(ia, ja)%color = B%Color_now
+          end do
+          end do
 
-! Èç¹ûÓĞÁ¬½Ó,´´Á¢Á¬½ÓµÄ×ÓÃæĞÅÏ¢£¬²¢È¾É«
-   if(F%point(i1,i2)%Num_link .ne. 0) then   
-          mt=F%point(i1,i2)%block_link(1)     ! ÄÚµãÁ¬½ÓµÄ¿éºÅ 
-          nft=F%point(i1,i2)%face_link(1)     ! ÄÚµãÁ¬½ÓµÄÃæºÅ
-	
-   ! ´´Á¢Á¬½Ó×ÓÃæ£¬µÇ¼ÇÁ¬½Ó×ÓÃæµÄÁ¬½ÓĞÅÏ¢
-          Bt=>Block(mt)   ! Á¬½ÓµÄ¿é
-          Ft=>Bt%face(nft)                    ! Á¬½ÓµÄÃæ                    
-          Bt%color_now=Bt%color_now+1         ! Éè¶¨Á¬½Ó×ÓÃæµÄµ±Ç°ÑÕÉ«  £¨ÔÚÁ´½Ó¿éÖĞ½¨Á¢Ò»¸öĞÂµÄ×ÓÃæ£©
-          SFt=>Bt%subface(Bt%color_now)       ! Á¬½ÓµÄ×ÓÃæ
-          SFt%subface_no=Bt%color_now         ! Á¬½Ó×ÓÃæµÄ±àºÅ
-          SFt%face_no=nft                     ! Á¬½Ó×ÓÃæËùÔÚµÄÃæºÅ
-          SFt%block_link=m   ! Á¬Ïòµ±Ç°¿é
-          SFt%face_link=nf   ! Á¬Ïòµ±Ç°Ãæ
-          SFt%subface_link=B%Color_now  ! Á¬Ïòµ±Ç°×ÓÃæ
+!  ç™»è®°æœ¬å­é¢çš„å±æ€§ (ç¼–å·ã€èµ·æ­¢ç‚¹åæ ‡)
+          SF => B%subface(B%Color_now)  ! æŒ‡å‘è¯¥å­é¢
+          SF%subface_no = B%Color_now   ! ç¼–å· ï¼ˆé¢œè‰²ï¼‰
+          SF%face_no = nf               ! è¯¥å­é¢æ‰€åœ¨çš„é¢å·
+          SF%ib = i1-1; SF%jb = i2-1    ! å­é¢çš„å·¦ä¸Šè§’ç‚¹åæ ‡
+          SF%ie = ie+1; SF%je = je+1    ! å­é¢çš„å³ä¸‹è§’ç‚¹åæ ‡
 
-  !  µÇ¼Ç±¾×ÓÃæµÄÁ¬½ÓĞÅÏ¢		  
-          SF%block_link=mt  ! ×ÓÃæµÄÁ¬½Ó¿éºÅ £¨=ÄÚµãµÄÁ¬½Ó¿éºÅ£©
-          SF%face_link=nft  ! ×ÓÃæµÄÁ¬½ÓÃæºÅ
-          SF%subface_link=Bt%color_now        ! ×ÓÃæµÄÁ¬½Ó×ÓÃæ±àºÅ £¨ÑÕÉ«,ËùÁ¬½ÓÃæµÄµ±Ç°É«£©
+! å¦‚æœæœ‰è¿æ¥,åˆ›ç«‹è¿æ¥çš„å­é¢ä¿¡æ¯ï¼Œå¹¶æŸ“è‰²
+          if (F%point(i1, i2)%Num_link .ne. 0) then
+            mt = F%point(i1, i2)%block_link(1)     ! å†…ç‚¹è¿æ¥çš„å—å·
+            nft = F%point(i1, i2)%face_link(1)     ! å†…ç‚¹è¿æ¥çš„é¢å·
 
- ! È·¶¨×óÉÏ¡¢ÓÒÏÂ½ÇµãµÄÁ¬½Óµã         
-          call find_corner_link_point(m,nf,SF%ib,SF%jb,i1t,j1t,mt,nft)
-          call find_corner_link_point(m,nf,SF%ie,SF%je,i2t,j2t,mt,nft)
+            ! åˆ›ç«‹è¿æ¥å­é¢ï¼Œç™»è®°è¿æ¥å­é¢çš„è¿æ¥ä¿¡æ¯
+            Bt => Block(mt)   ! è¿æ¥çš„å—
+            Ft => Bt%face(nft)                    ! è¿æ¥çš„é¢
+            Bt%color_now = Bt%color_now+1         ! è®¾å®šè¿æ¥å­é¢çš„å½“å‰é¢œè‰²  ï¼ˆåœ¨é“¾æ¥å—ä¸­å»ºç«‹ä¸€ä¸ªæ–°çš„å­é¢ï¼‰
+            SFt => Bt%subface(Bt%color_now)       ! è¿æ¥çš„å­é¢
+            SFt%subface_no = Bt%color_now         ! è¿æ¥å­é¢çš„ç¼–å·
+            SFt%face_no = nft                     ! è¿æ¥å­é¢æ‰€åœ¨çš„é¢å·
+            SFt%block_link = m   ! è¿å‘å½“å‰å—
+            SFt%face_link = nf   ! è¿å‘å½“å‰é¢
+            SFt%subface_link = B%Color_now  ! è¿å‘å½“å‰å­é¢
 
-  !  µÇ¼ÇÁ¬½Ó×ÓÃæµÄ½Çµã£¨·¶Î§£©ĞÅÏ¢
-         SFt%ib=min(i1t,i2t) ; SFt%ie=max(i1t,i2t)
-         SFt%jb=min(j1t,j2t) ; SFt%je=max(j1t,j2t)
+            !  ç™»è®°æœ¬å­é¢çš„è¿æ¥ä¿¡æ¯
+            SF%block_link = mt  ! å­é¢çš„è¿æ¥å—å· ï¼ˆ=å†…ç‚¹çš„è¿æ¥å—å·ï¼‰
+            SF%face_link = nft  ! å­é¢çš„è¿æ¥é¢å·
+            SF%subface_link = Bt%color_now        ! å­é¢çš„è¿æ¥å­é¢ç¼–å· ï¼ˆé¢œè‰²,æ‰€è¿æ¥é¢çš„å½“å‰è‰²ï¼‰
 
-  ! Á¬½Ó×ÓÃæÈ¾É«
-        do ja=i2,je
-        do ia=i1,ie
-          iat=F%point(ia,ja)%n1_link(1)
-          jat=F%point(ia,ja)%n2_link(1)
-          Ft%point(iat,jat)%color=Bt%color_now   ! Á¬½ÓµÄµãÒ²È¾É« £¨Í¬Ê±´´Á¢×ÓÃæ¼°Á¬½Ó×ÓÃæ£¬²¢È¾É«£©
-        enddo
-        enddo
- 
- !  ´´½¨Á¬½ÓÖ¸ÏòĞÔ
-      if( mod(F%face_no,2) .eq. 1) then  !  l·½ÏòÊÇµÚ2¸öÏÂ±ê±ä»¯µÄ·½Ïò (l*m=n)
-           call find_corner_link_point(m,nf,SF%ib,SF%je,i2t,j2t,mt,nft)   ! (ib,je)Á¬½ÓµÄµã
-      else                               !  l·½ÏòÊÇµÚ1¸öÏÂ±ê±ä»¯µÄ·½Ïò
-           call find_corner_link_point(m,nf,SF%ie,SF%jb,i2t,j2t,mt,nft)   ! (ie,jb)Á¬½ÓµÄµã
-      endif
+            ! ç¡®å®šå·¦ä¸Šã€å³ä¸‹è§’ç‚¹çš„è¿æ¥ç‚¹
+            call find_corner_link_point(m, nf, SF%ib, SF%jb, i1t, j1t, mt, nft)
+            call find_corner_link_point(m, nf, SF%ie, SF%je, i2t, j2t, mt, nft)
 
-      call comput_orient(Ft%face_no,i1t,j1t,i2t,j2t,orient )
-         SF%orient=orient
-         SFt%orient=orient
-   else
-! ÎŞÁ¬½Ó
-         SF%block_link=0  
-         SF%face_link=0  
-         SF%subface_link=0        
-         SF%orient=0
-   endif
+            !  ç™»è®°è¿æ¥å­é¢çš„è§’ç‚¹ï¼ˆèŒƒå›´ï¼‰ä¿¡æ¯
+            SFt%ib = min(i1t, i2t); SFt%ie = max(i1t, i2t)
+            SFt%jb = min(j1t, j2t); SFt%je = max(j1t, j2t)
+
+            ! è¿æ¥å­é¢æŸ“è‰²
+            do ja = i2, je
+            do ia = i1, ie
+              iat = F%point(ia, ja)%n1_link(1)
+              jat = F%point(ia, ja)%n2_link(1)
+              Ft%point(iat, jat)%color = Bt%color_now   ! è¿æ¥çš„ç‚¹ä¹ŸæŸ“è‰² ï¼ˆåŒæ—¶åˆ›ç«‹å­é¢åŠè¿æ¥å­é¢ï¼Œå¹¶æŸ“è‰²ï¼‰
+            end do
+            end do
+
+            !  åˆ›å»ºè¿æ¥æŒ‡å‘æ€§
+            if (mod(F%face_no, 2) .eq. 1) then  !  læ–¹å‘æ˜¯ç¬¬2ä¸ªä¸‹æ ‡å˜åŒ–çš„æ–¹å‘ (l*m=n)
+              call find_corner_link_point(m, nf, SF%ib, SF%je, i2t, j2t, mt, nft)   ! (ib,je)è¿æ¥çš„ç‚¹
+            else                               !  læ–¹å‘æ˜¯ç¬¬1ä¸ªä¸‹æ ‡å˜åŒ–çš„æ–¹å‘
+              call find_corner_link_point(m, nf, SF%ie, SF%jb, i2t, j2t, mt, nft)   ! (ie,jb)è¿æ¥çš„ç‚¹
+            end if
+
+            call comput_orient(Ft%face_no, i1t, j1t, i2t, j2t, orient)
+            SF%orient = orient
+            SFt%orient = orient
+          else
+! æ— è¿æ¥
+            SF%block_link = 0
+            SF%face_link = 0
+            SF%subface_link = 0
+            SF%orient = 0
+          end if
 !-----------------------------------------------------------
-  endif
-   
-  enddo
-  enddo
- 
-   B%Num_subface=B%Color_now  ! ×ÓÃæµÄÊıÄ¿
+        end if
 
- !------------------------------------------
-  enddo
-    print*, "zone = ", m ,  "Subface Number=", B%Num_Subface
- 
-  enddo
- 
- end subroutine creat_subface
+      end do
+      end do
+
+      B%Num_subface = B%Color_now  ! å­é¢çš„æ•°ç›®
+
+      !------------------------------------------
+    end do
+    print *, "zone = ", m, "Subface Number=", B%Num_Subface
+
+  end do
+
+end subroutine creat_subface
 
 !--------------------------------------------------------------------------------------------
-!---Í¨¹ıÈ¾É«·¨£¬ÕÒµ½×Ó¿éµÄÏÂ±ß½çµã(ie,je), ¼´(i1,i2)-(ie,je)Î§³ÉµÄ¾ØĞÎÇøÓòÄÚµÄµã£¬È«²¿ÊÇÄÚµã
-   subroutine find_subface_boundary(m,nf,i1,i2,ie,je)
-   use Global_Variables
-   implicit none
-   integer:: m,nf,i1,i2,ie,je,ia,ja
-   TYPE (Face_Type), Pointer:: F
-   TYPE (Point_Type), Pointer:: P
+!---é€šè¿‡æŸ“è‰²æ³•ï¼Œæ‰¾åˆ°å­å—çš„ä¸‹è¾¹ç•Œç‚¹(ie,je), å³(i1,i2)-(ie,je)å›´æˆçš„çŸ©å½¢åŒºåŸŸå†…çš„ç‚¹ï¼Œå…¨éƒ¨æ˜¯å†…ç‚¹
+subroutine find_subface_boundary(m, nf, i1, i2, ie, je)
+  use Global_Variables
+  implicit none
+  integer:: m, nf, i1, i2, ie, je, ia, ja
+  TYPE(Face_Type), Pointer:: F
+  TYPE(Point_Type), Pointer:: P
 
-    F=> Block(m)%face(nf)
- !  Ñ°ÕÒ¸ÃÁ¬Ğø¾ØĞÎ¿éµÄÖÕÖ¹Î»ÖÃ (ie,je)
- Loop1:  do ia=i1, F%n1
-          P=> F%point(ia,i2)
-          if(P%If_inner .eq. 0) then 
-          ie=ia-1 
-          exit Loop1
-          endif
-         enddo Loop1
-         
- Loop2:  do ja=i2, F%n2
-           do ia=i1,ie
-            P=> F%point(ia,ja)
-            if(P%If_inner .eq. 0) then 
-            je=ja-1
-            exit Loop2
-            endif
-          enddo
-         enddo Loop2
-    end subroutine find_subface_boundary
+  F => Block(m)%face(nf)
+  !  å¯»æ‰¾è¯¥è¿ç»­çŸ©å½¢å—çš„ç»ˆæ­¢ä½ç½® (ie,je)
+  Loop1: do ia = i1, F%n1
+    P => F%point(ia, i2)
+    if (P%If_inner .eq. 0) then
+      ie = ia-1
+      exit Loop1
+    end if
+  end do Loop1
+
+  Loop2: do ja = i2, F%n2
+    do ia = i1, ie
+      P => F%point(ia, ja)
+      if (P%If_inner .eq. 0) then
+        je = ja-1
+        exit Loop2
+      end if
+    end do
+  end do Loop2
+end subroutine find_subface_boundary
 
 !----------------------------------------------------
-! ÕÒµ½½Çµã(ib,ie)¶ÔÓ¦µÄÁ¬½Óµã(i1t,j1t) , ÓÉÓÚ¸Ãµã¿ÉÄÜ²»Ö¹Ò»¸öÁ¬½Ó£¬Òò´ËĞèÒªËÑË÷ÓëÄÚµãÁ¬½ÓµãÔÚÍ¬Ò»¿é¡¢Í¬Ò»ÃæµÄµã
-      subroutine find_corner_link_point(m,nf,ib,jb,i1t,j1t,mt,nft)
-          use Global_Variables
-          implicit none
-          integer:: m,nf,ib,jb,i1t,j1t,mt,nft,ns
-          TYPE (Point_Type), Pointer:: P
-          P=>Block(m)%face(nf)%point(ib,jb)   ! ½Çµã
-  Loop3:  do ns=1,P%Num_link        ! ÔÚÈ«²¿Á¬½ÓµãÖĞËÑË÷£¨Á¬½Ó¿é=mt, Á¬½ÓÃæ=nftµÄµã£©
-            if(P%block_link(ns) .eq. mt .and. P%face_link(ns) .eq. nft) then
-             i1t=P%n1_link(ns); j1t=P%n2_link(ns)    ! Á¬½Óµã
-            exit Loop3           
-	    endif
-	   enddo Loop3
-      end subroutine find_corner_link_point
-
+! æ‰¾åˆ°è§’ç‚¹(ib,ie)å¯¹åº”çš„è¿æ¥ç‚¹(i1t,j1t) , ç”±äºè¯¥ç‚¹å¯èƒ½ä¸æ­¢ä¸€ä¸ªè¿æ¥ï¼Œå› æ­¤éœ€è¦æœç´¢ä¸å†…ç‚¹è¿æ¥ç‚¹åœ¨åŒä¸€å—ã€åŒä¸€é¢çš„ç‚¹
+subroutine find_corner_link_point(m, nf, ib, jb, i1t, j1t, mt, nft)
+  use Global_Variables
+  implicit none
+  integer:: m, nf, ib, jb, i1t, j1t, mt, nft, ns
+  TYPE(Point_Type), Pointer:: P
+  P => Block(m)%face(nf)%point(ib, jb)   ! è§’ç‚¹
+  Loop3: do ns = 1, P%Num_link        ! åœ¨å…¨éƒ¨è¿æ¥ç‚¹ä¸­æœç´¢ï¼ˆè¿æ¥å—=mt, è¿æ¥é¢=nftçš„ç‚¹ï¼‰
+    if (P%block_link(ns) .eq. mt .and. P%face_link(ns) .eq. nft) then
+      i1t = P%n1_link(ns); j1t = P%n2_link(ns)    ! è¿æ¥ç‚¹
+      exit Loop3
+    end if
+  end do Loop3
+end subroutine find_corner_link_point
 
 !---------------------------------------------------------------
-!  ±È½ÏÁ½¸öµã m¿é,nfÃæÉÏµÄÁ½¸öµã(i1,j1) Óë (i2,j2) ÊÇ·ñ¾ßÓĞÏàÍ¬µÄÁ¬½ÓĞÅÏ¢
-    subroutine compare(m,nf, i1,j1, i2,j2,flag1) 
+!  æ¯”è¾ƒä¸¤ä¸ªç‚¹ må—,nfé¢ä¸Šçš„ä¸¤ä¸ªç‚¹(i1,j1) ä¸ (i2,j2) æ˜¯å¦å…·æœ‰ç›¸åŒçš„è¿æ¥ä¿¡æ¯
+subroutine compare(m, nf, i1, j1, i2, j2, flag1)
 !   subroutine compare(P,P1,flag1)
-   use Global_Variables
-   implicit none
-   integer:: m,nf, i1,j1, i2,j2, flag1 , pb,pf, n
-   TYPE (Face_Type), Pointer::F
-   TYPE (Point_Type), Pointer:: P1,P2
-    F=> Block(m)%face(nf)
-    P1=> F%Point(i1,j1)
-    P2 => F%point(i2,j2)
-    if(P1%num_link .eq. 0)  then   ! PµãÎŞÁ¬½Ó
-       if(P2%num_link .eq. 0) then  
-         flag1=1           !Á½¸öµã¾ùÎŞÁ¬½Ó£¬Æ¥Åä
-       else if (i2 .eq. 1 .or. j2 .eq. 1 .or. i2 .eq. F%n1 .or. j2 .eq. F%n2) then
-         flag1=1           ! ÃæµÄ±ß½çµã¼´Ê¹ÓĞÁ¬½ÓÒ²¿ÉÒÔºÍÎŞÁ¬½ÓµãÆ¥Åä
-       else   
-        flag1=0            ! ÓĞÁ¬½ÓµãÓëÎŞÁ¬½Óµã£¬²»Æ¥Åä
-       endif
-    else     
-         pb=P1%block_link(1) ; pf=P1%face_link(1)    ! (µÚÒ»¸öµã) Á¬½ÓµÄ¿éºÅÓëÃæºÅ
-         flag1=0
-Loop1:   do n=1,P2%num_link                           ! ËÑË÷µÚ2¸öµãµÄÈ«²¿Á¬½ÓĞÅÏ¢
-         if(P2%block_link(n) .eq. Pb .and. P2%face_link(n) .eq. Pf) then   
-         flag1=1                      ! ¿éºÅ¡¢ÃæºÅ¾ùÆ¥Åä
-         exit Loop1
-         endif
-         enddo Loop1
-     endif
+  use Global_Variables
+  implicit none
+  integer:: m, nf, i1, j1, i2, j2, flag1, pb, pf, n
+  TYPE(Face_Type), Pointer::F
+  TYPE(Point_Type), Pointer:: P1, P2
+  F => Block(m)%face(nf)
+  P1 => F%Point(i1, j1)
+  P2 => F%point(i2, j2)
+  if (P1%num_link .eq. 0) then   ! Pç‚¹æ— è¿æ¥
+    if (P2%num_link .eq. 0) then
+      flag1 = 1           !ä¸¤ä¸ªç‚¹å‡æ— è¿æ¥ï¼ŒåŒ¹é…
+    else if (i2 .eq. 1 .or. j2 .eq. 1 .or. i2 .eq. F%n1 .or. j2 .eq. F%n2) then
+      flag1 = 1           ! é¢çš„è¾¹ç•Œç‚¹å³ä½¿æœ‰è¿æ¥ä¹Ÿå¯ä»¥å’Œæ— è¿æ¥ç‚¹åŒ¹é…
+    else
+      flag1 = 0            ! æœ‰è¿æ¥ç‚¹ä¸æ— è¿æ¥ç‚¹ï¼Œä¸åŒ¹é…
+    end if
+  else
+    pb = P1%block_link(1); pf = P1%face_link(1)    ! (ç¬¬ä¸€ä¸ªç‚¹) è¿æ¥çš„å—å·ä¸é¢å·
+    flag1 = 0
+    Loop1: do n = 1, P2%num_link                           ! æœç´¢ç¬¬2ä¸ªç‚¹çš„å…¨éƒ¨è¿æ¥ä¿¡æ¯
+      if (P2%block_link(n) .eq. Pb .and. P2%face_link(n) .eq. Pf) then
+        flag1 = 1                      ! å—å·ã€é¢å·å‡åŒ¹é…
+        exit Loop1
+      end if
+    end do Loop1
+  end if
 
-   end subroutine compare
+end subroutine compare
 !---------------------------------------------------------------
 
-! ËÑË÷×ø±êÏàÍ¬µÄµã£¨Á¬½Óµã£©
-   subroutine search_link
-   use Global_Variables
-   implicit none
-   integer:: m,nf,mt,nft,i1,i2,j1,j2,i1t,i2t,n,ns,mt1,nft1,mt_now,nft_now 
-   integer:: zone,face,i,j,flag1,i0,j0,Link_max_point,ni1,nj1,ni2,nj2
-   real*8:: m1,m2,mp1,mp2,tmp,d1
+! æœç´¢åæ ‡ç›¸åŒçš„ç‚¹ï¼ˆè¿æ¥ç‚¹ï¼‰
+subroutine search_link
+  use Global_Variables
+  implicit none
+  integer:: m, nf, mt, nft, i1, i2, j1, j2, i1t, i2t, n, ns, mt1, nft1, mt_now, nft_now
+  integer:: zone, face, i, j, flag1, i0, j0, Link_max_point, ni1, nj1, ni2, nj2
+  real*8:: m1, m2, mp1, mp2, tmp, d1
 
-   real*8:: dist2
-   TYPE (Block_Type), Pointer:: B,Bt
-   TYPE (Face_Type), Pointer:: F,Ft
-   TYPE (Point_Type), Pointer:: P,Pt
+  real*8:: dist2
+  TYPE(Block_Type), Pointer:: B, Bt
+  TYPE(Face_Type), Pointer:: F, Ft
+  TYPE(Point_Type), Pointer:: P, Pt
 
+!-------------ä¼°ç®—é‡‡ç”¨ æ ‘å½¢å¤šçº§æœç´¢æ³• (åˆ†ç‰‡æœç´¢æ³•) çš„æ•ˆç‡, è¯¥å€¼å¯ä½œä¸ºä¿®æ”¹å‚æ•°Nqçš„å‚è€ƒ-------------------
+  print *, "To Estimate the efficient of Multi-stage search program ..."
+  m1 = 0; m2 = 0; mp1 = 0; mp2 = 0
+  do m = 1, Num_Block
+    B => Block(m)
+    do nf = 1, 6
+      F => B%face(nf)
+      do j1 = 1, F%nk2
+        !     print*, F%n2b(j1),F%n2e(j1)
+        do i1 = 1, F%nk1
+          !---------------- è¢«æœç´¢ç‚¹
+          do mt = 1, Num_Block
+            Bt => Block(mt)
+            do nft = 1, 6
+              Ft => Bt%face(nft)
+              do j2 = 1, Ft%nk2
+              do i2 = 1, Ft%nk1
+                tmp = 1.d0*(F%n2e(j1)-F%n2b(j1)+1)*(F%n1e(i1)-F%n1b(i1)+1)*(Ft%n2e(j2)-Ft%n2b(j2)+1)*(Ft%n1e(i2)-Ft%n1b(i2)+1)
+                if (tmp .lt. 0) then
+                  print *, i1, j1, i2, j2
+                  print *, F%n2e(j1), F%n2b(j1), F%n1e(i1), F%n1b(i1), Ft%n2e(j2), Ft%n2b(j2), Ft%n1e(i2), F%n1b(i2)
+                end if
 
-!-------------¹ÀËã²ÉÓÃ Ê÷ĞÎ¶à¼¶ËÑË÷·¨ (·ÖÆ¬ËÑË÷·¨) µÄĞ§ÂÊ, ¸ÃÖµ¿É×÷ÎªĞŞ¸Ä²ÎÊıNqµÄ²Î¿¼-------------------
-   print*, "To Estimate the efficient of Multi-stage search program ..."
-   m1=0; m2=0;mp1=0;mp2=0
-   do m=1,Num_Block
-     B => Block(m)
-     do nf=1,6 
-     F=> B%face(nf)
-      do j1=1,F%nk2
- !     print*, F%n2b(j1),F%n2e(j1)
-      do i1=1,F%nk1
- !---------------- ±»ËÑË÷µã   
-       do mt=1,Num_Block
-        Bt=> Block(mt)
-        do nft=1,6
-         Ft=> Bt%face(nft)
-         do j2=1,Ft%nk2
-         do i2=1,Ft%nk1
-         tmp=1.d0*(F%n2e(j1)-F%n2b(j1)+1)*(F%n1e(i1)-F%n1b(i1)+1)*(Ft%n2e(j2)-Ft%n2b(j2)+1)*(Ft%n1e(i2)-Ft%n1b(i2)+1)
-         if(tmp .lt. 0) then
-          print*, i1,j1,i2,j2
-          print*, F%n2e(j1),F%n2b(j1), F%n1e(i1), F%n1b(i1), Ft%n2e(j2), Ft%n2b(j2), Ft%n1e(i2),F%n1b(i2)
-         endif
+                if (sqrt((F%xc(i1, j1)-Ft%xc(i2, j2))**2+(F%yc(i1, j1)-Ft%yc(i2, j2))**2+(F%zc(i1, j1)-Ft%zc(i2, j2))**2) &
+                    .gt. F%dc(i1, j1)+Ft%dc(i2, j2)+Dist_limit) then  ! ä¸¤ä¸ªé¢è·ç¦»å¤ªè¿œï¼Œè·³è¿‡æœç´¢
+                  m1 = m1+1
+                  mp1 = mp1+1.d0*(F%n2e(j1)-F%n2b(j1)+1)*(F%n1e(i1)-F%n1b(i1)+1)*(Ft%n2e(j2)-Ft%n2b(j2)+1)*(Ft%n1e(i2)-Ft%n1b(i2)+1)
+                else
+                  m2 = m2+1
+                  mp2 = mp2+1.d0*(F%n2e(j1)-F%n2b(j1)+1)*(F%n1e(i1)-F%n1b(i1)+1)*(Ft%n2e(j2)-Ft%n2b(j2)+1)*(Ft%n1e(i2)-Ft%n1b(i2)+1)
+                end if
+              end do
+              end do
+            end do
+          end do
+        end do
+      end do
+    end do
+  end do
 
-        if(sqrt((F%xc(i1,j1)-Ft%xc(i2,j2))**2+(F%yc(i1,j1)-Ft%yc(i2,j2))**2+(F%zc(i1,j1)-Ft%zc(i2,j2))**2)  &
-                 .gt. F%dc(i1,j1)+Ft%dc(i2,j2)+Dist_limit ) then  ! Á½¸öÃæ¾àÀëÌ«Ô¶£¬Ìø¹ıËÑË÷
-         m1=m1+1
-         mp1=mp1+1.d0*(F%n2e(j1)-F%n2b(j1)+1)*(F%n1e(i1)-F%n1b(i1)+1)*(Ft%n2e(j2)-Ft%n2b(j2)+1)*(Ft%n1e(i2)-Ft%n1b(i2)+1)
-        else
-         m2=m2+1
-         mp2=mp2+1.d0*(F%n2e(j1)-F%n2b(j1)+1)*(F%n1e(i1)-F%n1b(i1)+1)*(Ft%n2e(j2)-Ft%n2b(j2)+1)*(Ft%n1e(i2)-Ft%n1b(i2)+1)
-       endif
-      enddo
-      enddo
-      enddo
-      enddo
-      enddo
-      enddo
-      enddo
-      enddo
- 
-      print*, "The speed-up by using multi-stage search technique is:",    mp1/mp2
-      print*, "If the speed-up is low, you can modify the parameter 'Nq' to increase it" 
-
+  print *, "The speed-up by using multi-stage search technique is:", mp1/mp2
+  print *, "If the speed-up is low, you can modify the parameter 'Nq' to increase it"
 
 !---Search the face point----------------------------------------------------------
 
-  Link_max_point=0   ! ×î¶àÁ¬½ÓµãµÄÁ¬½ÓÊı
-   print*, "Search the Edge Points ......"
- !------ËÑË÷µã--------             
-   do m=1,Num_Block
-    print*, "----------------------------- :  Zone ", m 
-     B => Block(m)
-     do nf=1,6 
-     print*, "face ", nf
-     F=> B%face(nf)
-     do nj1=1,F%nk2
-     do ni1=1,F%nk1
-       do i2= F%n2b(nj1),F%n2e(nj1)
-       do i1= F%n1b(ni1),F%n1e(ni1)
-        P=> F%point(i1,i2)
-        P%Search_flag=1     ! ±íÊ¾ÒÑ±»ËÑË÷¹ı
-!--------------------------------------------------------------    
-!       ±»ËÑË÷µã       
-       do mt=1,Num_Block
-        Bt=> Block(mt)
-        do nft=1,6
-         Ft=> Bt%face(nft)
-         do nj2=1,Ft%nk2
-         do ni2=1,Ft%nk1
-          d1=sqrt((F%xc(ni1,nj1)-Ft%xc(ni2,nj2))**2+(F%yc(ni1,nj1)-Ft%yc(ni2,nj2))**2+(F%zc(ni1,nj1)-Ft%zc(ni2,nj2))**2)
-          if(d1 .gt. F%dc(ni1,nj1)+Ft%dc(ni2,nj2)+Dist_limit )  cycle  ! Á½¸öÃæ¾àÀëÌ«Ô¶£¬Ìø¹ıËÑË÷
- !---------------------------------------
-          do i2t= Ft%n2b(nj2),Ft%n2e(nj2)
-          do i1t= Ft%n1b(ni2),Ft%n1e(ni2)
-            Pt=>Ft%point(i1t,i2t)
-           if(Pt%Search_flag .eq. 0 ) then       ! ÉĞÎ´ËÑË÷¹ıµÄ
-            dist2=(P%x-Pt%x)**2+(P%y-Pt%y)**2+(P%z-Pt%z)**2
+  Link_max_point = 0   ! æœ€å¤šè¿æ¥ç‚¹çš„è¿æ¥æ•°
+  print *, "Search the Edge Points ......"
+  !------æœç´¢ç‚¹--------
+  do m = 1, Num_Block
+    print *, "----------------------------- :  Zone ", m
+    B => Block(m)
+    do nf = 1, 6
+      print *, "face ", nf
+      F => B%face(nf)
+      do nj1 = 1, F%nk2
+      do ni1 = 1, F%nk1
+        do i2 = F%n2b(nj1), F%n2e(nj1)
+        do i1 = F%n1b(ni1), F%n1e(ni1)
+          P => F%point(i1, i2)
+          P%Search_flag = 1     ! è¡¨ç¤ºå·²è¢«æœç´¢è¿‡
+!--------------------------------------------------------------
+!       è¢«æœç´¢ç‚¹
+          do mt = 1, Num_Block
+            Bt => Block(mt)
+            do nft = 1, 6
+              Ft => Bt%face(nft)
+              do nj2 = 1, Ft%nk2
+              do ni2 = 1, Ft%nk1
+              d1 = sqrt((F%xc(ni1, nj1)-Ft%xc(ni2, nj2))**2+(F%yc(ni1, nj1)-Ft%yc(ni2, nj2))**2+(F%zc(ni1, nj1)-Ft%zc(ni2, nj2))**2)
+                if (d1 .gt. F%dc(ni1, nj1)+Ft%dc(ni2, nj2)+Dist_limit) cycle  ! ä¸¤ä¸ªé¢è·ç¦»å¤ªè¿œï¼Œè·³è¿‡æœç´¢
+                !---------------------------------------
+                do i2t = Ft%n2b(nj2), Ft%n2e(nj2)
+                do i1t = Ft%n1b(ni2), Ft%n1e(ni2)
+                  Pt => Ft%point(i1t, i2t)
+                  if (Pt%Search_flag .eq. 0) then       ! å°šæœªæœç´¢è¿‡çš„
+                    dist2 = (P%x-Pt%x)**2+(P%y-Pt%y)**2+(P%z-Pt%z)**2
 
-           if(dist2 .lt. Dist_limit**2  ) then       ! ÕÒµ½×ø±êÏàÍ¬µÄµã        
-!        Ò»¶Ô¶ÔÓ¦µã         
-           P%num_link=P%num_link+1
-           P%block_link(P%num_link)=mt
-           P%face_link(P%num_link)=nft
-           P%n1_link(P%num_link)=i1t
-           P%n2_link(P%num_link)=i2t
-           Pt%num_link=Pt%num_link+1
-           Pt%block_link(Pt%num_link)=m
-           Pt%face_link(Pt%num_link)=nf
-           Pt%n1_link(Pt%num_link)=i1
-           Pt%n2_link(Pt%num_link)=i2
+                    if (dist2 .lt. Dist_limit**2) then       ! æ‰¾åˆ°åæ ‡ç›¸åŒçš„ç‚¹
+!        ä¸€å¯¹å¯¹åº”ç‚¹
+                      P%num_link = P%num_link+1
+                      P%block_link(P%num_link) = mt
+                      P%face_link(P%num_link) = nft
+                      P%n1_link(P%num_link) = i1t
+                      P%n2_link(P%num_link) = i2t
+                      Pt%num_link = Pt%num_link+1
+                      Pt%block_link(Pt%num_link) = m
+                      Pt%face_link(Pt%num_link) = nf
+                      Pt%n1_link(Pt%num_link) = i1
+                      Pt%n2_link(Pt%num_link) = i2
 
-           if(P%num_link .gt. Link_max_point) Link_max_point=P%num_link
-           if(Pt%num_link .gt. Link_max_point) Link_max_point=Pt%num_link
-           endif
-          endif
-        enddo
-        enddo
-        enddo
-        enddo
-        enddo
-        enddo 
-     enddo
-     enddo
-     enddo
-     enddo
-     enddo
-     enddo
+                      if (P%num_link .gt. Link_max_point) Link_max_point = P%num_link
+                      if (Pt%num_link .gt. Link_max_point) Link_max_point = Pt%num_link
+                    end if
+                  end if
+                end do
+                end do
+              end do
+              end do
+            end do
+          end do
+        end do
+        end do
+      end do
+      end do
+    end do
+  end do
 
-  print*, "Search Edge OK ..."
-  print*, "Max Link is ", Link_max_point
+  print *, "Search Edge OK ..."
+  print *, "Max Link is ", Link_max_point
 
-
-
-  print*, "Search OK ..."
+  print *, "Search OK ..."
 
 !-----------------------------------
 !    print*, "Write the file link.dat"
@@ -484,7 +474,7 @@ Loop1:   do n=1,P2%num_link                           ! ËÑË÷µÚ2¸öµãµÄÈ«²¿Á¬½ÓĞÅÏ
 
 !    do m=1,Num_Block
 !      B => Block(m)
-!    do nf=1,6 
+!    do nf=1,6
 !      F=> B%face(nf)
 !     write(99,*) "Zone= ", m, " Face= ", nf , "-----------------------------------------"
 !     do j=1, F%n2
@@ -500,675 +490,658 @@ Loop1:   do n=1,P2%num_link                           ! ËÑË÷µÚ2¸öµãµÄÈ«²¿Á¬½ÓĞÅÏ
 !    enddo
 !   close(99)
 
+end subroutine search_link
 
- 
-  end subroutine search_link
-        
-  
 !-----------------------------------------------------------------
-! ¶ÁÈ¡Íø¸ñĞÅÏ¢£¬´æ´¢±íÃæÍø¸ñ
-! ËÑË÷×îĞ¡Íø¸ñ¼ä¾àDist_min (¾àÀëĞ¡ÓÚ0.1±¶Dis_minµÄÁ½¸öµãÈÏÎªÊÇÍ¬Ò»¸öµã£© 
-  
-  subroutine read_coordinate
-   use Global_Variables
-   implicit none
-   integer,allocatable,dimension(:):: NI,NJ,NK
-   real*8,allocatable,dimension(:,:,:):: x,y,z
-   integer:: nx,ny,nz,i,j,k,m,nf,ib(6),jb(6),kb(6),ie(6),je(6),ke(6)
-   integer:: i1,i2,nf1,ni1,nj1,n1,nk1,nk2
-    TYPE (Block_Type), Pointer:: B
-   TYPE (Face_Type), Pointer:: F
-   TYPE (SubFace_Type), Pointer:: SF
-   TYPE (Point_Type), Pointer:: P
+! è¯»å–ç½‘æ ¼ä¿¡æ¯ï¼Œå­˜å‚¨è¡¨é¢ç½‘æ ¼
+! æœç´¢æœ€å°ç½‘æ ¼é—´è·Dist_min (è·ç¦»å°äº0.1å€Dis_minçš„ä¸¤ä¸ªç‚¹è®¤ä¸ºæ˜¯åŒä¸€ä¸ªç‚¹ï¼‰
 
-   real*8:: di,dj,dk,d1,tmp
-!-----------------------------------------------------------------------  
-   Dist_min=1000.d0  ! ³õÖµ
-  
- !  print*, "==================================================================="
- !  print*, "Please input the distance threshold Dist_limit"
- !  print*, "two points with distance < Dist_limit will be considered as the same point"
- !  print*, "if Dist_limit<=0, this code will automatically set it"
- !  print*, "????? Input Dist_limit ?????"
- !  read(*,*) Dist_limit
- 
- 
-   print*, "Is Mesh3d.dat formatted file ?  1 for formatted, 0 for unformatted"
-   read(*,*) Form_Mesh   
-   if(Form_Mesh .eq. 1) then
-    open(99,file="Mesh3d.dat")
-    read(99,*) Num_Block
-   else
-    open(99,file="Mesh3d.dat",form="unformatted")
-    read(99) Num_Block         ! ×Ü¿éÊı
-   endif
+subroutine read_coordinate
+  use Global_Variables
+  implicit none
+  integer, allocatable, dimension(:):: NI, NJ, NK
+  real*8, allocatable, dimension(:, :, :):: x, y, z
+  integer:: nx, ny, nz, i, j, k, m, nf, ib(6), jb(6), kb(6), ie(6), je(6), ke(6)
+  integer:: i1, i2, nf1, ni1, nj1, n1, nk1, nk2
+  TYPE(Block_Type), Pointer:: B
+  TYPE(Face_Type), Pointer:: F
+  TYPE(SubFace_Type), Pointer:: SF
+  TYPE(Point_Type), Pointer:: P
 
-  
-    allocate(Block(Num_Block))               
-    allocate(NI(Num_Block),NJ(Num_Block),NK(Num_Block) )   ! Ã¿¿éµÄ´óĞ¡
-   if(Form_Mesh .eq. 1) then
-    read(99,*) (NI(k), NJ(k), NK(k), k=1,Num_Block)
-   else
-    read(99) (NI(k), NJ(k), NK(k), k=1,Num_Block)
-   endif
-! ¶ÁÈ¡Ã¿¿é¼¸ºÎĞÅÏ¢, ¼ÇÂ¼ÃæÉÏµÄĞÅÏ¢----------------------------------------   
-    do m=1,Num_Block
-     B => Block(m)
-     B%Block_no=m
-     B%nx=NI(m); B%ny=NJ(m) ; B%nz=NK(m)   ! nx,ny,nz Ã¿¿éµÄ´óĞ¡
-     nx=B%nx ; ny= B%ny ; nz=B%nz
-! ----------  ¼¸ºÎÁ¿ -----------------------------------------------
-    allocate(x(nx,ny,nz), y(nx,ny,nz), z(nx,ny,nz))  ! ¸ñµã×ø±ê
-   if(Form_Mesh .eq. 1) then
-    read(99,*) (((x(i,j,k),i=1,nx),j=1,ny),k=1,nz) , &
-                (((y(i,j,k),i=1,nx),j=1,ny),k=1,nz) , &
-                (((z(i,j,k),i=1,nx),j=1,ny),k=1,nz)
-   else  
-    read(99) (((x(i,j,k),i=1,nx),j=1,ny),k=1,nz) , &
-                (((y(i,j,k),i=1,nx),j=1,ny),k=1,nz) , &
-                (((z(i,j,k),i=1,nx),j=1,ny),k=1,nz)
-   endif
+  real*8:: di, dj, dk, d1, tmp
+!-----------------------------------------------------------------------
+  Dist_min = 1000.d0  ! åˆå€¼
+
+  !  print*, "==================================================================="
+  !  print*, "Please input the distance threshold Dist_limit"
+  !  print*, "two points with distance < Dist_limit will be considered as the same point"
+  !  print*, "if Dist_limit<=0, this code will automatically set it"
+  !  print*, "????? Input Dist_limit ?????"
+  !  read(*,*) Dist_limit
+
+  print *, "Is Mesh3d.dat formatted file ?  1 for formatted, 0 for unformatted"
+  read (*, *) Form_Mesh
+  if (Form_Mesh .eq. 1) then
+    open (99, file="Mesh3d.dat")
+    read (99, *) Num_Block
+  else
+    open (99, file="Mesh3d.dat", form="unformatted")
+    read (99) Num_Block         ! æ€»å—æ•°
+  end if
+
+  allocate (Block(Num_Block))
+  allocate (NI(Num_Block), NJ(Num_Block), NK(Num_Block))   ! æ¯å—çš„å¤§å°
+  if (Form_Mesh .eq. 1) then
+    read (99, *) (NI(k), NJ(k), NK(k), k=1, Num_Block)
+  else
+    read (99) (NI(k), NJ(k), NK(k), k=1, Num_Block)
+  end if
+! è¯»å–æ¯å—å‡ ä½•ä¿¡æ¯, è®°å½•é¢ä¸Šçš„ä¿¡æ¯----------------------------------------
+  do m = 1, Num_Block
+    B => Block(m)
+    B%Block_no = m
+    B%nx = NI(m); B%ny = NJ(m); B%nz = NK(m)   ! nx,ny,nz æ¯å—çš„å¤§å°
+    nx = B%nx; ny = B%ny; nz = B%nz
+! ----------  å‡ ä½•é‡ -----------------------------------------------
+    allocate (x(nx, ny, nz), y(nx, ny, nz), z(nx, ny, nz))  ! æ ¼ç‚¹åæ ‡
+    if (Form_Mesh .eq. 1) then
+      read (99, *) (((x(i, j, k), i=1, nx), j=1, ny), k=1, nz), &
+        (((y(i, j, k), i=1, nx), j=1, ny), k=1, nz), &
+        (((z(i, j, k), i=1, nx), j=1, ny), k=1, nz)
+    else
+      read (99) (((x(i, j, k), i=1, nx), j=1, ny), k=1, nz), &
+        (((y(i, j, k), i=1, nx), j=1, ny), k=1, nz), &
+        (((z(i, j, k), i=1, nx), j=1, ny), k=1, nz)
+    end if
 
 !------------
-    do k=1,nz-1
-    do j=1,ny-1
-    do i=1,nx-1
-      di=sqrt( (x(i+1,j,k)-x(i,j,k))**2+ (y(i+1,j,k)-y(i,j,k))**2 + (z(i+1,j,k)-z(i,j,k))**2 )
-      dj=sqrt( (x(i,j+1,k)-x(i,j,k))**2+ (y(i,j+1,k)-y(i,j,k))**2 + (z(i,j+1,k)-z(i,j,k))**2 )
-      dk=sqrt( (x(i,j,k+1)-x(i,j,k))**2+ (y(i,j,k+1)-y(i,j,k))**2 + (z(i,j,k+1)-z(i,j,k))**2 )
-     Dist_min=min(Dist_min,di,dj,dk)
-    enddo
-    enddo
-    enddo
+    do k = 1, nz-1
+    do j = 1, ny-1
+    do i = 1, nx-1
+      di = sqrt((x(i+1, j, k)-x(i, j, k))**2+(y(i+1, j, k)-y(i, j, k))**2+(z(i+1, j, k)-z(i, j, k))**2)
+      dj = sqrt((x(i, j+1, k)-x(i, j, k))**2+(y(i, j+1, k)-y(i, j, k))**2+(z(i, j+1, k)-z(i, j, k))**2)
+      dk = sqrt((x(i, j, k+1)-x(i, j, k))**2+(y(i, j, k+1)-y(i, j, k))**2+(z(i, j, k+1)-z(i, j, k))**2)
+      Dist_min = min(Dist_min, di, dj, dk)
+    end do
+    end do
+    end do
 !-------------
 
-!  ¼ÇÂ¼6¸öÃæµÄĞÅÏ¢ 
-! face 1  (i-)     
-     F=> B%face(1)
-     F%face_no=1 ; F%n1= ny ; F%n2= nz           
-     allocate(F%point(F%n1,F%n2))
-     do i2=1,F%n2
-     do i1=1,F%n1
-       F%point(i1,i2)%x=x(1,i1,i2);   F%point(i1,i2)%y=y(1,i1,i2);  F%point(i1,i2)%z=z(1,i1,i2)
-     enddo
-     enddo
+!  è®°å½•6ä¸ªé¢çš„ä¿¡æ¯
+! face 1  (i-)
+    F => B%face(1)
+    F%face_no = 1; F%n1 = ny; F%n2 = nz
+    allocate (F%point(F%n1, F%n2))
+    do i2 = 1, F%n2
+    do i1 = 1, F%n1
+      F%point(i1, i2)%x = x(1, i1, i2); F%point(i1, i2)%y = y(1, i1, i2); F%point(i1, i2)%z = z(1, i1, i2)
+    end do
+    end do
 
-! face 2  (j-)     
-     F=> B%face(2)
-     F%face_no=2 ; F%n1= nx ; F%n2= nz           
-     allocate(F%point(F%n1,F%n2))
-     do i2=1,F%n2
-     do i1=1,F%n1
-       F%point(i1,i2)%x=x(i1,1,i2);   F%point(i1,i2)%y=y(i1,1,i2);  F%point(i1,i2)%z=z(i1,1,i2)
-     enddo
-     enddo
+! face 2  (j-)
+    F => B%face(2)
+    F%face_no = 2; F%n1 = nx; F%n2 = nz
+    allocate (F%point(F%n1, F%n2))
+    do i2 = 1, F%n2
+    do i1 = 1, F%n1
+      F%point(i1, i2)%x = x(i1, 1, i2); F%point(i1, i2)%y = y(i1, 1, i2); F%point(i1, i2)%z = z(i1, 1, i2)
+    end do
+    end do
 
-! face 3  (k-)     
-     F=> B%face(3)
-     F%face_no=3 ; F%n1= nx ; F%n2= ny           
-     allocate(F%point(F%n1,F%n2))
-     do i2=1,F%n2
-     do i1=1,F%n1
-       F%point(i1,i2)%x=x(i1,i2,1);   F%point(i1,i2)%y=y(i1,i2,1);  F%point(i1,i2)%z=z(i1,i2,1)
-     enddo
-     enddo
+! face 3  (k-)
+    F => B%face(3)
+    F%face_no = 3; F%n1 = nx; F%n2 = ny
+    allocate (F%point(F%n1, F%n2))
+    do i2 = 1, F%n2
+    do i1 = 1, F%n1
+      F%point(i1, i2)%x = x(i1, i2, 1); F%point(i1, i2)%y = y(i1, i2, 1); F%point(i1, i2)%z = z(i1, i2, 1)
+    end do
+    end do
 
-! face 4  (i+)     
-     F=> B%face(4)
-     F%face_no=4 ; F%n1= ny ; F%n2= nz           
-     allocate(F%point(F%n1,F%n2))
-     do i2=1,F%n2
-     do i1=1,F%n1
-       F%point(i1,i2)%x=x(nx,i1,i2);   F%point(i1,i2)%y=y(nx,i1,i2);  F%point(i1,i2)%z=z(nx,i1,i2)
-     enddo
-     enddo
+! face 4  (i+)
+    F => B%face(4)
+    F%face_no = 4; F%n1 = ny; F%n2 = nz
+    allocate (F%point(F%n1, F%n2))
+    do i2 = 1, F%n2
+    do i1 = 1, F%n1
+      F%point(i1, i2)%x = x(nx, i1, i2); F%point(i1, i2)%y = y(nx, i1, i2); F%point(i1, i2)%z = z(nx, i1, i2)
+    end do
+    end do
 
-! face 5  (j+)     
-     F=> B%face(5)
-     F%face_no=5 ; F%n1= nx ; F%n2= nz           
-     allocate(F%point(F%n1,F%n2))
-     do i2=1,F%n2
-     do i1=1,F%n1
-       F%point(i1,i2)%x=x(i1,ny,i2);   F%point(i1,i2)%y=y(i1,ny,i2);  F%point(i1,i2)%z=z(i1,ny,i2)
-     enddo
-     enddo
+! face 5  (j+)
+    F => B%face(5)
+    F%face_no = 5; F%n1 = nx; F%n2 = nz
+    allocate (F%point(F%n1, F%n2))
+    do i2 = 1, F%n2
+    do i1 = 1, F%n1
+      F%point(i1, i2)%x = x(i1, ny, i2); F%point(i1, i2)%y = y(i1, ny, i2); F%point(i1, i2)%z = z(i1, ny, i2)
+    end do
+    end do
 
-! face 6  (k+)     
-     F=> B%face(6)
-     F%face_no=6 ; F%n1= nx ; F%n2= ny           
-     allocate(F%point(F%n1,F%n2))
-     do i2=1,F%n2
-     do i1=1,F%n1
-       F%point(i1,i2)%x=x(i1,i2,nz);   F%point(i1,i2)%y=y(i1,i2,nz);  F%point(i1,i2)%z=z(i1,i2,nz)
-     enddo
-     enddo
+! face 6  (k+)
+    F => B%face(6)
+    F%face_no = 6; F%n1 = nx; F%n2 = ny
+    allocate (F%point(F%n1, F%n2))
+    do i2 = 1, F%n2
+    do i1 = 1, F%n1
+      F%point(i1, i2)%x = x(i1, i2, nz); F%point(i1, i2)%y = y(i1, i2, nz); F%point(i1, i2)%z = z(i1, i2, nz)
+    end do
+    end do
 !----------------------------------
 
-    deallocate(x,y,z) 
+    deallocate (x, y, z)
 
-!  ³õÊ¼»¯ÃæĞÅÏ¢    
-   do nf=1,6
-    F=> B%face(nf)
-!   ³õÊ¼»¯µãĞÅÏ¢   
-    do i2=1,F%n2
-    do i1=1,F%n1
-    F%point(i1,i2)%Search_flag=0    ! ËÑË÷Ê±Ê¹ÓÃµÄÁÙÊ±±äÁ¿ 
-    F%Point(i1,i2)%color=0
-    F%point(i1,i2)%If_inner=0       ! "×ÓÃæÄÚµã" ±êÖ¾
-    F%point(i1,i2)%num_link=0       ! Á¬½Óµã×ÜÊı
-    F%point(i1,i2)% block_link(:)=0    ! 
-    F%point(i1,i2)% face_link(:)=0
-    F%point(i1,i2)% n1_link(:)=0
-    F%point(i1,i2)% n2_link(:)=0
-    enddo
-    enddo
-   enddo
+!  åˆå§‹åŒ–é¢ä¿¡æ¯
+    do nf = 1, 6
+      F => B%face(nf)
+!   åˆå§‹åŒ–ç‚¹ä¿¡æ¯
+      do i2 = 1, F%n2
+      do i1 = 1, F%n1
+        F%point(i1, i2)%Search_flag = 0    ! æœç´¢æ—¶ä½¿ç”¨çš„ä¸´æ—¶å˜é‡
+        F%Point(i1, i2)%color = 0
+        F%point(i1, i2)%If_inner = 0       ! "å­é¢å†…ç‚¹" æ ‡å¿—
+        F%point(i1, i2)%num_link = 0       ! è¿æ¥ç‚¹æ€»æ•°
+        F%point(i1, i2)%block_link(:) = 0    !
+        F%point(i1, i2)%face_link(:) = 0
+        F%point(i1, i2)%n1_link(:) = 0
+        F%point(i1, i2)%n2_link(:) = 0
+      end do
+      end do
+    end do
 
-    ! ³õÊ¼»¯×ÓÃæĞÅÏ¢ 
-     B%Num_Subface=0  
-     B%color_now=0
+    ! åˆå§‹åŒ–å­é¢ä¿¡æ¯
+    B%Num_Subface = 0
+    B%color_now = 0
 
-     do k=1, Max_Subface
-     SF=> B%subface(k)
-     SF%subface_no=0 ; SF%face_no=0; SF%ib=0 ; SF%jb=0 ; SF%ie=0 ; SF%je=0
-     SF%subface_link=0; SF%block_link=0 ; SF%face_link=0 ; SF%orient=0
-     enddo
-  !--------------------------------------------------------------
-  ! ´´½¨ÃæÔª£¬ ¼ÇÂ¼Ã¿¸öÃæÔªµÄÖĞĞÄµã¼°°ë¾¶
-     do nf=1,6 
-      F=> B%face(nf)
-      nk1=int((F%n1-1)/Nq)+1    !ÃæÔªµÄÊıÄ¿ £¨nk1*nk2¿é£©
-      nk2=int((F%n2-1)/Nq)+1
-      F%nk1=nk1  
-      F%nk2=nk2
-      allocate(F%n1b(nk1),F%n1e(nk1),F%n2b(nk2),F%n2e(nk2))
-      allocate(F%xc(nk1,nk2),F%yc(nk1,nk2),F%zc(nk1,nk2),F%dc(nk1,nk2))
+    do k = 1, Max_Subface
+      SF => B%subface(k)
+      SF%subface_no = 0; SF%face_no = 0; SF%ib = 0; SF%jb = 0; SF%ie = 0; SF%je = 0
+      SF%subface_link = 0; SF%block_link = 0; SF%face_link = 0; SF%orient = 0
+    end do
+    !--------------------------------------------------------------
+    ! åˆ›å»ºé¢å…ƒï¼Œ è®°å½•æ¯ä¸ªé¢å…ƒçš„ä¸­å¿ƒç‚¹åŠåŠå¾„
+    do nf = 1, 6
+      F => B%face(nf)
+      nk1 = int((F%n1-1)/Nq)+1    !é¢å…ƒçš„æ•°ç›® ï¼ˆnk1*nk2å—ï¼‰
+      nk2 = int((F%n2-1)/Nq)+1
+      F%nk1 = nk1
+      F%nk2 = nk2
+      allocate (F%n1b(nk1), F%n1e(nk1), F%n2b(nk2), F%n2e(nk2))
+      allocate (F%xc(nk1, nk2), F%yc(nk1, nk2), F%zc(nk1, nk2), F%dc(nk1, nk2))
 
-! °Ñ´ÓÏÂ±ê´Ó1µ½F%n1µÄµã·Ö¸î³ÉÈô¸É¶Î£¬Ã¿¶ÎNq¸öµã; Èç¹û²»ÄÜÕû³ı£¬×îºóÒ»¶ÎÊıÄ¿ÉÙĞ©
-!  F%n1b(k) ºÍF%n1e(k) ÊÇµÚk¶ÎµÄÆğ¡¢Ö¹ÏÂ±ê    
-      do k=1,nk1
-        F%n1b(k)=(k-1)*Nq+1        
-        if(k .ne. nk1) then
-          F%n1e(k)=k*Nq
+! æŠŠä»ä¸‹æ ‡ä»1åˆ°F%n1çš„ç‚¹åˆ†å‰²æˆè‹¥å¹²æ®µï¼Œæ¯æ®µNqä¸ªç‚¹; å¦‚æœä¸èƒ½æ•´é™¤ï¼Œæœ€åä¸€æ®µæ•°ç›®å°‘äº›
+!  F%n1b(k) å’ŒF%n1e(k) æ˜¯ç¬¬kæ®µçš„èµ·ã€æ­¢ä¸‹æ ‡
+      do k = 1, nk1
+        F%n1b(k) = (k-1)*Nq+1
+        if (k .ne. nk1) then
+          F%n1e(k) = k*Nq
         else
-          F%n1e(k)=F%n1
-        endif   
-      enddo
+          F%n1e(k) = F%n1
+        end if
+      end do
 
-! °Ñ´ÓÏÂ±ê´Ó1µ½F%n2µÄµã·Ö¸î³ÉÈô¸É¶Î£¬Ã¿¶ÎNq¸öµã; Èç¹û²»ÄÜÕû³ı£¬×îºóÒ»¶ÎÊıÄ¿ÉÙĞ©
-      do k=1,nk2
-        F%n2b(k)=(k-1)*Nq+1        
-        if(k .ne. nk2) then
-          F%n2e(k)=k*Nq
+! æŠŠä»ä¸‹æ ‡ä»1åˆ°F%n2çš„ç‚¹åˆ†å‰²æˆè‹¥å¹²æ®µï¼Œæ¯æ®µNqä¸ªç‚¹; å¦‚æœä¸èƒ½æ•´é™¤ï¼Œæœ€åä¸€æ®µæ•°ç›®å°‘äº›
+      do k = 1, nk2
+        F%n2b(k) = (k-1)*Nq+1
+        if (k .ne. nk2) then
+          F%n2e(k) = k*Nq
         else
-          F%n2e(k)=F%n2
-        endif   
-      enddo
+          F%n2e(k) = F%n2
+        end if
+      end do
 
+      do nj1 = 1, nk2
+      do ni1 = 1, nk1
 
-      do nj1=1,nk2
-      do ni1=1,nk1
+        F%xc(ni1, nj1) = 0.d0; F%yc(ni1, nj1) = 0.d0; F%dc(ni1, nj1) = 0.d0
+        do j = F%n2b(nj1), F%n2e(nj1)
+        do i = F%n1b(ni1), F%n1e(ni1)
+          P => F%point(i, j)
+          F%xc(ni1, nj1) = F%xc(ni1, nj1)+P%x
+          F%yc(ni1, nj1) = F%yc(ni1, nj1)+P%y
+          F%zc(ni1, nj1) = F%zc(ni1, nj1)+P%z
+        end do
+        end do
+        tmp = (F%n2e(nj1)-F%n2b(nj1)+1)*(F%n1e(ni1)-F%n1b(ni1)+1)
+        F%xc(ni1, nj1) = F%xc(ni1, nj1)/tmp
+        F%yc(ni1, nj1) = F%yc(ni1, nj1)/tmp
+        F%zc(ni1, nj1) = F%zc(ni1, nj1)/tmp
 
-      F%xc(ni1,nj1)=0.d0; F%yc(ni1,nj1)=0.d0 ; F%dc(ni1,nj1)=0.d0
-      do j=F%n2b(nj1), F%n2e(nj1)
-      do i=F%n1b(ni1), F%n1e(ni1)
-       P=> F%point(i,j)
-       F%xc(ni1,nj1)=F%xc(ni1,nj1)+P%x
-       F%yc(ni1,nj1)=F%yc(ni1,nj1)+P%y
-       F%zc(ni1,nj1)=F%zc(ni1,nj1)+P%z
-      enddo
-      enddo
-      tmp=(F%n2e(nj1)-F%n2b(nj1)+1)*(F%n1e(ni1)-F%n1b(ni1)+1)
-      F%xc(ni1,nj1)=F%xc(ni1,nj1)/tmp
-      F%yc(ni1,nj1)=F%yc(ni1,nj1)/tmp
-      F%zc(ni1,nj1)=F%zc(ni1,nj1)/tmp
+        do j = F%n2b(nj1), F%n2e(nj1)
+        do i = F%n1b(ni1), F%n1e(ni1)
+          P => F%point(i, j)
+          d1 = sqrt((P%x-F%xc(ni1, nj1))**2+(P%y-F%yc(ni1, nj1))**2+(P%z-F%zc(ni1, nj1))**2)
+          if (d1 .gt. F%dc(ni1, nj1)) F%dc(ni1, nj1) = d1
+        end do
+        end do
+        !     print*, F%xc,F%yc,F%zc,F%dc
+      end do
+      end do
 
-      do j=F%n2b(nj1), F%n2e(nj1)
-      do i=F%n1b(ni1), F%n1e(ni1)
-       P=> F%point(i,j)
-       d1=sqrt((P%x-F%xc(ni1,nj1))**2+(P%y-F%yc(ni1,nj1))**2 +(P%z-F%zc(ni1,nj1))**2 )
-       if(d1 .gt. F%dc(ni1,nj1)) F%dc(ni1,nj1)=d1
-      enddo
-      enddo
- !     print*, F%xc,F%yc,F%zc,F%dc
-    enddo
-    enddo
+    end do      ! face
 
-   enddo      ! face
+!---------------------------------------------------------------------------------------
+  end do      ! block
+  close (99)
+  print *, "read Mesh3d OK ..."
+  print *, "Minima Mesh Space is ", Dist_min
 
-!---------------------------------------------------------------------------------------   
-   enddo      ! block
-   close(99)
-   print*, "read Mesh3d OK ..."
-   print*, "Minima Mesh Space is ", Dist_min
-    
- !   if(Dist_limit .le. 0) Dist_limit=0.5d0*Dist_min  ! ÉèÖÃ¼ä¾àÃÅ¼÷ £¨0.5±¶×îĞ¡Íø¸ñ¼ä¾à£©£¬¾àÀëĞ¡ÓÚ¸ÃÃÅ¼÷µÄÁ½¸öµã½«ÈÏÎªÊÇÍ¬Ò»¸öµã
-    Dist_limit=0.5d0*Dist_min  ! ÉèÖÃ¼ä¾àÃÅ¼÷ £¨0.5±¶×îĞ¡Íø¸ñ¼ä¾à£©£¬¾àÀëĞ¡ÓÚ¸ÃÃÅ¼÷µÄÁ½¸öµã½«ÈÏÎªÊÇÍ¬Ò»¸öµã
-    print*, "The distance threshold is ", Dist_limit
-   end subroutine read_coordinate
+  !   if(Dist_limit .le. 0) Dist_limit=0.5d0*Dist_min  ! è®¾ç½®é—´è·é—¨æ§› ï¼ˆ0.5å€æœ€å°ç½‘æ ¼é—´è·ï¼‰ï¼Œè·ç¦»å°äºè¯¥é—¨æ§›çš„ä¸¤ä¸ªç‚¹å°†è®¤ä¸ºæ˜¯åŒä¸€ä¸ªç‚¹
+  Dist_limit = 0.5d0*Dist_min  ! è®¾ç½®é—´è·é—¨æ§› ï¼ˆ0.5å€æœ€å°ç½‘æ ¼é—´è·ï¼‰ï¼Œè·ç¦»å°äºè¯¥é—¨æ§›çš„ä¸¤ä¸ªç‚¹å°†è®¤ä¸ºæ˜¯åŒä¸€ä¸ªç‚¹
+  print *, "The distance threshold is ", Dist_limit
+end subroutine read_coordinate
 
 !---------------------------------------------------------
-! ¼ÆËãÁ¬½ÓÖ¸ÏòĞÔ
-!  ×ÓÃæµÄl·½ÏòÁ¬½Óµ½Ä¿±ê×ÓÃæ´Ó(i1,j1)Ö¸Ïò(i2,j2)µÄÒ»ÌõÓĞÏòÏß¶Î
-    subroutine comput_orient(fno,i1,j1,i2,j2,orient )
-    implicit none
-    integer:: fno,i1,j1,i2,j2,orient,p1,p2
-! ÅĞ¶Ï ´Ó(i1,j1) Ö¸Ïò (i2,j2) Ê¸Á¿µÄ·½Ïò £¨1,-1, 2, -2 ±íÊ¾ i, -i, j, -j ·½Ïò£©     
-    if(i1 .eq. i2 ) then
-      if(j2 .gt. j1) then
-        p1=2            ! j·½Ïò
-      else
-        p1=-2           ! -j·½Ïò
-      endif
+! è®¡ç®—è¿æ¥æŒ‡å‘æ€§
+!  å­é¢çš„læ–¹å‘è¿æ¥åˆ°ç›®æ ‡å­é¢ä»(i1,j1)æŒ‡å‘(i2,j2)çš„ä¸€æ¡æœ‰å‘çº¿æ®µ
+subroutine comput_orient(fno, i1, j1, i2, j2, orient)
+  implicit none
+  integer:: fno, i1, j1, i2, j2, orient, p1, p2
+! åˆ¤æ–­ ä»(i1,j1) æŒ‡å‘ (i2,j2) çŸ¢é‡çš„æ–¹å‘ ï¼ˆ1,-1, 2, -2 è¡¨ç¤º i, -i, j, -j æ–¹å‘ï¼‰
+  if (i1 .eq. i2) then
+    if (j2 .gt. j1) then
+      p1 = 2            ! jæ–¹å‘
     else
-      if(i2 .gt. i1) then
-        p1=1
+      p1 = -2           ! -jæ–¹å‘
+    end if
+  else
+    if (i2 .gt. i1) then
+      p1 = 1
+    else
+      p1 = -1
+    end if
+  end if
+! æ ¹æ®ï¼ˆè¿æ¥é¢ï¼‰çš„é¢å·ï¼ˆæŒ‡å‘ï¼‰ï¼Œå°†Pæ–¹å‘(P1ä»¥ i, -i, j, -jåº¦é‡ï¼‰ è½¬æ¢æˆä»¥ l, -l, m, -m åº¦é‡ çš„æ•° P2ï¼›
+  if (mod(fno, 2) .eq. 0) then
+    p2 = p1
+  else
+    if (p1 .eq. 1) p2 = 2
+    if (p1 .eq. -1) p2 = -2
+    if (p1 .eq. 2) p2 = 1
+    if (p1 .eq. -2) p2 = -1
+  end if
+!  æ ¹æ®P2ï¼Œè®¾å®šæŒ‡å‘æ€§orient
+  if (p2 .eq. 1) orient = 1
+  if (p2 .eq. 2) orient = 2
+  if (p2 .eq. -1) orient = 3
+  if (p2 .eq. -2) orient = 4
+
+end subroutine comput_orient
+
+! -------å†™bc_inæ–‡ä»¶----------------------------------------
+subroutine write_bcin
+  use Global_Variables
+  implicit none
+  integer:: m, ns, ist, jst, kst, iend, jend, kend, face, block_link
+  TYPE(Block_Type), Pointer:: B   ! å—æŒ‡é’ˆ
+  TYPE(Face_Type), Pointer:: F    ! é¢æŒ‡é’ˆ
+  TYPE(Subface_Type), Pointer:: SF   ! å­å—æŒ‡é’ˆ
+  open (109, file="bc.in")
+  write (109, *) " BC file , By Li Xinliang"
+  write (109, *) "# Blocks"
+  write (109, *) Num_Block
+  do m = 1, Num_Block
+    B => Block(m)
+    write (109, *) "Block  ", m
+    write (109, *) "Subfaces"
+    write (109, *) B%Num_subface, 1, 1, -1
+    write (109, *) " f_no, face, istart,iend, jstart, jend, kstart, kend, neighb, subface ori theta"
+    do ns = 1, B%Num_subface
+      SF => B%subface(ns)
+      face = SF%face_no
+      call convert_ijk(ist, jst, kst, SF%ib, SF%jb, face, B%nx, B%ny, B%nz)
+      call convert_ijk(iend, jend, kend, SF%ie, SF%je, face, B%nx, B%ny, B%nz)
+      if (SF%block_link .eq. 0) then
+        Block_link = -1
       else
-        p1=-1
-      endif
-    endif
-! ¸ù¾İ£¨Á¬½ÓÃæ£©µÄÃæºÅ£¨Ö¸Ïò£©£¬½«P·½Ïò(P1ÒÔ i, -i, j, -j¶ÈÁ¿£© ×ª»»³ÉÒÔ l, -l, m, -m ¶ÈÁ¿ µÄÊı P2£»
-   if( mod(fno,2) .eq. 0) then
-     p2=p1
-   else
-     if(p1 .eq. 1)  p2=2
-     if(p1 .eq. -1) p2=-2
-     if(p1 .eq. 2)  p2=1
-     if(p1 .eq. -2) p2=-1
-   endif
-!  ¸ù¾İP2£¬Éè¶¨Ö¸ÏòĞÔorient    
-    if(p2 .eq. 1) orient=1
-    if(p2 .eq. 2) orient=2
-    if(p2 .eq. -1) orient=3
-    if(p2 .eq. -2) orient=4
-  
-   end subroutine comput_orient
+        Block_link = SF%block_link
+      end if
 
-! -------Ğ´bc_inÎÄ¼ş----------------------------------------  
-  subroutine write_bcin
-   use Global_Variables
-   implicit none
-   integer:: m,ns,ist,jst,kst,iend,jend,kend,face,block_link
-   TYPE (Block_Type), Pointer:: B   ! ¿éÖ¸Õë
-   TYPE (Face_Type), Pointer:: F    ! ÃæÖ¸Õë
-   TYPE (Subface_Type), Pointer:: SF   ! ×Ó¿éÖ¸Õë
-   open(109,file="bc.in")
-   write(109,*) " BC file , By Li Xinliang"
-   write(109,*) "# Blocks"
-   write(109,*) Num_Block
-   do m=1,Num_Block
-   B => Block(m)
-    write(109,*) "Block  ", m
-    write(109,*) "Subfaces"
-    write(109,*) B%Num_subface, 1, 1, -1
-     write(109,*) " f_no, face, istart,iend, jstart, jend, kstart, kend, neighb, subface ori theta"
-     do ns=1,B%Num_subface
-     SF=>B%subface(ns)
-     face=SF%face_no
-     call convert_ijk(ist,jst,kst,SF%ib,SF%jb,face,B%nx,B%ny,B%nz) 
-     call convert_ijk(iend,jend,kend,SF%ie,SF%je,face,B%nx,B%ny,B%nz) 
-     if(SF%block_link .eq. 0) then
-       Block_link=-1
-     else
-       Block_link=SF%block_link
-     endif
-
-     write(109,"(11I7,E16.5)") ns,face,ist,iend,jst,jend,kst,kend, block_link, SF%subface_link, SF%orient , 0.d0
-     enddo
-    enddo
-   close(109)
-   end subroutine write_bcin
-
+      write (109, "(11I7,E16.5)") ns, face, ist, iend, jst, jend, kst, kend, block_link, SF%subface_link, SF%orient, 0.d0
+    end do
+  end do
+  close (109)
+end subroutine write_bcin
 
 !-----------------------------------------------------------------
-! ½«ÃæÉÏµÄ¾Ö²¿×ø±ê(i1,i2)×ª»¯Îª¿éÉÏµÄÈ«¾Ö×ø±ê(i,j,k)  
-  subroutine convert_ijk(i,j,k,i1,i2,face_no,nx,ny,nz)
+! å°†é¢ä¸Šçš„å±€éƒ¨åæ ‡(i1,i2)è½¬åŒ–ä¸ºå—ä¸Šçš„å…¨å±€åæ ‡(i,j,k)
+subroutine convert_ijk(i, j, k, i1, i2, face_no, nx, ny, nz)
   implicit none
-  integer:: i,j,k,i1,i2,face_no,nx,ny,nz
-   if(face_no .eq. 1) then
-     i=1; j=i1; k=i2
-   else if (face_no .eq. 2) then
-     i=i1; j=1; k=i2
-   else if (face_no .eq. 3) then
-     i=i1; j=i2; k=1
-   else if (face_no .eq. 4) then
-     i=nx; j=i1; k=i2
-   else if (face_no .eq. 5) then
-     i=i1; j=ny ; k=i2
-   else if (face_no .eq. 6) then
-     i=i1; j=i2; k=nz
-   endif
-   end subroutine convert_ijk
+  integer:: i, j, k, i1, i2, face_no, nx, ny, nz
+  if (face_no .eq. 1) then
+    i = 1; j = i1; k = i2
+  else if (face_no .eq. 2) then
+    i = i1; j = 1; k = i2
+  else if (face_no .eq. 3) then
+    i = i1; j = i2; k = 1
+  else if (face_no .eq. 4) then
+    i = nx; j = i1; k = i2
+  else if (face_no .eq. 5) then
+    i = i1; j = ny; k = i2
+  else if (face_no .eq. 6) then
+    i = i1; j = i2; k = nz
+  end if
+end subroutine convert_ijk
 
 !-----------------------------------------------------
-! ËÑË÷¹Ì±Ú¡¢Ô¶³¡¼°¶Ô³ÆÃæ
-   subroutine search_wall_and_farfield
-   use Global_Variables
-   implicit none
-   integer:: i,j,k,m,ns,nf
-   real*8:: xc,yc,zc,tmp,xrms,yrms,zrms
-   TYPE (Block_Type), Pointer:: B   ! ¿éÖ¸Õë
-   TYPE (Face_Type), Pointer:: F    ! ÃæÖ¸Õë
-   TYPE (Subface_Type), Pointer:: SF   ! ×Ó¿éÖ¸Õë
- !---------------------
-   open(103,file="surface.dat")
-   write(103,*) "variables=x,y,z,bc" 
-   do m=1,Num_Block
-     B => Block(m)
-   do ns=1,B%Num_subface
-     SF=>B%subface(ns)
-     nf=SF%face_no
-     F=>B%face(nf)
-    if(SF%block_link .eq. 0 ) then
-!  ¼ÆËã¸÷×ÓÃæµÄÆ½¾ù(ÖĞĞÄ)×ø±ê
-     xc=0.d0; yc=0.d0; zc=0.d0
-     xrms=0.d0;yrms=0.d0;zrms=0.d0
-     do j=SF%jb,SF%je
-     do i=SF%ib,SF%ie
-       xc=xc+F%point(i,j)%x
-       yc=yc+F%point(i,j)%y
-       zc=zc+F%point(i,j)%z
-      enddo
-      enddo
-       tmp=1.d0*(SF%ie-SF%ib+1)*(SF%je-SF%jb+1)
-       xc=xc/tmp; yc=yc/tmp ; zc=zc/tmp
+! æœç´¢å›ºå£ã€è¿œåœºåŠå¯¹ç§°é¢
+subroutine search_wall_and_farfield
+  use Global_Variables
+  implicit none
+  integer:: i, j, k, m, ns, nf
+  real*8:: xc, yc, zc, tmp, xrms, yrms, zrms
+  TYPE(Block_Type), Pointer:: B   ! å—æŒ‡é’ˆ
+  TYPE(Face_Type), Pointer:: F    ! é¢æŒ‡é’ˆ
+  TYPE(Subface_Type), Pointer:: SF   ! å­å—æŒ‡é’ˆ
+  !---------------------
+  open (103, file="surface.dat")
+  write (103, *) "variables=x,y,z,bc"
+  do m = 1, Num_Block
+    B => Block(m)
+    do ns = 1, B%Num_subface
+      SF => B%subface(ns)
+      nf = SF%face_no
+      F => B%face(nf)
+      if (SF%block_link .eq. 0) then
+!  è®¡ç®—å„å­é¢çš„å¹³å‡(ä¸­å¿ƒ)åæ ‡
+        xc = 0.d0; yc = 0.d0; zc = 0.d0
+        xrms = 0.d0; yrms = 0.d0; zrms = 0.d0
+        do j = SF%jb, SF%je
+        do i = SF%ib, SF%ie
+          xc = xc+F%point(i, j)%x
+          yc = yc+F%point(i, j)%y
+          zc = zc+F%point(i, j)%z
+        end do
+        end do
+        tmp = 1.d0*(SF%ie-SF%ib+1)*(SF%je-SF%jb+1)
+        xc = xc/tmp; yc = yc/tmp; zc = zc/tmp
 
-!  ¼ÆËã×ÓÃæ¸÷µãÓëÖĞĞÄµãµÄÎ»ÖÃ²î  
-       do j=SF%jb,SF%je
-       do i=SF%ib,SF%ie
-        xrms=xrms+(F%point(i,j)%x-xc)**2
-        yrms=yrms+(F%point(i,j)%y-yc)**2
-        zrms=zrms+(F%point(i,j)%z-zc)**2
-       enddo
-       enddo
-        xrms=sqrt(xrms/tmp) ; yrms=sqrt(yrms/tmp) ; zrms=sqrt(zrms/tmp)
+!  è®¡ç®—å­é¢å„ç‚¹ä¸ä¸­å¿ƒç‚¹çš„ä½ç½®å·®
+        do j = SF%jb, SF%je
+        do i = SF%ib, SF%ie
+          xrms = xrms+(F%point(i, j)%x-xc)**2
+          yrms = yrms+(F%point(i, j)%y-yc)**2
+          zrms = zrms+(F%point(i, j)%z-zc)**2
+        end do
+        end do
+        xrms = sqrt(xrms/tmp); yrms = sqrt(yrms/tmp); zrms = sqrt(zrms/tmp)
 
 !       print*, "------------------"
 !       print*, "Block =", B%Block_no, "subface=",SF%subface_no, "x,y,z=", xc, yc,zc
 !       print*, "xrms,yrms,zrms=",xrms,yrms,zrms
 !        We assume "Y=0" is the symmetry plane !!!!  if Y=0 is not the symmetry plane, please modify the code !
-!    Èç¹ûÊÇÆ½Ãæ£¬ÔòÓ¦µ±ÊÇÔ¶³¡»ò¶Ô³ÆÃæ £¨Ö»ÊÊÓÃÓÚ·½ĞÎ¼ÆËãÓò£©      
-      if(xrms .lt. Dist_limit .or. yrms .lt. Dist_limit .or. zrms .lt. Dist_limit ) then
-         if(abs(yc) .lt. Dist_limit) then  
-          SF%block_link=BC_Symmetry        ! ¶Ô³ÆÃæ
-         else 
-           SF%block_link=BC_Farfield       ! Ô¶³¡
-         endif
-      else 
-        SF%block_link=BC_Wall
-      endif
+!    å¦‚æœæ˜¯å¹³é¢ï¼Œåˆ™åº”å½“æ˜¯è¿œåœºæˆ–å¯¹ç§°é¢ ï¼ˆåªé€‚ç”¨äºæ–¹å½¢è®¡ç®—åŸŸï¼‰
+        if (xrms .lt. Dist_limit .or. yrms .lt. Dist_limit .or. zrms .lt. Dist_limit) then
+          if (abs(yc) .lt. Dist_limit) then
+            SF%block_link = BC_Symmetry        ! å¯¹ç§°é¢
+          else
+            SF%block_link = BC_Farfield       ! è¿œåœº
+          end if
+        else
+          SF%block_link = BC_Wall
+        end if
 !------write to surface file-------------------------
-      write(103,*) "zone i=", SF%ie-SF%ib+1, " j= ", SF%je-SF%jb+1
-      do j=SF%jb,SF%je
-      do i=SF%ib,SF%ie
-       write(103, "(4f20.10)") F%point(i,j)%x, F%point(i,j)%y,F%point(i,j)%z, SF%block_link*1.d0
-      enddo
-      enddo
-     endif
-     enddo
-     enddo
- 
-   close(103)
-   end  
+        write (103, *) "zone i=", SF%ie-SF%ib+1, " j= ", SF%je-SF%jb+1
+        do j = SF%jb, SF%je
+        do i = SF%ib, SF%ie
+          write (103, "(4f20.10)") F%point(i, j)%x, F%point(i, j)%y, F%point(i, j)%z, SF%block_link*1.d0
+        end do
+        end do
+      end if
+    end do
+  end do
 
+  close (103)
+end
 
 !==========================================================================
-! In2inp, Transform BXCFD .in file to Gridgen .inp file  
-! £¨Íø¸ñÁ¬½ÓĞÅÏ¢£©´ÓBXCFDµÄ .in¸ñÊ½ ×ª»¯ÎªGridgen .inp¸ñÊ½
+! In2inp, Transform BXCFD .in file to Gridgen .inp file
+! ï¼ˆç½‘æ ¼è¿æ¥ä¿¡æ¯ï¼‰ä»BXCFDçš„ .inæ ¼å¼ è½¬åŒ–ä¸ºGridgen .inpæ ¼å¼
 ! Copyright by Li Xinliang, lixl@imech.ac.cn
 ! Ver 1.0, 2012-7-11
 
-!------Types ¶¨Òå×ÓÃæºÍ¿éÁ½ÖÖÊı¾İ½á¹¹ ----------------------------------------------------------------------
-! Ãæ£º ÊôĞÔÓĞ ÃæºÅ¡¢Î¬Êı¡¢Á¬½ÓĞÅÏ¢
-! ¿é£º ÊôĞÔÓĞ ¿éºÅ¡¢Î¬Êı¡¢Ãæ
+!------Types å®šä¹‰å­é¢å’Œå—ä¸¤ç§æ•°æ®ç»“æ„ ----------------------------------------------------------------------
+! é¢ï¼š å±æ€§æœ‰ é¢å·ã€ç»´æ•°ã€è¿æ¥ä¿¡æ¯
+! å—ï¼š å±æ€§æœ‰ å—å·ã€ç»´æ•°ã€é¢
 !-----------------------------------------------------------------------------------------------------------
 !---------------------------------------------------------------------
-  module Def_block
+module Def_block
   implicit none
-  Integer:: NB    ! Íø¸ñ¿éÊı
+  Integer:: NB    ! ç½‘æ ¼å—æ•°
 
-! ±ß½çĞÅÏ¢, Gridgen .inp¸ñÊ½
-   TYPE BC_MSG_TYPE             ! ±ß½çÁ´½ÓĞÅÏ¢ 
-     integer:: ist, iend, jst, jend, kst, kend, neighb, subface, orient   ! BXCFD .in format
-     integer:: ib,ie,jb,je,kb,ke,bc,face,f_no                      ! ±ß½çÇøÓò£¨×ÓÃæ£©µÄ¶¨Òå£¬ .inp format
-     integer:: ib1,ie1,jb1,je1,kb1,ke1,nb1,face1,f_no1             ! Á¬½ÓÇøÓò
-   END TYPE BC_MSG_TYPE
-  
-   TYPE Block_TYPE           !  ¿é
-     integer:: nx,ny,nz
-	 integer::  subface  !  ×ÓÃæÊıÄ¿
-     TYPE (BC_MSG_TYPE),dimension(:),pointer:: bc_msg   ! ×ÓÃæ £¨´ÓÊôÓÚ¿é£©
-   End TYPE Block_TYPE  
-  
-   TYPE (Block_TYPE), save,dimension(:),allocatable,target:: Block
-  
-  end module Def_block
+! è¾¹ç•Œä¿¡æ¯, Gridgen .inpæ ¼å¼
+  TYPE BC_MSG_TYPE             ! è¾¹ç•Œé“¾æ¥ä¿¡æ¯
+    integer:: ist, iend, jst, jend, kst, kend, neighb, subface, orient   ! BXCFD .in format
+    integer:: ib, ie, jb, je, kb, ke, bc, face, f_no                      ! è¾¹ç•ŒåŒºåŸŸï¼ˆå­é¢ï¼‰çš„å®šä¹‰ï¼Œ .inp format
+    integer:: ib1, ie1, jb1, je1, kb1, ke1, nb1, face1, f_no1             ! è¿æ¥åŒºåŸŸ
+  END TYPE BC_MSG_TYPE
+
+  TYPE Block_TYPE           !  å—
+    integer:: nx, ny, nz
+    integer::  subface  !  å­é¢æ•°ç›®
+    TYPE(BC_MSG_TYPE), dimension(:), pointer:: bc_msg   ! å­é¢ ï¼ˆä»å±äºå—ï¼‰
+  End TYPE Block_TYPE
+
+  TYPE(Block_TYPE), save, dimension(:), allocatable, target:: Block
+
+end module Def_block
 
 !============================================================================
-  subroutine Inp2In (Form_Mesh)
+subroutine Inp2In(Form_Mesh)
   use Def_block
   implicit none
   integer:: Form_Mesh
-  print*, " Transform  from .in file to .inp file ......"
+  print *, " Transform  from .in file to .inp file ......"
 !----------------------------
   call read_bcin(Form_Mesh)
   call trans_in_inp
   call write_inp
-  end
+end
 
-  
 !--------------------------------------------------------------------
 
-  
- !----Mesh control message (bc2d.in)------------------------------------------
-  subroutine read_bcin (Ia) 
-   use Def_block
-   implicit none
-   integer::m,ksub,Ia,NB1
-   Type (Block_TYPE),pointer:: B
-   TYPE (BC_MSG_TYPE),pointer:: Bc
+!----Mesh control message (bc2d.in)------------------------------------------
+subroutine read_bcin(Ia)
+  use Def_block
+  implicit none
+  integer::m, ksub, Ia, NB1
+  Type(Block_TYPE), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer:: Bc
 
-   print*, "read bc.in ......"
-   open(88,file="bc.in")
-   read(88,*)
-   read(88,*)
-   read(88,*) NB
-   allocate (Block(NB))
+  print *, "read bc.in ......"
+  open (88, file="bc.in")
+  read (88, *)
+  read (88, *)
+  read (88, *) NB
+  allocate (Block(NB))
 
-   do m=1,NB
-     B => Block(m)
-     read(88,*)
-     read(88,*) 
-     read(88,*) B%subface   !number of the subface in the Block m
-     read(88,*)
-     allocate(B%bc_msg(B%subface))
-     do ksub=1, B%subface
-       Bc => B%bc_msg(ksub)
-       read(88,*)  Bc%f_no, Bc%face, Bc%ist, Bc%iend, Bc%jst, Bc%jend,  Bc%kst, Bc%kend, Bc%neighb, Bc%subface, Bc%orient
-     enddo
-   enddo
-   close(88)
-   print*, "read bc3d.in OK"
-   
- !  print*, "read Mesh3d.dat for nx,ny,nz"
- !  print*, "please input the format of Mesh3d.dat, 1 formatted, 2 unformatted, 0 not read"
- !  read(*,*) Ia
-   
-   if(Ia .eq. 1 ) then
-     open(100,file="Mesh3d.dat")
-     read(100,*) NB1
-     if(NB1 .ne. NB) then
-	  print*, "error ! NB in Mesh3d.dat is not the same as that in bc3d.in "
-	  stop
-	 endif 
-	  read(100,*) ((Block(m)%nx,Block(m)%ny,Block(m)%nz),m=1,NB)
-   
-   else if (Ia .eq. 0 ) then
-     open(100,file="Mesh3d.dat",form="unformatted")
-     read(100) NB1
-     if(NB1 .ne. NB) then
-	  print*, "error ! NB in Mesh3d.dat is not the same as that in bc3d.in "
-	  stop
-	 endif 
-	  read(100) ((Block(m)%nx,Block(m)%ny,Block(m)%nz),m=1,NB)
-   else
-	 do m=1,NB
-	  Block(m)%nx=0; Block(m)%ny=0; Block(m)%nz=0
-	 enddo
-   endif
+  do m = 1, NB
+    B => Block(m)
+    read (88, *)
+    read (88, *)
+    read (88, *) B%subface   !number of the subface in the Block m
+    read (88, *)
+    allocate (B%bc_msg(B%subface))
+    do ksub = 1, B%subface
+      Bc => B%bc_msg(ksub)
+      read (88, *) Bc%f_no, Bc%face, Bc%ist, Bc%iend, Bc%jst, Bc%jend, Bc%kst, Bc%kend, Bc%neighb, Bc%subface, Bc%orient
+    end do
+  end do
+  close (88)
+  print *, "read bc3d.in OK"
 
+  !  print*, "read Mesh3d.dat for nx,ny,nz"
+  !  print*, "please input the format of Mesh3d.dat, 1 formatted, 2 unformatted, 0 not read"
+  !  read(*,*) Ia
 
-  end  subroutine read_bcin
+  if (Ia .eq. 1) then
+    open (100, file="Mesh3d.dat")
+    read (100, *) NB1
+    if (NB1 .ne. NB) then
+      print *, "error ! NB in Mesh3d.dat is not the same as that in bc3d.in "
+      stop
+    end if
+    read (100, *) ((Block(m)%nx, Block(m)%ny, Block(m)%nz), m=1, NB)
+
+  else if (Ia .eq. 0) then
+    open (100, file="Mesh3d.dat", form="unformatted")
+    read (100) NB1
+    if (NB1 .ne. NB) then
+      print *, "error ! NB in Mesh3d.dat is not the same as that in bc3d.in "
+      stop
+    end if
+    read (100) ((Block(m)%nx, Block(m)%ny, Block(m)%nz), m=1, NB)
+  else
+    do m = 1, NB
+      Block(m)%nx = 0; Block(m)%ny = 0; Block(m)%nz = 0
+    end do
+  end if
+
+end subroutine read_bcin
 !-------------------------------------------------------------------------------------------------------------
-!------------------------------------------------------------------------------------------------------------- 
-! ½« .inÎÄ¼ş×ª»¯Îª .inpÎÄ¼ş  
-  subroutine trans_in_inp
-   use Def_block
-   implicit none
-   integer,parameter:: BC_Wall_in=-10, BC_Farfield_in=-20, BC_Periodic_in=-30,BC_Symmetry_in=-40,BC_Outlet_in=-22   ! .in ¹ØÓÚ±ß½çÌõ¼şµÄ¶¨Òå
-   integer,parameter:: BC_Wall=2, BC_Symmetry=3, BC_Farfield=4,BC_Outlet=401, BC_Periodic=501     ! ÓëGriggen .inpÎÄ¼şµÄ¶¨Òå¿ÉÄÜÓĞËùÇø±ğ£¬Çë×¢Òâ
-   integer:: m,ksub
-   integer:: Lp(3),Ls(3),tmp  
-   Type (Block_TYPE),pointer:: B,B1
-   TYPE (BC_MSG_TYPE),pointer:: Bc,Bc1
-    do m=1,NB
-     B => Block(m)
-      do ksub=1, B%subface
-       Bc => B%bc_msg(ksub)
-        if(Bc%neighb .lt. 0) then    ! ÎïÀí±ß½ç
-          Bc%ib=Bc%ist ; Bc%ie=Bc%iend ;  Bc%jb=Bc%jst ; Bc%je=Bc%jend ;  Bc%kb=Bc%kst ; Bc%ke=Bc%kend
-		
-		   if(Bc%neighb .eq. BC_Wall_in ) then 
-		    Bc%bc=BC_Wall
-		   else if (Bc%neighb .eq. BC_Farfield_in ) then 
-		    Bc%bc=BC_Farfield
-		   else if (Bc%neighb .eq. BC_Periodic_in ) then 
-		    Bc%bc=BC_Periodic
-		   else if (Bc%neighb .eq. BC_Symmetry_in ) then 
-		    Bc%bc=BC_Symmetry
-		   else if (Bc%neighb .eq. BC_Outlet_in ) then 
-		    Bc%bc=BC_Outlet
- 		   else
-		    print*, "The boundary condition is not supported!", NB, ksub
-	       endif 
-		else
-		  Bc%bc=-1
-          B1=>Block(Bc%neighb)
-		  Bc1=>B1%bc_msg(Bc%subface)
-		  Bc%nb1=Bc%neighb
-		  Bc%face1=Bc1%face
-		  Bc%f_no1=Bc1%f_no
+!-------------------------------------------------------------------------------------------------------------
+! å°† .inæ–‡ä»¶è½¬åŒ–ä¸º .inpæ–‡ä»¶
+subroutine trans_in_inp
+  use Def_block
+  implicit none
+  integer, parameter:: BC_Wall_in = -10, BC_Farfield_in = -20, BC_Periodic_in = -30, BC_Symmetry_in = -40, BC_Outlet_in = -22   ! .in å…³äºè¾¹ç•Œæ¡ä»¶çš„å®šä¹‰
+  integer, parameter:: BC_Wall = 2, BC_Symmetry = 3, BC_Farfield = 4, BC_Outlet = 401, BC_Periodic = 501     ! ä¸Griggen .inpæ–‡ä»¶çš„å®šä¹‰å¯èƒ½æœ‰æ‰€åŒºåˆ«ï¼Œè¯·æ³¨æ„
+  integer:: m, ksub
+  integer:: Lp(3), Ls(3), tmp
+  Type(Block_TYPE), pointer:: B, B1
+  TYPE(BC_MSG_TYPE), pointer:: Bc, Bc1
+  do m = 1, NB
+    B => Block(m)
+    do ksub = 1, B%subface
+      Bc => B%bc_msg(ksub)
+      if (Bc%neighb .lt. 0) then    ! ç‰©ç†è¾¹ç•Œ
+        Bc%ib = Bc%ist; Bc%ie = Bc%iend; Bc%jb = Bc%jst; Bc%je = Bc%jend; Bc%kb = Bc%kst; Bc%ke = Bc%kend
 
-          Bc%ib=Bc%ist ; Bc%ie=Bc%iend ;  Bc%jb=Bc%jst ; Bc%je=Bc%jend ;  Bc%kb=Bc%kst ; Bc%ke=Bc%kend
-		  if(Bc%kst .eq. Bc% kend ) then
-		    Bc%jb=-Bc%jst ; Bc%je=-Bc%jend
-		  else
-		    Bc%kb=-Bc%kst ; Bc%ke=-Bc%kend
-          endif
-          call get_orient(Bc%face,Bc1%face,Bc%orient,Lp,Ls)  ! Lp(k)==-1 ½»»»´ÎĞò, Ls(k)==-1 ¸Ä±ä·ûºÅ 
-		   
-		   Bc%ib1= Ls(1)*Bc1%ist ;  Bc%ie1=Ls(1)*Bc1%iend
-		   if(Lp(1) .eq. -1) then
-		    tmp=Bc%ib1; Bc%ib1=Bc%ie1; Bc%ie1=tmp
-           endif
-		   Bc%jb1= Ls(2)*Bc1%jst ;  Bc%je1=Ls(2)*Bc1%jend
-		   if(Lp(2) .eq. -1) then
-		    tmp=Bc%jb1; Bc%jb1=Bc%je1; Bc%je1=tmp
-           endif
-		   Bc%kb1= Ls(3)*Bc1%kst ;  Bc%ke1=Ls(3)*Bc1%kend
-		   if(Lp(3) .eq. -1) then
-		    tmp=Bc%kb1; Bc%kb1=Bc%ke1; Bc%ke1=tmp
-           endif
-		  
-		endif
-      enddo 
-    enddo
- end  subroutine trans_in_inp
+        if (Bc%neighb .eq. BC_Wall_in) then
+          Bc%bc = BC_Wall
+        else if (Bc%neighb .eq. BC_Farfield_in) then
+          Bc%bc = BC_Farfield
+        else if (Bc%neighb .eq. BC_Periodic_in) then
+          Bc%bc = BC_Periodic
+        else if (Bc%neighb .eq. BC_Symmetry_in) then
+          Bc%bc = BC_Symmetry
+        else if (Bc%neighb .eq. BC_Outlet_in) then
+          Bc%bc = BC_Outlet
+        else
+          print *, "The boundary condition is not supported!", NB, ksub
+        end if
+      else
+        Bc%bc = -1
+        B1 => Block(Bc%neighb)
+        Bc1 => B1%bc_msg(Bc%subface)
+        Bc%nb1 = Bc%neighb
+        Bc%face1 = Bc1%face
+        Bc%f_no1 = Bc1%f_no
 
-!------------------------------------------------------------------------------------------  
-   subroutine write_inp
-   use Def_block
-   implicit none
-   integer:: m,ksub
-   Type (Block_TYPE),pointer:: B
-   TYPE (BC_MSG_TYPE),pointer:: Bc
-   open(99,file="bc.inp")
-    write(99,*) 1
-	write(99,*) NB
-	do m=1,NB
-     B => Block(m)
-     write(99,*) B%nx, B%ny, B%nz
-	 write(99,*) "Block ", m 
-	 write(99,*) B%subface 
-	  do ksub=1, B%subface
-       Bc => B%bc_msg(ksub)
-	   write(99,"(7I6)") Bc%ib,Bc%ie,Bc%jb,Bc%je,Bc%kb,Bc%ke,Bc%bc
-       if(Bc%bc .eq. -1) then
-	   write(99,"(7I6)") Bc%ib1,Bc%ie1,Bc%jb1,Bc%je1,Bc%kb1,Bc%ke1,Bc%nb1
-       endif
-	  enddo
-    enddo
-   close(99)
- end
-  
+        Bc%ib = Bc%ist; Bc%ie = Bc%iend; Bc%jb = Bc%jst; Bc%je = Bc%jend; Bc%kb = Bc%kst; Bc%ke = Bc%kend
+        if (Bc%kst .eq. Bc%kend) then
+          Bc%jb = -Bc%jst; Bc%je = -Bc%jend
+        else
+          Bc%kb = -Bc%kst; Bc%ke = -Bc%kend
+        end if
+        call get_orient(Bc%face, Bc1%face, Bc%orient, Lp, Ls)  ! Lp(k)==-1 äº¤æ¢æ¬¡åº, Ls(k)==-1 æ”¹å˜ç¬¦å·
 
+        Bc%ib1 = Ls(1)*Bc1%ist; Bc%ie1 = Ls(1)*Bc1%iend
+        if (Lp(1) .eq. -1) then
+          tmp = Bc%ib1; Bc%ib1 = Bc%ie1; Bc%ie1 = tmp
+        end if
+        Bc%jb1 = Ls(2)*Bc1%jst; Bc%je1 = Ls(2)*Bc1%jend
+        if (Lp(2) .eq. -1) then
+          tmp = Bc%jb1; Bc%jb1 = Bc%je1; Bc%je1 = tmp
+        end if
+        Bc%kb1 = Ls(3)*Bc1%kst; Bc%ke1 = Ls(3)*Bc1%kend
+        if (Lp(3) .eq. -1) then
+          tmp = Bc%kb1; Bc%kb1 = Bc%ke1; Bc%ke1 = tmp
+        end if
 
-!  ¸ù¾İorientµÄÖµ£¬È·¶¨.inpÎÄ¼şµÄÁ¬½Ó´ÎĞò 
-!  ¼û OpenCFD-ECÀíÂÛÊÖ²á  
+      end if
+    end do
+  end do
+end subroutine trans_in_inp
+
+!------------------------------------------------------------------------------------------
+subroutine write_inp
+  use Def_block
+  implicit none
+  integer:: m, ksub
+  Type(Block_TYPE), pointer:: B
+  TYPE(BC_MSG_TYPE), pointer:: Bc
+  open (99, file="bc.inp")
+  write (99, *) 1
+  write (99, *) NB
+  do m = 1, NB
+    B => Block(m)
+    write (99, *) B%nx, B%ny, B%nz
+    write (99, *) "Block ", m
+    write (99, *) B%subface
+    do ksub = 1, B%subface
+      Bc => B%bc_msg(ksub)
+      write (99, "(7I6)") Bc%ib, Bc%ie, Bc%jb, Bc%je, Bc%kb, Bc%ke, Bc%bc
+      if (Bc%bc .eq. -1) then
+        write (99, "(7I6)") Bc%ib1, Bc%ie1, Bc%jb1, Bc%je1, Bc%kb1, Bc%ke1, Bc%nb1
+      end if
+    end do
+  end do
+  close (99)
+end
+
+!  æ ¹æ®orientçš„å€¼ï¼Œç¡®å®š.inpæ–‡ä»¶çš„è¿æ¥æ¬¡åº
+!  è§ OpenCFD-ECç†è®ºæ‰‹å†Œ
 !      subroutine get_ijk_orient(i2,j2,i1,j1,ibegin,iend,jbegin,jend,orient,face1,face2)  ! bug bug but !!! (face1, face2)
-      subroutine get_orient(face1,face2,orient,Lp,Ls)
-      implicit none 
-      integer:: l1,m1,l2,m2,tmp,face1,face2,orient,Lp(3),Ls(3),k0,k1,k2
- 
- !           
-          if(mod(face1,2) .eq. 1) then    ! i-, j- or k- Ãæ
-            l1=2 ; m1= 1                  ! lÊÇµÚ2¸öÏÂ±ê£¬ mÊÇµÚ1¸öÏÂ±ê
-          else                            ! i+, j+ or k+ Ãæ
-            l1=1 ; m1= 2                  ! lÊÇµÚ1¸öÏÂ±ê£¬ mÊÇµÚ2¸öÏÂ±ê
-          endif
-         
-          if(orient .eq. 1) then           ! ¸ù¾İorientÀ´ Ğı×ªÁ¬½Ó·½Ïò £¨¼û¡¶ÀíÂÛÊÖ²á¡·£©
-            l2=l1 ; m2=-m1
-          else if (orient .eq. 2) then
-            l2=m1 ; m2=l1
-          else if (orient .eq. 3) then
-            l2=-l1; m2=m1
-          else 
-            l2=-m1; m2=-l1
-          endif
-          
-          if(mod(face2,2) .eq. 1) then            ! ¶ÔÓÚ i-, j- or k- Ãæ 
-            tmp=l2; l2=m2; m2=tmp                  ! swap l2 and m2
-          endif
+subroutine get_orient(face1, face2, orient, Lp, Ls)
+  implicit none
+  integer:: l1, m1, l2, m2, tmp, face1, face2, orient, Lp(3), Ls(3), k0, k1, k2
 
-! .inpÎÄ¼şµÄÁ¬½ÓÃèÊö Îª£ºÕı<-->Õı£¬ ¸º<-->¸º£» 
-! Lp(k)==-1 ½»»»´ÎĞò (ib,ie)--> (ie,ib)
-! Ls(k)==-1 ¸Ä±ä·ûºÅ (ib,ie) ---> (-ib, -ie)
-          
-		  if(face2 .eq. 1 .or. face2 .eq. 4) then  ! i- or i+
-		    k0=1; k1=2 ; k2=3                  ! k0 µ¥Ãæ£» k1 -- l;  k2--m
-		  else  if(face2 .eq. 2 .or. face2 .eq. 5) then  ! j- or j+
-            k0=2; k1=1; k2=3
-          else
-		    k0=3; k1=1; k2=2
-		  endif
-		   
-		   Lp(k0)=1 ; Ls(k0)=1            ! ÎŞĞè½»»»´ÎĞò£¬¸Ä±ä·ûºÅ 
-		   Lp(k1)=sign(1,l2)
-           if(abs(l2) .eq. 1) then
-		     Ls(k1)=1
-		   else
-             Ls(k1)=-1
-		   endif
+  !
+  if (mod(face1, 2) .eq. 1) then    ! i-, j- or k- é¢
+    l1 = 2; m1 = 1                  ! læ˜¯ç¬¬2ä¸ªä¸‹æ ‡ï¼Œ mæ˜¯ç¬¬1ä¸ªä¸‹æ ‡
+  else                            ! i+, j+ or k+ é¢
+    l1 = 1; m1 = 2                  ! læ˜¯ç¬¬1ä¸ªä¸‹æ ‡ï¼Œ mæ˜¯ç¬¬2ä¸ªä¸‹æ ‡
+  end if
 
-		   Lp(k2)=sign(1,m2)
-           if(abs(m2) .eq. 1) then
-		     Ls(k2)=1
-		   else
-             Ls(k2)=-1
-		   endif
-       end subroutine get_orient
-    
+  if (orient .eq. 1) then           ! æ ¹æ®orientæ¥ æ—‹è½¬è¿æ¥æ–¹å‘ ï¼ˆè§ã€Šç†è®ºæ‰‹å†Œã€‹ï¼‰
+    l2 = l1; m2 = -m1
+  else if (orient .eq. 2) then
+    l2 = m1; m2 = l1
+  else if (orient .eq. 3) then
+    l2 = -l1; m2 = m1
+  else
+    l2 = -m1; m2 = -l1
+  end if
 
+  if (mod(face2, 2) .eq. 1) then            ! å¯¹äº i-, j- or k- é¢
+    tmp = l2; l2 = m2; m2 = tmp                  ! swap l2 and m2
+  end if
 
+! .inpæ–‡ä»¶çš„è¿æ¥æè¿° ä¸ºï¼šæ­£<-->æ­£ï¼Œ è´Ÿ<-->è´Ÿï¼›
+! Lp(k)==-1 äº¤æ¢æ¬¡åº (ib,ie)--> (ie,ib)
+! Ls(k)==-1 æ”¹å˜ç¬¦å· (ib,ie) ---> (-ib, -ie)
 
+  if (face2 .eq. 1 .or. face2 .eq. 4) then  ! i- or i+
+    k0 = 1; k1 = 2; k2 = 3                  ! k0 å•é¢ï¼› k1 -- l;  k2--m
+  else if (face2 .eq. 2 .or. face2 .eq. 5) then  ! j- or j+
+    k0 = 2; k1 = 1; k2 = 3
+  else
+    k0 = 3; k1 = 1; k2 = 2
+  end if
+
+  Lp(k0) = 1; Ls(k0) = 1            ! æ— éœ€äº¤æ¢æ¬¡åºï¼Œæ”¹å˜ç¬¦å·
+  Lp(k1) = sign(1, l2)
+  if (abs(l2) .eq. 1) then
+    Ls(k1) = 1
+  else
+    Ls(k1) = -1
+  end if
+
+  Lp(k2) = sign(1, m2)
+  if (abs(m2) .eq. 1) then
+    Ls(k2) = 1
+  else
+    Ls(k2) = -1
+  end if
+end subroutine get_orient

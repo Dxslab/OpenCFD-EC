@@ -522,7 +522,7 @@ contains
     real(PRE_EC) :: PrL, PrT
     real(PRE_EC) :: dt_global, CFL, dtmax, dtmin, Time_Method
     real(PRE_EC) :: w_LU, Twall, Kt_inf, Wt_inf
-    real(PRE_EC) :: Step_Inner_Limit, Res_Inner_Limit, MUT_MAX
+    real(PRE_EC) :: Step_Inner_Limit, Res_Inner_Limit, Res_Inner_Rel, MUT_MAX
     real(PRE_EC) :: Ref_S, Ref_L, Centroid(3)
     real(PRE_EC) :: Ldmin, Ldmax, Lpmin, Lpmax, Lumax, LSAmax, CP1_NSA, CP2_NSA
     real(PRE_EC) :: Turbo_P0, Turbo_T0, Turbo_L0, Turbo_w, Turbo_Periodic_seta
@@ -544,7 +544,7 @@ contains
       Iflag_Scheme, Iflag_Flux, IFlag_Reconstruction, &
       Mesh_File_Format, Kstep_show, Kstep_average, Kstep_smooth, Kstep_init_smooth, &
       Num_Mesh, T_inf, Twall, Kt_inf, Wt_inf, IF_Debug, NUM_THREADS, &
-      Step_Inner_Limit, Res_Inner_Limit, MUT_MAX, Bound_Scheme, &
+      Step_Inner_Limit, Res_Inner_Limit, Res_Inner_Rel, MUT_MAX, Bound_Scheme, &
       Pre_Step_Mesh, Ref_S, Ref_L, Centroid, Cood_Y_UP, IFLAG_LIMIT_FLOW, Pdebug, &
       Ldmin, Ldmax, Lpmin, Lpmax, Lumax, LSAmax, CP1_NSA, CP2_NSA, &
       IF_TurboMachinary, Ref_medium_usrdef, IF_Scheme_Positivity, &
@@ -575,6 +575,7 @@ contains
     Wt_inf = 0.0d0
     Step_Inner_Limit = 0.0d0
     Res_Inner_Limit = 0.0d0
+    Res_Inner_Rel = 0.0d0
     MUT_MAX = 0.0d0
     Ref_S = 0.0d0
     Ref_L = 0.0d0

@@ -1,17 +1,3 @@
-!-----------------------------------------------------------
-! Copyright by LiXinliang
-! Ver 1.2   将格心坐标转换到格点上
-! Ver 1.3 可读取flow3d.dat (tecplot格式文件)及flow.dat (无格式文件)
-! Ver 1.4  读取 ver 0.8 以上版本的数据 （包含k,w,mu_t等）
-! Ver 1.5 读取ver0.82以上的数据
-! Ver 1.6 读取ver 0.84以上版本的数据（.inp文件）
-! Ver 1.7 Plot 3D flow
-! Ver 1.8 Plot Cp and Cf on the wall
-! Ver 1.8a, vt 无需乘以Re
-! Ver 2.3, 可读取BC_user
-! Ver 2.4a, 修正了read wall_dist() 中的Bug
-! Ver 2.5, 可输出网格点上的流场
-!------------------------------------------------------------
 module Const_Variables
   implicit none
   integer, parameter:: PRE_EC = 8
@@ -27,16 +13,14 @@ end module Const_Variables
 module Global_Variables
   use Const_Variables
   implicit none
-  ! global parameter (for all blocks)
+
   real(PRE_EC), save:: Ma, Re, gamma, T_inf, p00
   integer, save:: Num_Block, Mesh_File_Format, BC_number, BC_type(100)
-!-----------------------------------------------------------------------------------------
-! 网格连接信息
+
   TYPE BC_MSG_TYPE
     integer::   ib, ie, jb, je, kb, ke, bc
   END TYPE BC_MSG_TYPE
 
-!  核心变量——每块网格存储的信息 （全局变量）
   TYPE Block_TYPE           !  variables for each block
     integer :: Block_no, nx, ny, nz, subface
     real(PRE_EC), pointer, dimension(:, :, :):: xc, yc, zc  ! coordinates of cell center, 网格中心坐标
@@ -48,9 +32,7 @@ module Global_Variables
   TYPE(Block_TYPE), save, dimension(:), allocatable, target:: Block
 
 end module Global_Variables
-!------------------------------------------------------------------
 
-!-------------------------------------------
 program readflow
   use Global_Variables
   implicit none
@@ -583,7 +565,7 @@ subroutine read_parameter_ec
                  PrL, PrT, &
                  dt_global, CFL, dtmax, dtmin, Time_Method, &
                  w_LU, Twall, Kt_inf, Wt_inf, &
-                 Step_Inner_Limit, Res_Inner_Limit, MUT_MAX, &
+                 Step_Inner_Limit, Res_Inner_Limit, Res_Inner_Rel, MUT_MAX, &
                  Ref_S, Ref_L, Centroid(3), &
                  Ldmin, Ldmax, Lpmin, Lpmax, Lumax, LSAmax, CP1_NSA, CP2_NSA, &
                  Turbo_P0, Turbo_T0, Turbo_L0, Turbo_w, Turbo_Periodic_seta, &
@@ -605,7 +587,7 @@ subroutine read_parameter_ec
     Iflag_Scheme, Iflag_Flux, IFlag_Reconstruction, &
     Mesh_File_Format, Kstep_show, Kstep_average, Kstep_smooth, Kstep_init_smooth, &
     Num_Mesh, T_inf, Twall, Kt_inf, Wt_inf, IF_Debug, NUM_THREADS, &
-    Step_Inner_Limit, Res_Inner_Limit, MUT_MAX, Bound_Scheme, &
+    Step_Inner_Limit, Res_Inner_Limit, Res_Inner_Rel, MUT_MAX, Bound_Scheme, &
     Pre_Step_Mesh, Ref_S, Ref_L, Centroid, Cood_Y_UP, IFLAG_LIMIT_FLOW, Pdebug, &
     Ldmin, Ldmax, Lpmin, Lpmax, Lumax, LSAmax, CP1_NSA, CP2_NSA, &
     IF_TurboMachinary, Ref_medium_usrdef, IF_Scheme_Positivity, &

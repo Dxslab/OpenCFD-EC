@@ -4,7 +4,7 @@ program add_noise
   
   real(PRE_EC):: Ma, Re, AoA, AoS, p_outlet, t_end, gamma, PrL, PrT
   real(PRE_EC):: dt_global, CFL, dtmax, dtmin, w_LU, T_inf, Twall, Kt_inf, Wt_inf
-  real(PRE_EC):: Step_Inner_Limit, Res_Inner_Limit, MUT_MAX, Ref_S, Ref_L, Centroid(3)
+  real(PRE_EC):: Step_Inner_Limit, Res_Inner_Limit, Res_Inner_Rel, MUT_MAX, Ref_S, Ref_L, Centroid(3)
   real(PRE_EC):: Ldmin, Ldmax, Lpmin, Lpmax, Lumax, LSAmax, CP1_NSA, CP2_NSA
   real(PRE_EC):: Turbo_P0, Turbo_T0, Turbo_L0, Turbo_w, Turbo_Periodic_seta
   real(PRE_EC):: Periodic_dX, Periodic_dY, Periodic_dZ
@@ -26,7 +26,7 @@ program add_noise
     Iflag_Scheme, Iflag_Flux, IFlag_Reconstruction, &
     Mesh_File_Format, Kstep_show, Kstep_average, Kstep_smooth, Kstep_init_smooth, &
     Num_Mesh, T_inf, T_inf, Twall, Kt_inf, Wt_inf, IF_Debug, NUM_THREADS, &
-    Step_Inner_Limit, Res_Inner_Limit, MUT_MAX, Bound_Scheme, &
+    Step_Inner_Limit, Res_Inner_Limit, Res_Inner_Rel, MUT_MAX, Bound_Scheme, &
     Pre_Step_Mesh, Ref_S, Ref_L, Centroid, Cood_Y_UP, IFLAG_LIMIT_FLOW, Pdebug, &
     Ldmin, Ldmax, Lpmin, Lpmax, Lumax, LSAmax, CP1_NSA, CP2_NSA, &
     IF_TurboMachinary, Ref_medium_usrdef, IF_Scheme_Positivity, &

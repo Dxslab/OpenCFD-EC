@@ -6,55 +6,55 @@
 ! Ver 0.98c, Nondimensional (See CFL3D manual)
 
 subroutine Turbulence_model_SA(nMesh, mBlock)
-  use Global_Var
-  Use Flow_Var
-  implicit none
-  integer:: mBlock, nx, ny, nz, i, j, k, nMesh
-  real(PRE_EC):: ui, vi, wi, uj, vj, wj, uk, vk, wk, ux, vx, wx, uy, vy, wy, uz, vz, wz
-  real(PRE_EC):: s1x, s1y, s1z, v0, vti, vtj, vtk, vtx, vty, vtz
-  real(PRE_EC):: ix, iy, iz, jx, jy, jz, kx, ky, kz
-  real(PRE_EC):: S, S1, X, fv1, fv2, fv3, ft1, ft2, r, g, fw, Q_SA, vn1, vn2, vfi, Q3
+    use Global_Var
+    use Flow_Var
+    implicit none
+    integer:: mBlock, nx, ny, nz, i, j, k, nMesh
+    real(PRE_EC):: ui, vi, wi, uj, vj, wj, uk, vk, wk, ux, vx, wx, uy, vy, wy, uz, vz, wz
+    real(PRE_EC):: s1x, s1y, s1z, v0, vti, vtj, vtk, vtx, vty, vtz
+    real(PRE_EC):: ix, iy, iz, jx, jy, jz, kx, ky, kz
+    real(PRE_EC):: S, S1, X, fv1, fv2, fv3, ft1, ft2, r, g, fw, Q_SA, vn1, vn2, vfi, Q3
 
-  real(PRE_EC), parameter:: SA_sigma = 2.d0/3.d0, Cv1 = 7.1d0, Cv2 = 5.d0, Cb1 = 0.1355d0, Cb2 = 0.622d0, SA_k = 0.41d0
-  real(PRE_EC), parameter:: Cw1 = Cb1/(SA_k*SA_k)+(1.d0+Cb2)/SA_sigma, Cw2 = 0.3d0, Cw3 = 2.d0, &
-                            Ct1 = 1.d0, Ct2 = 2.d0, Ct3 = 1.2d0, Ct4 = 0.5d0  !Ct3=1.3d0
-  real(PRE_EC), Pointer, dimension(:, :, :):: vt, Fluxv, fluxv2
-  Type(Block_TYPE), pointer:: B
+    real(PRE_EC), parameter:: SA_sigma = 2.d0/3.d0, Cv1 = 7.1d0, Cv2 = 5.d0, Cb1 = 0.1355d0, Cb2 = 0.622d0, SA_k = 0.41d0
+    real(PRE_EC), parameter:: Cw1 = Cb1/(SA_k*SA_k)+(1.d0+Cb2)/SA_sigma, Cw2 = 0.3d0, Cw3 = 2.d0, &
+                              Ct1 = 1.d0, Ct2 = 2.d0, Ct3 = 1.2d0, Ct4 = 0.5d0  !Ct3=1.3d0
+    real(PRE_EC), pointer, dimension(:, :, :):: vt, Fluxv, fluxv2
+    type(Block_TYPE), pointer:: B
 
-  B => Mesh(nMesh)%Block(mBlock)
-  nx = B%nx; ny = B%ny; nz = B%nz
+    B => Mesh(nMesh)%block(mBlock)
+    nx = B%nx; ny = B%ny; nz = B%nz
 
 ! 计算湍流粘性系数
-  allocate (vt(0:nx, 0:ny, 0:nz), Fluxv(nx, ny, nz), fluxv2(nx, ny, nz))
+    allocate (vt(0:nx, 0:ny, 0:nz), Fluxv(nx, ny, nz), fluxv2(nx, ny, nz))
 
 ! OpenMP的编译指示符（不是注释）， 指定Do 循环并行执行； 指定一些各进程私有的变量
 
 !$OMP PARALLEL DO DEFAULT(PRIVATE) SHARED(nx,ny,nz,B,Re)
-  do k = 0, nz
-  do j = 0, ny
-  do i = 0, nx
-    B%mu(i, j, k) = B%mu(i, j, k)*Re             ! 量纲转换
-  end do
-  end do
-  end do
+    do k = 0, nz
+    do j = 0, ny
+    do i = 0, nx
+        B%mu(i, j, k) = B%mu(i, j, k)*Re             ! 量纲转换
+    end do
+    end do
+    end do
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO DEFAULT(PRIVATE) SHARED(nx,ny,nz,B,vt,d)
 
-  do k = 0, nz
-  do j = 0, ny
-  do i = 0, nx
-    vt(i, j, k) = B%U(6, i, j, k)
-    X = d(i, j, k)*vt(i, j, k)/B%mu(i, j, k)   ! 湍流粘性系数与层流粘性系数之比
-    fv1 = X**3/(X**3+Cv1**3)
-    B%mu_t(i, j, k) = fv1*d(i, j, k)*vt(i, j, k)
-  end do
-  end do
-  end do
+    do k = 0, nz
+    do j = 0, ny
+    do i = 0, nx
+        vt(i, j, k) = B%U(6, i, j, k)
+        X = d(i, j, k)*vt(i, j, k)/B%mu(i, j, k)   ! 湍流粘性系数与层流粘性系数之比
+        fv1 = X**3/(X**3+Cv1**3)
+        B%mu_t(i, j, k) = fv1*d(i, j, k)*vt(i, j, k)
+    end do
+    end do
+    end do
 !$OMP END PARALLEL DO
 
 ! 限定湍流粘性系数
-  call limit_mut(nMesh, mBlock)
+    call limit_mut(nMesh, mBlock)
 
 ! 设定湍流粘性系数虚网格的值
 
@@ -63,150 +63,150 @@ subroutine Turbulence_model_SA(nMesh, mBlock)
 !$OMP PARALLEL  DEFAULT(FIRSTPRIVATE) SHARED(nx,ny,nz,B,Re,vt,d,uu,v,w,Fluxv,fluxv2)
 !------i- direcion ---------------------------
 !$OMP DO
-  do k = 1, nz-1
-  do j = 1, ny-1
-    do i = 1, nx
-      s1x = B%ni1(i, j, k); s1y = B%ni2(i, j, k); s1z = B%ni3(i, j, k)  ! 归一化的法方向
-      vti = vt(i, j, k)-vt(i-1, j, k)                               ! SA模型中的vt
-      vtj = 0.25d0*(vt(i, j+1, k)-vt(i, j-1, k)+vt(i-1, j+1, k)-vt(i-1, j-1, k))
-      vtk = 0.25d0*(vt(i, j, k+1)-vt(i, j, k-1)+vt(i-1, j, k+1)-vt(i-1, j, k-1))
-      ix = B%ix1(i, j, k); iy = B%iy1(i, j, k); iz = B%iz1(i, j, k)
-      jx = B%jx1(i, j, k); jy = B%jy1(i, j, k); jz = B%jz1(i, j, k)
-      kx = B%kx1(i, j, k); ky = B%ky1(i, j, k); kz = B%kz1(i, j, k)
-      vtx = vti*ix+vtj*jx+vtk*kx
-      vty = vti*iy+vtj*jy+vtk*ky
-      vtz = vti*iz+vtj*jz+vtk*kz
-      v0 = 0.5d0*(1.d0+Cb2)/SA_sigma*(vt(i, j, k)+B%mu(i, j, k)/d(i, j, k)+vt(i-1, j, k)+B%mu(i-1, j, k)/d(i-1, j, k))  ! (I-1/2,J,K) 点的动力学粘性系数
+    do k = 1, nz-1
+    do j = 1, ny-1
+        do i = 1, nx
+            s1x = B%ni1(i, j, k); s1y = B%ni2(i, j, k); s1z = B%ni3(i, j, k)  ! 归一化的法方向
+            vti = vt(i, j, k)-vt(i-1, j, k)                               ! SA模型中的vt
+            vtj = 0.25d0*(vt(i, j+1, k)-vt(i, j-1, k)+vt(i-1, j+1, k)-vt(i-1, j-1, k))
+            vtk = 0.25d0*(vt(i, j, k+1)-vt(i, j, k-1)+vt(i-1, j, k+1)-vt(i-1, j, k-1))
+            ix = B%ix1(i, j, k); iy = B%iy1(i, j, k); iz = B%iz1(i, j, k)
+            jx = B%jx1(i, j, k); jy = B%jy1(i, j, k); jz = B%jz1(i, j, k)
+            kx = B%kx1(i, j, k); ky = B%ky1(i, j, k); kz = B%kz1(i, j, k)
+            vtx = vti*ix+vtj*jx+vtk*kx
+            vty = vti*iy+vtj*jy+vtk*ky
+            vtz = vti*iz+vtj*jz+vtk*kz
+            v0 = 0.5d0*(1.d0+Cb2)/SA_sigma*(vt(i, j, k)+B%mu(i, j, k)/d(i, j, k)+vt(i-1, j, k)+B%mu(i-1, j, k)/d(i-1, j, k))  ! (I-1/2,J,K) 点的动力学粘性系数
 
-      vn1 = uu(i-1, j, k)*s1x+v(i-1, j, k)*s1y+w(i-1, j, k)*s1z   ! 法向速度
-      vn2 = uu(i, j, k)*s1x+v(i, j, k)*s1y+w(i, j, k)*s1z
-      vfi = 0.5d0*((vn1+abs(vn1))*vt(i-1, j, k)+(vn2-abs(vn2))*vt(i, j, k))  ! 一阶 L-F格式
-      Fluxv(i, j, k) = (-vfi+v0/Re*(vtx*s1x+vty*s1y+vtz*s1z))*B%Si(i, j, k)    !!! Re
-      Fluxv2(i, j, k) = (vtx*s1x+vty*s1y+vtz*s1z)*B%Si(i, j, k)
+            vn1 = uu(i-1, j, k)*s1x+v(i-1, j, k)*s1y+w(i-1, j, k)*s1z   ! 法向速度
+            vn2 = uu(i, j, k)*s1x+v(i, j, k)*s1y+w(i, j, k)*s1z
+            vfi = 0.5d0*((vn1+abs(vn1))*vt(i-1, j, k)+(vn2-abs(vn2))*vt(i, j, k))  ! 一阶 L-F格式
+            Fluxv(i, j, k) = (-vfi+v0/Re*(vtx*s1x+vty*s1y+vtz*s1z))*B%Si(i, j, k)    !!! Re
+            Fluxv2(i, j, k) = (vtx*s1x+vty*s1y+vtz*s1z)*B%Si(i, j, k)
+        end do
     end do
-  end do
-  end do
+    end do
 !$OMP END DO
 !$OMP DO
-  do k = 1, nz-1
-  do j = 1, ny-1
-  do i = 1, nx-1
-    v0 = (vt(i, j, k)+B%mu(i, j, k)/d(i, j, k))*Cb2/SA_sigma
-    B%Res(6, i, j, k) = Fluxv(i+1, j, k)-Fluxv(i, j, k)-v0/Re*(Fluxv2(i+1, j, k)-Fluxv2(i, j, k))    !!! Re
-  end do
-  end do
-  end do
+    do k = 1, nz-1
+    do j = 1, ny-1
+    do i = 1, nx-1
+        v0 = (vt(i, j, k)+B%mu(i, j, k)/d(i, j, k))*Cb2/SA_sigma
+        B%Res(6, i, j, k) = Fluxv(i+1, j, k)-Fluxv(i, j, k)-v0/Re*(Fluxv2(i+1, j, k)-Fluxv2(i, j, k))    !!! Re
+    end do
+    end do
+    end do
 !$OMP END DO
 !-----j- direction ------------------------
 !$OMP DO
-  do k = 1, nz-1
-  do j = 1, ny
-  do i = 1, nx-1
-    s1x = B%nj1(i, j, k); s1y = B%nj2(i, j, k); s1z = B%nj3(i, j, k)  ! 归一化的法方向
-    vti = 0.25d0*(vt(i+1, j, k)-vt(i-1, j, k)+vt(i+1, j-1, k)-vt(i-1, j-1, k))
-    vtj = vt(i, j, k)-vt(i, j-1, k)
-    vtk = 0.25d0*(vt(i, j, k+1)-vt(i, j, k-1)+vt(i, j-1, k+1)-vt(i, j-1, k-1))
-    ix = B%ix2(i, j, k); iy = B%iy2(i, j, k); iz = B%iz2(i, j, k)
-    jx = B%jx2(i, j, k); jy = B%jy2(i, j, k); jz = B%jz2(i, j, k)
-    kx = B%kx2(i, j, k); ky = B%ky2(i, j, k); kz = B%kz2(i, j, k)
-    vtx = vti*ix+vtj*jx+vtk*kx
-    vty = vti*iy+vtj*jy+vtk*ky
-    vtz = vti*iz+vtj*jz+vtk*kz
-    v0 = 0.5d0*(1.d0+Cb2)/SA_sigma*(vt(i, j, k)+B%mu(i, j, k)/d(i, j, k)+vt(i, j-1, k)+B%mu(i, j-1, k)/d(i, j-1, k))  ! (I-1/2,J,K) 点的动力学粘性系数   s11=Amu1*(tmp1*ux-tmp2*(vy+wz))    ! tmp1=4.d0/3.d0; tmp2=2.d0/3.d0
-    vn1 = uu(i, j-1, k)*s1x+v(i, j-1, k)*s1y+w(i, j-1, k)*s1z   ! 法向速度
-    vn2 = uu(i, j, k)*s1x+v(i, j, k)*s1y+w(i, j, k)*s1z
-    vfi = 0.5d0*((vn1+abs(vn1))*vt(i, j-1, k)+(vn2-abs(vn2))*vt(i, j, k))  ! 一阶 L-F格式
-    Fluxv(i, j, k) = (-vfi+v0/Re*(vtx*s1x+vty*s1y+vtz*s1z))*B%Sj(i, j, k)   !!! Re
-    Fluxv2(i, j, k) = (vtx*s1x+vty*s1y+vtz*s1z)*B%Sj(i, j, k)
-  end do
-  end do
-  end do
+    do k = 1, nz-1
+    do j = 1, ny
+    do i = 1, nx-1
+        s1x = B%nj1(i, j, k); s1y = B%nj2(i, j, k); s1z = B%nj3(i, j, k)  ! 归一化的法方向
+        vti = 0.25d0*(vt(i+1, j, k)-vt(i-1, j, k)+vt(i+1, j-1, k)-vt(i-1, j-1, k))
+        vtj = vt(i, j, k)-vt(i, j-1, k)
+        vtk = 0.25d0*(vt(i, j, k+1)-vt(i, j, k-1)+vt(i, j-1, k+1)-vt(i, j-1, k-1))
+        ix = B%ix2(i, j, k); iy = B%iy2(i, j, k); iz = B%iz2(i, j, k)
+        jx = B%jx2(i, j, k); jy = B%jy2(i, j, k); jz = B%jz2(i, j, k)
+        kx = B%kx2(i, j, k); ky = B%ky2(i, j, k); kz = B%kz2(i, j, k)
+        vtx = vti*ix+vtj*jx+vtk*kx
+        vty = vti*iy+vtj*jy+vtk*ky
+        vtz = vti*iz+vtj*jz+vtk*kz
+        v0 = 0.5d0*(1.d0+Cb2)/SA_sigma*(vt(i, j, k)+B%mu(i, j, k)/d(i, j, k)+vt(i, j-1, k)+B%mu(i, j-1, k)/d(i, j-1, k))  ! (I-1/2,J,K) 点的动力学粘性系数   s11=Amu1*(tmp1*ux-tmp2*(vy+wz))    ! tmp1=4.d0/3.d0; tmp2=2.d0/3.d0
+        vn1 = uu(i, j-1, k)*s1x+v(i, j-1, k)*s1y+w(i, j-1, k)*s1z   ! 法向速度
+        vn2 = uu(i, j, k)*s1x+v(i, j, k)*s1y+w(i, j, k)*s1z
+        vfi = 0.5d0*((vn1+abs(vn1))*vt(i, j-1, k)+(vn2-abs(vn2))*vt(i, j, k))  ! 一阶 L-F格式
+        Fluxv(i, j, k) = (-vfi+v0/Re*(vtx*s1x+vty*s1y+vtz*s1z))*B%Sj(i, j, k)   !!! Re
+        Fluxv2(i, j, k) = (vtx*s1x+vty*s1y+vtz*s1z)*B%Sj(i, j, k)
+    end do
+    end do
+    end do
 !$OMP END DO
 !$OMP DO
-  do k = 1, nz-1
-  do j = 1, ny-1
-  do i = 1, nx-1
-    v0 = (vt(i, j, k)+B%mu(i, j, k)/d(i, j, k))*Cb2/SA_sigma
-    B%Res(6, i, j, k) = B%Res(6, i, j, k)+Fluxv(i, j+1, k)-Fluxv(i, j, k)-v0/Re*(Fluxv2(i, j+1, k)-Fluxv2(i, j, k))   !!! Re
-  end do
-  end do
-  end do
+    do k = 1, nz-1
+    do j = 1, ny-1
+    do i = 1, nx-1
+        v0 = (vt(i, j, k)+B%mu(i, j, k)/d(i, j, k))*Cb2/SA_sigma
+        B%Res(6, i, j, k) = B%Res(6, i, j, k)+Fluxv(i, j+1, k)-Fluxv(i, j, k)-v0/Re*(Fluxv2(i, j+1, k)-Fluxv2(i, j, k))   !!! Re
+    end do
+    end do
+    end do
 !$OMP END DO
 !-----k- direction ------------------------
 !$OMP DO
-  do k = 1, nz
-  do j = 1, ny-1
-  do i = 1, nx-1
-    s1x = B%nk1(i, j, k); s1y = B%nk2(i, j, k); s1z = B%nk3(i, j, k)  ! 归一化的法方向
-    vti = 0.25d0*(vt(i+1, j, k)-vt(i-1, j, k)+vt(i+1, j, k-1)-vt(i-1, j, k-1))
-    vtj = 0.25d0*(vt(i, j+1, k)-vt(i, j-1, k)+vt(i, j+1, k-1)-vt(i, j-1, k-1))
-    vtk = vt(i, j, k)-vt(i, j, k-1)
+    do k = 1, nz
+    do j = 1, ny-1
+    do i = 1, nx-1
+        s1x = B%nk1(i, j, k); s1y = B%nk2(i, j, k); s1z = B%nk3(i, j, k)  ! 归一化的法方向
+        vti = 0.25d0*(vt(i+1, j, k)-vt(i-1, j, k)+vt(i+1, j, k-1)-vt(i-1, j, k-1))
+        vtj = 0.25d0*(vt(i, j+1, k)-vt(i, j-1, k)+vt(i, j+1, k-1)-vt(i, j-1, k-1))
+        vtk = vt(i, j, k)-vt(i, j, k-1)
 
-    ix = B%ix3(i, j, k); iy = B%iy3(i, j, k); iz = B%iz3(i, j, k)
-    jx = B%jx3(i, j, k); jy = B%jy3(i, j, k); jz = B%jz3(i, j, k)
-    kx = B%kx3(i, j, k); ky = B%ky3(i, j, k); kz = B%kz3(i, j, k)
-    vtx = vti*ix+vtj*jx+vtk*kx
-    vty = vti*iy+vtj*jy+vtk*ky
-    vtz = vti*iz+vtj*jz+vtk*kz
-    v0 = 0.5d0*(1.d0+Cb2)/SA_sigma*(vt(i, j, k)+B%mu(i, j, k)/d(i, j, k)+vt(i, j, k-1)+B%mu(i, j, k-1)/d(i, j, k-1))  ! (I,J,K-1/2) 点的动力学粘性系数
-    vn1 = uu(i, j, k-1)*s1x+v(i, j, k-1)*s1y+w(i, j, k-1)*s1z   ! 法向速度
-    vn2 = uu(i, j, k)*s1x+v(i, j, k)*s1y+w(i, j, k)*s1z
-    vfi = 0.5d0*((vn1+abs(vn1))*vt(i, j, k-1)+(vn2-abs(vn2))*vt(i, j, k))  ! 一阶 L-F格式
-    Fluxv(i, j, k) = (-vfi+v0/Re*(vtx*s1x+vty*s1y+vtz*s1z))*B%Sk(i, j, k)    ! 无粘+粘性通量
-    Fluxv2(i, j, k) = (vtx*s1x+vty*s1y+vtz*s1z)*B%Sk(i, j, k)
-  end do
-  end do
-  end do
+        ix = B%ix3(i, j, k); iy = B%iy3(i, j, k); iz = B%iz3(i, j, k)
+        jx = B%jx3(i, j, k); jy = B%jy3(i, j, k); jz = B%jz3(i, j, k)
+        kx = B%kx3(i, j, k); ky = B%ky3(i, j, k); kz = B%kz3(i, j, k)
+        vtx = vti*ix+vtj*jx+vtk*kx
+        vty = vti*iy+vtj*jy+vtk*ky
+        vtz = vti*iz+vtj*jz+vtk*kz
+        v0 = 0.5d0*(1.d0+Cb2)/SA_sigma*(vt(i, j, k)+B%mu(i, j, k)/d(i, j, k)+vt(i, j, k-1)+B%mu(i, j, k-1)/d(i, j, k-1))  ! (I,J,K-1/2) 点的动力学粘性系数
+        vn1 = uu(i, j, k-1)*s1x+v(i, j, k-1)*s1y+w(i, j, k-1)*s1z   ! 法向速度
+        vn2 = uu(i, j, k)*s1x+v(i, j, k)*s1y+w(i, j, k)*s1z
+        vfi = 0.5d0*((vn1+abs(vn1))*vt(i, j, k-1)+(vn2-abs(vn2))*vt(i, j, k))  ! 一阶 L-F格式
+        Fluxv(i, j, k) = (-vfi+v0/Re*(vtx*s1x+vty*s1y+vtz*s1z))*B%Sk(i, j, k)    ! 无粘+粘性通量
+        Fluxv2(i, j, k) = (vtx*s1x+vty*s1y+vtz*s1z)*B%Sk(i, j, k)
+    end do
+    end do
+    end do
 !$OMP END DO
 !$OMP DO
-  do k = 1, nz-1
-  do j = 1, ny-1
-  do i = 1, nx-1
-    v0 = (vt(i, j, k)+B%mu(i, j, k)/d(i, j, k))*Cb2/SA_sigma
-    B%Res(6, i, j, k) = B%Res(6, i, j, k)+Fluxv(i, j, k+1)-Fluxv(i, j, k)-v0/Re*(Fluxv2(i, j, k+1)-Fluxv2(i, j, k))
-  end do
-  end do
-  end do
+    do k = 1, nz-1
+    do j = 1, ny-1
+    do i = 1, nx-1
+        v0 = (vt(i, j, k)+B%mu(i, j, k)/d(i, j, k))*Cb2/SA_sigma
+        B%Res(6, i, j, k) = B%Res(6, i, j, k)+Fluxv(i, j, k+1)-Fluxv(i, j, k)-v0/Re*(Fluxv2(i, j, k+1)-Fluxv2(i, j, k))
+    end do
+    end do
+    end do
 !$OMP END DO
 !--------------源项---------------------------------------------------------
 !$OMP DO
-  do k = 1, nz-1
-  do j = 1, ny-1
-  do i = 1, nx-1
+    do k = 1, nz-1
+    do j = 1, ny-1
+    do i = 1, nx-1
 !----- get S (normal of vorticity)  S=sqrt(0.5*Omiga_ij*Omiga_ij) at the cell's center ------
 !  计算涡量；计算湍流粘性系数的梯度
 
-    ui = uu(i+1, j, k)-uu(i-1, j, k)
-    vi = v(i+1, j, k)-v(i-1, j, k)
-    wi = w(i+1, j, k)-w(i-1, j, k)
+        ui = uu(i+1, j, k)-uu(i-1, j, k)
+        vi = v(i+1, j, k)-v(i-1, j, k)
+        wi = w(i+1, j, k)-w(i-1, j, k)
 
-    uj = uu(i, j+1, k)-uu(i, j-1, k)
-    vj = v(i, j+1, k)-v(i, j-1, k)
-    wj = w(i, j+1, k)-w(i, j-1, k)
+        uj = uu(i, j+1, k)-uu(i, j-1, k)
+        vj = v(i, j+1, k)-v(i, j-1, k)
+        wj = w(i, j+1, k)-w(i, j-1, k)
 
-    uk = uu(i, j, k+1)-uu(i, j, k-1)
-    vk = v(i, j, k+1)-v(i, j, k-1)
-    wk = w(i, j, k+1)-w(i, j, k-1)
+        uk = uu(i, j, k+1)-uu(i, j, k-1)
+        vk = v(i, j, k+1)-v(i, j, k-1)
+        wk = w(i, j, k+1)-w(i, j, k-1)
 
-    ix = B%ix0(i, j, k); iy = B%iy0(i, j, k); iz = B%iz0(i, j, k)
-    jx = B%jx0(i, j, k); jy = B%jy0(i, j, k); jz = B%jz0(i, j, k)
-    kx = B%kx0(i, j, k); ky = B%ky0(i, j, k); kz = B%kz0(i, j, k)
+        ix = B%ix0(i, j, k); iy = B%iy0(i, j, k); iz = B%iz0(i, j, k)
+        jx = B%jx0(i, j, k); jy = B%jy0(i, j, k); jz = B%jz0(i, j, k)
+        kx = B%kx0(i, j, k); ky = B%ky0(i, j, k); kz = B%kz0(i, j, k)
 
-    ux = ui*ix+uj*jx+uk*kx
-    vx = vi*ix+vj*jx+vk*kx
-    wx = wi*ix+wj*jx+wk*kx
+        ux = ui*ix+uj*jx+uk*kx
+        vx = vi*ix+vj*jx+vk*kx
+        wx = wi*ix+wj*jx+wk*kx
 
-    uy = ui*iy+uj*jy+uk*ky
-    vy = vi*iy+vj*jy+vk*ky
-    wy = wi*iy+wj*jy+wk*ky
+        uy = ui*iy+uj*jy+uk*ky
+        vy = vi*iy+vj*jy+vk*ky
+        wy = wi*iy+wj*jy+wk*ky
 
-    uz = ui*iz+uj*jz+uk*kz
-    vz = vi*iz+vj*jz+vk*kz
-    wz = wi*iz+wj*jz+wk*kz
+        uz = ui*iz+uj*jz+uk*kz
+        vz = vi*iz+vj*jz+vk*kz
+        wz = wi*iz+wj*jz+wk*kz
 
 ! 涡量
-    S = sqrt((wy-vz)**2+(uz-wx)**2+(vx-uy)**2)
-    X = d(i, j, k)*vt(i, j, k)/B%mu(i, j, k)   ! 湍流粘性系数与层流粘性系数之比
+        S = sqrt((wy-vz)**2+(uz-wx)**2+(vx-uy)**2)
+        X = d(i, j, k)*vt(i, j, k)/B%mu(i, j, k)   ! 湍流粘性系数与层流粘性系数之比
 !--------------------------------------------------------------------------
 
 ! 源项 采用 Blazek's book,  p241 (7.38), (7.39)
@@ -221,40 +221,40 @@ subroutine Turbulence_model_SA(nMesh, mBlock)
 
 !------------------------------------------------------------------------
 ! Source term, original form; See: http://turbmodels.larc.nasa.gov/spalart.html
-    fv1 = X**3/(X**3+Cv1**3)
-    fv2 = 1.d0-X/(1.d0+X*fv1)
-    ft2 = Ct3*exp(-Ct4*X*X)
-    S1 = max(S+fv2*vt(i, j, k)/(Re*(SA_k*B%dw(i, j, k))**2), 0.d0)    !!! Re
-    r = min(vt(i, j, k)/(Re*S1*SA_K*SA_K*B%dw(i, j, k)*B%dw(i, j, k)), 10.0)    !!! Re
-    g = r+Cw2*(r**6-r)
-    fw = g*((1.d0+Cw3**6)/(g**6+Cw3**6))**(1.d0/6.d0)
+        fv1 = X**3/(X**3+Cv1**3)
+        fv2 = 1.d0-X/(1.d0+X*fv1)
+        ft2 = Ct3*exp(-Ct4*X*X)
+        S1 = max(S+fv2*vt(i, j, k)/(Re*(SA_k*B%dw(i, j, k))**2), 0.d0)    !!! Re
+        r = min(vt(i, j, k)/(Re*S1*SA_K*SA_K*B%dw(i, j, k)*B%dw(i, j, k)), 10.0)    !!! Re
+        g = r+Cw2*(r**6-r)
+        fw = g*((1.d0+Cw3**6)/(g**6+Cw3**6))**(1.d0/6.d0)
 !   Q_SA=Cb1*(1.d0-ft2)*S1*vt(i,j,k) -(Cw1*fw-Cb1*ft2/(SA_k*SA_k))*(vt(i,j,k)/B%dw(i,j,k))**2/Re   !!! Re
 !---------Source term, see: CFL3D manual ---------------------
-    Q3 = Cb1*((1-ft2)*fv2+ft2)/(SA_k*SA_k)-Cw1*fw
-    Q_SA = Cb1*(1.d0-ft2)*S1*vt(i, j, k) &
-           +Q3*(vt(i, j, k)/B%dw(i, j, k))**2/Re   !!! Re
+        Q3 = Cb1*((1-ft2)*fv2+ft2)/(SA_k*SA_k)-Cw1*fw
+        Q_SA = Cb1*(1.d0-ft2)*S1*vt(i, j, k) &
+               +Q3*(vt(i, j, k)/B%dw(i, j, k))**2/Re   !!! Re
 
 !---------------------------------------------------------------------------
-    B%Res(6, i, j, k) = B%Res(6, i, j, k)+Q_SA*B%vol(i, j, k)     ! Bug removed
+        B%Res(6, i, j, k) = B%Res(6, i, j, k)+Q_SA*B%vol(i, j, k)     ! Bug removed
 
-  end do
-  end do
-  end do
+    end do
+    end do
+    end do
 !$OMP END DO
 !$OMP END PARALLEL
 
 !$OMP PARALLEL DO DEFAULT(PRIVATE) SHARED(nx,ny,nz,B,Re)
-  do k = 0, nz
-  do j = 0, ny
-  do i = 0, nx
-    B%mu(i, j, k) = B%mu(i, j, k)/Re             ! 量纲转换
-    B%mu_t(i, j, k) = B%mu_t(i, j, k)/Re
-  end do
-  end do
-  end do
+    do k = 0, nz
+    do j = 0, ny
+    do i = 0, nx
+        B%mu(i, j, k) = B%mu(i, j, k)/Re             ! 量纲转换
+        B%mu_t(i, j, k) = B%mu_t(i, j, k)/Re
+    end do
+    end do
+    end do
 !$OMP END PARALLEL DO
 
-  deallocate (vt, Fluxv, fluxv2)
+    deallocate (vt, Fluxv, fluxv2)
 
 end subroutine Turbulence_model_SA
 
@@ -264,16 +264,16 @@ end subroutine Turbulence_model_SA
 
 ! 粘性系数虚网格上的值 （固壁边界采用反值，以保证固壁上的平均湍流粘性系数为0）
 subroutine Amut_boundary(nMesh, mBlock)
-  use Global_Var
-  use Flow_Var
-  implicit none
-  integer:: mBlock, nx, ny, nz, i, j, k, m, ksub, nMesh
-  integer:: ib, ie, jb, je, kb, ke
-  Type(Block_TYPE), pointer:: B
-  Type(BC_MSG_TYPE), pointer:: Bc
+    use Global_Var
+    use Flow_Var
+    implicit none
+    integer:: mBlock, nx, ny, nz, i, j, k, m, ksub, nMesh
+    integer:: ib, ie, jb, je, kb, ke
+    type(Block_TYPE), pointer:: B
+    type(BC_MSG_TYPE), pointer:: Bc
 
-  B => Mesh(nMesh)%Block(mBlock)
-  nx = B%nx; ny = B%ny; nz = B%nz
+    B => Mesh(nMesh)%block(mBlock)
+    nx = B%nx; ny = B%ny; nz = B%nz
 
 ! mut in Ghost Cell of the boundary
 ! 采用临近点的值
@@ -287,66 +287,66 @@ subroutine Amut_boundary(nMesh, mBlock)
 
 ! Ghost Cell 点的 mut值为 内点mut值*（-1） (这样可以使壁面上mut=0)
 
-  do ksub = 1, B%subface
-    Bc => B%bc_msg(ksub)
-    if (Bc%bc .eq. BC_Wall) then   ! (粘性) 壁面边界条件
-      Bc => B%bc_msg(ksub)
-      ib = Bc%ib; ie = Bc%ie; jb = Bc%jb; je = Bc%je; kb = Bc%kb; ke = Bc%ke
+    do ksub = 1, B%subface
+        Bc => B%bc_msg(ksub)
+        if (Bc%bc .eq. BC_Wall) then   ! (粘性) 壁面边界条件
+            Bc => B%bc_msg(ksub)
+            ib = Bc%ib; ie = Bc%ie; jb = Bc%jb; je = Bc%je; kb = Bc%kb; ke = Bc%ke
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,j,k)
-      if (Bc%face .eq. 1) then   ! i-
+            if (Bc%face .eq. 1) then   ! i-
 !$OMP DO
-        do k = kb, ke-1
-        do j = jb, je-1
-          B%mu_t(0, j, k) = -B%mu_t(1, j, k)       ! mut
-        end do
-        end do
+                do k = kb, ke-1
+                do j = jb, je-1
+                    B%mu_t(0, j, k) = -B%mu_t(1, j, k)       ! mut
+                end do
+                end do
 !$OMP ENDDO
-      else if (Bc%face .eq. 4) then   ! i+
+            else if (Bc%face .eq. 4) then   ! i+
 !$OMP DO
-        do k = kb, ke-1
-        do j = jb, je-1
-          B%mu_t(ie, j, k) = -B%mu_t(ie-1, j, k)       ! mut
-        end do
-        end do
+                do k = kb, ke-1
+                do j = jb, je-1
+                    B%mu_t(ie, j, k) = -B%mu_t(ie-1, j, k)       ! mut
+                end do
+                end do
 !$OMP ENDDO
-      else if (Bc%face .eq. 2) then   !j-
+            else if (Bc%face .eq. 2) then   !j-
 !$OMP DO
-        do k = kb, ke-1
-        do i = ib, ie-1
-          B%mu_t(i, 0, k) = -B%mu_t(i, 1, k)       ! mut
-        end do
-        end do
+                do k = kb, ke-1
+                do i = ib, ie-1
+                    B%mu_t(i, 0, k) = -B%mu_t(i, 1, k)       ! mut
+                end do
+                end do
 !$OMP ENDDO
-      else if (Bc%face .eq. 5) then   !j+
+            else if (Bc%face .eq. 5) then   !j+
 !$OMP DO
-        do k = kb, ke-1
-        do i = ib, ie-1
-          B%mu_t(i, je, k) = -B%mu_t(i, je-1, k)       ! mut
-        end do
-        end do
+                do k = kb, ke-1
+                do i = ib, ie-1
+                    B%mu_t(i, je, k) = -B%mu_t(i, je-1, k)       ! mut
+                end do
+                end do
 !$OMP ENDDO
-      else if (Bc%face .eq. 3) then   !k-
+            else if (Bc%face .eq. 3) then   !k-
 !$OMP DO
-        do j = jb, je-1
-        do i = ib, ie-1
-          B%mu_t(i, j, 0) = -B%mu_t(i, j, 1)
-        end do
-        end do
+                do j = jb, je-1
+                do i = ib, ie-1
+                    B%mu_t(i, j, 0) = -B%mu_t(i, j, 1)
+                end do
+                end do
 !$OMP ENDDO
-      else if (Bc%face .eq. 6) then   !k+
+            else if (Bc%face .eq. 6) then   !k+
 !$OMP DO
-        do j = jb, je-1
-        do i = ib, ie-1
-          B%mu_t(i, j, ke) = -B%mu_t(i, j, ke-1)
-        end do
-        end do
+                do j = jb, je-1
+                do i = ib, ie-1
+                    B%mu_t(i, j, ke) = -B%mu_t(i, j, ke-1)
+                end do
+                end do
 !$OMP ENDDO
 
-      end if
+            end if
 !$OMP END PARALLEL
 
-    end if
-  end do
+        end if
+    end do
 
 end subroutine Amut_boundary
