@@ -39,7 +39,43 @@ set(SOURCES
 )
 
 add_executable(opencfd-ec ${SOURCES})
-add_executable(readflow3d-tecio util/readflow3d-tecio.f90)
+# Keep solver .mod files out of the build root: gfortran searches the current
+# directory first, so util tools would pick up same-named solver modules (e.g. Type_def1)
+set_target_properties(opencfd-ec PROPERTIES
+    Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/mod/opencfd-ec)
+
+# Standalone pre/post-processing tools in util/ (one executable per source file)
+set(UTIL_TOOLS
+    Block_cut_1.1
+    In2inp-1.1
+    PlotZplane-1.3a
+    add_noise
+    check-mesh-ver1.1
+    comput-Q-ec1.0
+    convertMesh2d-3d-v1.1
+    convertXYZ-ver1.1
+    get_bcin_v1.4.2
+    partation-1.2
+    readflow3d-ver2.5
+    readflow3d-wing
+    readflow3d-tecio
+)
+
+# convert-cgns-inp needs the CGNS library; build it only when CGNS is found
+find_path(CGNS_INCLUDE_DIR cgnslib_f.h)
+find_library(CGNS_LIBRARY cgns)
+if(CGNS_INCLUDE_DIR AND CGNS_LIBRARY)
+    list(APPEND UTIL_TOOLS convert-cgns-inp-1.2)
+else()
+    message(STATUS "CGNS not found, skipping util/convert-cgns-inp-1.2.f90")
+endif()
+
+foreach(tool ${UTIL_TOOLS})
+    add_executable(${tool} util/${tool}.f90)
+    # Several tools define modules with the same name, keep their .mod files apart
+    set_target_properties(${tool} PROPERTIES
+        Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/mod/${tool})
+endforeach()
 
 # Link MPI and OpenMP to the executable
 target_link_libraries(opencfd-ec PRIVATE MPI::MPI_Fortran OpenMP::OpenMP_Fortran)
@@ -49,13 +85,17 @@ target_link_libraries(readflow3d-tecio PRIVATE
     pthread
     stdc++
 )
+if(TARGET convert-cgns-inp-1.2)
+    target_include_directories(convert-cgns-inp-1.2 PRIVATE ${CGNS_INCLUDE_DIR})
+    target_link_libraries(convert-cgns-inp-1.2 PRIVATE ${CGNS_LIBRARY})
+endif()
 
 # Enable LTO (Interprocedural Optimization) which corresponds to -flto or -ipo
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ipo_supported OUTPUT error)
 if(ipo_supported)
     set_property(TARGET opencfd-ec PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
-    set_property(TARGET readflow3d-tecio PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+    set_property(TARGET ${UTIL_TOOLS} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
 # Compiler specific optimization and flags
@@ -66,12 +106,14 @@ if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
         -march=native
         -ffree-line-length-none # Required because some lines exceed 132 columns
     )
-    target_compile_options(readflow3d-tecio PRIVATE
-        -O3
-        -march=native
-        -fcray-pointer
-        -ffree-line-length-none # Required because some lines exceed 132 columns
-    )
+    foreach(tool ${UTIL_TOOLS})
+        target_compile_options(${tool} PRIVATE
+            -O3
+            -march=native
+            -ffree-line-length-none
+        )
+    endforeach()
+    target_compile_options(readflow3d-tecio PRIVATE -fcray-pointer)
 elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel" OR CMAKE_Fortran_COMPILER_ID MATCHES "IntelLLVM")
     # For ifort or ifx
     target_compile_options(opencfd-ec PRIVATE
@@ -79,9 +121,11 @@ elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel" OR CMAKE_Fortran_COMPILER_ID MA
         -xHost
         -fp-model precise
     )
-    target_compile_options(readflow3d-tecio PRIVATE
-        -O3
-        -xHost
-        -fp-model precise
-    )
+    foreach(tool ${UTIL_TOOLS})
+        target_compile_options(${tool} PRIVATE
+            -O3
+            -xHost
+            -fp-model precise
+        )
+    endforeach()
 endif()

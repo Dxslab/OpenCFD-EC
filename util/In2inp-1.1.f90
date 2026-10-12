@@ -83,7 +83,7 @@ subroutine read_bcin
       print *, "error ! NB in Mesh3d.dat is not the same as that in bc3d.in "
       stop
     end if
-    read (100, *) ((Block(m)%nx, Block(m)%ny, Block(m)%nz), m=1, NB)
+    read (100, *) (Block(m)%nx, Block(m)%ny, Block(m)%nz, m=1, NB)
 
   else if (Ia .eq. 2) then
     open (100, file="Mesh3d.dat", form="unformatted")
@@ -92,7 +92,7 @@ subroutine read_bcin
       print *, "error ! NB in Mesh3d.dat is not the same as that in bc3d.in "
       stop
     end if
-    read (100) ((Block(m)%nx, Block(m)%ny, Block(m)%nz), m=1, NB)
+    read (100) (Block(m)%nx, Block(m)%ny, Block(m)%nz, m=1, NB)
   else
     do m = 1, NB
       Block(m)%nx = 0; Block(m)%ny = 0; Block(m)%nz = 0

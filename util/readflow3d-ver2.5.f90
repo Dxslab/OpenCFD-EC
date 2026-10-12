@@ -1,3 +1,17 @@
+!-----------------------------------------------------------
+! Copyright by LiXinliang
+! Ver 1.2   将格心坐标转换到格点上
+! Ver 1.3 可读取flow3d.dat (tecplot格式文件)及flow.dat (无格式文件)
+! Ver 1.4  读取 ver 0.8 以上版本的数据 （包含k,w,mu_t等）
+! Ver 1.5 读取ver0.82以上的数据
+! Ver 1.6 读取ver 0.84以上版本的数据（.inp文件）
+! Ver 1.7 Plot 3D flow
+! Ver 1.8 Plot Cp and Cf on the wall
+! Ver 1.8a, vt 无需乘以Re
+! Ver 2.3, 可读取BC_user
+! Ver 2.4a, 修正了read wall_dist() 中的Bug
+! Ver 2.5, 增加 PLOT3D 格式三维流场输出 (flow3d-plot3d.dat)
+!------------------------------------------------------------
 module Const_Variables
   implicit none
   integer, parameter:: PRE_EC = 8
@@ -13,14 +27,16 @@ end module Const_Variables
 module Global_Variables
   use Const_Variables
   implicit none
-
+  ! global parameter (for all blocks)
   real(PRE_EC), save:: Ma, Re, gamma, T_inf, p00
   integer, save:: Num_Block, Mesh_File_Format, BC_number, BC_type(100)
-
+!-----------------------------------------------------------------------------------------
+! 网格连接信息
   TYPE BC_MSG_TYPE
     integer::   ib, ie, jb, je, kb, ke, bc
   END TYPE BC_MSG_TYPE
 
+!  核心变量——每块网格存储的信息 （全局变量）
   TYPE Block_TYPE           !  variables for each block
     integer :: Block_no, nx, ny, nz, subface
     real(PRE_EC), pointer, dimension(:, :, :):: xc, yc, zc  ! coordinates of cell center, 网格中心坐标
@@ -45,10 +61,10 @@ program readflow
   print *, "xxx:  002 BC_Wall,  003BC_Symmetry, 004 BC_Farfield, 005 BC_Inflow, 006 BC_Outflow"
 
   do m = 1, Bc_number
-    write (filename, "('boundary-'I3.3'.dat')") Bc_type(m)
+    write (filename, "('boundary-',I3.3,'.dat')") Bc_type(m)
     call plot_p(filename, BC_type(m))
 
-    write (filename, "('boundaryc-'I3.3'.dat')") Bc_type(m)
+    write (filename, "('boundaryc-',I3.3,'.dat')") Bc_type(m)
     call plot_center(filename, BC_type(m))
   end do
 
